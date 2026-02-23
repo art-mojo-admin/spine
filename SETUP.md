@@ -171,6 +171,49 @@ Each tenant/account can configure its own theme via **Admin → Theme**. The the
 
 ---
 
+## Multi-Instance Setup (Shared Supabase Project)
+
+If you need to run **multiple Spine instances** on the same Supabase project (e.g. separate tenants, staging vs production, or white-label deployments), use the namespaced installer:
+
+### 1. Run the Namespaced Installer
+
+Open `supabase/install-namespaced.sql` and change `spine_v1` to your desired schema name on the **two lines** at the top of the file:
+
+```sql
+CREATE SCHEMA IF NOT EXISTS spine_v1;
+SET search_path TO spine_v1, extensions;
+```
+
+Then paste the entire file into the Supabase SQL Editor and click **Run**. Repeat with a different schema name (e.g. `spine_v2`) for each additional instance.
+
+### 2. Expose the Schema via PostgREST
+
+In the Supabase dashboard, go to **Settings → API → Exposed schemas** and add your schema name (e.g. `spine_v1`). This allows the Supabase client to query tables in that schema.
+
+### 3. Set Environment Variables
+
+For each deployed instance, set the schema env vars:
+
+```bash
+# Frontend (Vite)
+VITE_DB_SCHEMA=spine_v1
+
+# Backend (Netlify Functions)
+DB_SCHEMA=spine_v1
+```
+
+Omit these variables (or leave them unset) if you installed into the default `public` schema.
+
+### How It Works
+
+- Each instance gets its own PostgreSQL schema (e.g. `spine_v1.accounts`, `spine_v2.accounts`)
+- Schemas are fully isolated — data, functions, RLS policies, and triggers are all schema-scoped
+- Auth users (`auth.users`) are shared across all instances (Supabase manages auth at the project level)
+- The `supabase-js` client's `db: { schema }` option routes all queries to the correct schema
+- The script is idempotent and safe to re-run
+
+---
+
 ## Project Structure
 
 ```
@@ -192,8 +235,10 @@ Each tenant/account can configure its own theme via **Admin → Theme**. The the
 │       ├── _shared/        # Shared utilities (db, middleware, security)
 │       └── *.ts            # Individual API endpoints
 └── supabase/
-    ├── install.sql         # Master DB installer (run once)
-    ├── migrations/         # Individual migration files (reference)
+    ├── install.sql              # Master DB installer (new project)
+    ├── install-safe.sql         # Idempotent installer (existing project)
+    ├── install-namespaced.sql   # Multi-instance installer (shared project)
+    ├── migrations/              # Individual migration files (reference)
     └── seed-config-packs.sql
 ```
 

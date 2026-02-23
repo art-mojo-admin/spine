@@ -5,6 +5,7 @@ const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY!
 
 export const db = createClient(supabaseUrl, supabaseServiceKey, {
   auth: { persistSession: false, autoRefreshToken: false },
+  db: { schema: process.env.DB_SCHEMA || 'public' },
 })
 
 export async function query<T = any>(sql: string, params: any[] = []): Promise<T[]> {
