@@ -1,5 +1,6 @@
 import type { Context } from '@netlify/functions'
 import { db } from './db'
+import { logError, classifyError, extractFunctionName } from './errors'
 
 export interface RequestContext {
   requestId: string
@@ -268,6 +269,17 @@ export function createHandler(routes: RouteMap) {
       })
     } catch (err: any) {
       console.error(`[${requestId}] Error:`, err)
+      const fnName = extractFunctionName(req.url)
+      const errorCode = classifyError(err)
+      await logError({
+        requestId,
+        functionName: fnName,
+        errorCode,
+        message: err.message || 'Unknown error',
+        stack: err.stack,
+        accountId: null,
+        metadata: { method: req.method, url: req.url },
+      })
       return new Response(
         JSON.stringify({ error: 'Internal server error', requestId }),
         { status: 500, headers: CORS_HEADERS },

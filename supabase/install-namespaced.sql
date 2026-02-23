@@ -815,6 +815,44 @@ CREATE INDEX IF NOT EXISTS idx_impersonation_active ON impersonation_sessions (a
 CREATE INDEX IF NOT EXISTS idx_impersonation_target ON impersonation_sessions (target_person_id);
 
 -- ════════════════════════════════════════════════════════════════════════════
+-- 032: OBSERVABILITY
+-- ════════════════════════════════════════════════════════════════════════════
+CREATE TABLE IF NOT EXISTS error_events (
+  id              uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  account_id      uuid REFERENCES accounts(id) ON DELETE SET NULL,
+  request_id      text,
+  function_name   text NOT NULL,
+  error_code      text NOT NULL,
+  message         text NOT NULL,
+  stack_summary   text,
+  metadata        jsonb NOT NULL DEFAULT '{}',
+  created_at      timestamptz NOT NULL DEFAULT now()
+);
+
+CREATE INDEX IF NOT EXISTS idx_error_events_account ON error_events(account_id);
+CREATE INDEX IF NOT EXISTS idx_error_events_function ON error_events(function_name);
+CREATE INDEX IF NOT EXISTS idx_error_events_code ON error_events(error_code);
+CREATE INDEX IF NOT EXISTS idx_error_events_created ON error_events(created_at DESC);
+
+CREATE TABLE IF NOT EXISTS metrics_snapshots (
+  id                  uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  period_start        timestamptz NOT NULL,
+  period_end          timestamptz NOT NULL,
+  function_name       text,
+  total_errors        integer NOT NULL DEFAULT 0,
+  error_codes         jsonb NOT NULL DEFAULT '{}',
+  scheduler_executed  integer NOT NULL DEFAULT 0,
+  scheduler_errors    integer NOT NULL DEFAULT 0,
+  webhook_delivered   integer NOT NULL DEFAULT 0,
+  webhook_failed      integer NOT NULL DEFAULT 0,
+  metadata            jsonb NOT NULL DEFAULT '{}',
+  created_at          timestamptz NOT NULL DEFAULT now()
+);
+
+CREATE INDEX IF NOT EXISTS idx_metrics_snapshots_period ON metrics_snapshots(period_start);
+CREATE INDEX IF NOT EXISTS idx_metrics_snapshots_function ON metrics_snapshots(function_name);
+
+-- ════════════════════════════════════════════════════════════════════════════
 -- 030: RLS ENABLE
 -- ════════════════════════════════════════════════════════════════════════════
 ALTER TABLE accounts ENABLE ROW LEVEL SECURITY;
@@ -850,6 +888,8 @@ ALTER TABLE account_modules ENABLE ROW LEVEL SECURITY;
 ALTER TABLE custom_action_types ENABLE ROW LEVEL SECURITY;
 ALTER TABLE nav_extensions ENABLE ROW LEVEL SECURITY;
 ALTER TABLE impersonation_sessions ENABLE ROW LEVEL SECURITY;
+ALTER TABLE error_events ENABLE ROW LEVEL SECURITY;
+ALTER TABLE metrics_snapshots ENABLE ROW LEVEL SECURITY;
 
 -- ════════════════════════════════════════════════════════════════════════════
 -- 030/031: SECURITY LOCKDOWN + FUNCTIONS + RLS POLICIES
@@ -963,7 +1003,8 @@ BEGIN
         'profiles_select','profiles_update_own',
         'memberships_select','memberships_modify',
         'invites_select','invites_modify',
-        'audit_select','activity_select','packs_select'
+        'audit_select','activity_select','packs_select',
+        'error_events_select','metrics_snapshots_select'
       )
   LOOP
     EXECUTE format('DROP POLICY IF EXISTS %I ON %I.%I', _pol.policyname, _s, _pol.tablename);
@@ -1266,6 +1307,30 @@ BEGIN
   EXECUTE format($p$
     CREATE POLICY "packs_select" ON %1$I.config_packs FOR SELECT TO authenticated
       USING (true)
+  $p$, _s);
+
+  -- ── Observability policies (system admins only) ───────────────────────
+  EXECUTE format($p$
+    CREATE POLICY "error_events_select" ON %1$I.error_events FOR SELECT TO authenticated
+      USING (
+        EXISTS (
+          SELECT 1 FROM %1$I.profiles p
+          JOIN %1$I.persons per ON per.id = p.person_id
+          WHERE per.auth_uid = auth.uid()
+            AND p.system_role IN ('system_admin', 'system_operator')
+        )
+      )
+  $p$, _s);
+  EXECUTE format($p$
+    CREATE POLICY "metrics_snapshots_select" ON %1$I.metrics_snapshots FOR SELECT TO authenticated
+      USING (
+        EXISTS (
+          SELECT 1 FROM %1$I.profiles p
+          JOIN %1$I.persons per ON per.id = p.person_id
+          WHERE per.auth_uid = auth.uid()
+            AND p.system_role IN ('system_admin', 'system_operator')
+        )
+      )
   $p$, _s);
 
 END $security$;

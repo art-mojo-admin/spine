@@ -29,6 +29,7 @@ import {
   PlugZap,
   PanelLeftDashed,
   ShieldAlert,
+  HeartPulse,
 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { signOut } from '@/lib/auth'
@@ -221,6 +222,20 @@ export function Sidebar() {
             >
               <ShieldAlert className="h-4 w-4" />
               Account Browser
+            </NavLink>
+            <NavLink
+              to="/admin/system-health"
+              className={({ isActive }) =>
+                cn(
+                  'flex items-center gap-3 rounded-md px-3 py-2 text-sm font-medium transition-colors',
+                  isActive
+                    ? 'bg-primary/10 text-primary'
+                    : 'text-muted-foreground hover:bg-accent hover:text-accent-foreground',
+                )
+              }
+            >
+              <HeartPulse className="h-4 w-4" />
+              System Health
             </NavLink>
           </>
         )}

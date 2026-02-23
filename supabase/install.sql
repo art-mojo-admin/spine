@@ -825,6 +825,44 @@ CREATE INDEX idx_impersonation_active ON impersonation_sessions (admin_person_id
 CREATE INDEX idx_impersonation_target ON impersonation_sessions (target_person_id);
 
 -- ════════════════════════════════════════════════════════════════════════════
+-- 032: OBSERVABILITY
+-- ════════════════════════════════════════════════════════════════════════════
+CREATE TABLE error_events (
+  id              uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  account_id      uuid REFERENCES accounts(id) ON DELETE SET NULL,
+  request_id      text,
+  function_name   text NOT NULL,
+  error_code      text NOT NULL,
+  message         text NOT NULL,
+  stack_summary   text,
+  metadata        jsonb NOT NULL DEFAULT '{}',
+  created_at      timestamptz NOT NULL DEFAULT now()
+);
+
+CREATE INDEX idx_error_events_account ON error_events(account_id);
+CREATE INDEX idx_error_events_function ON error_events(function_name);
+CREATE INDEX idx_error_events_code ON error_events(error_code);
+CREATE INDEX idx_error_events_created ON error_events(created_at DESC);
+
+CREATE TABLE metrics_snapshots (
+  id                  uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  period_start        timestamptz NOT NULL,
+  period_end          timestamptz NOT NULL,
+  function_name       text,
+  total_errors        integer NOT NULL DEFAULT 0,
+  error_codes         jsonb NOT NULL DEFAULT '{}',
+  scheduler_executed  integer NOT NULL DEFAULT 0,
+  scheduler_errors    integer NOT NULL DEFAULT 0,
+  webhook_delivered   integer NOT NULL DEFAULT 0,
+  webhook_failed      integer NOT NULL DEFAULT 0,
+  metadata            jsonb NOT NULL DEFAULT '{}',
+  created_at          timestamptz NOT NULL DEFAULT now()
+);
+
+CREATE INDEX idx_metrics_snapshots_period ON metrics_snapshots(period_start);
+CREATE INDEX idx_metrics_snapshots_function ON metrics_snapshots(function_name);
+
+-- ════════════════════════════════════════════════════════════════════════════
 -- 030: SECURITY LOCKDOWN
 -- ════════════════════════════════════════════════════════════════════════════
 ALTER TABLE accounts ENABLE ROW LEVEL SECURITY;
@@ -860,6 +898,8 @@ ALTER TABLE account_modules ENABLE ROW LEVEL SECURITY;
 ALTER TABLE custom_action_types ENABLE ROW LEVEL SECURITY;
 ALTER TABLE nav_extensions ENABLE ROW LEVEL SECURITY;
 ALTER TABLE impersonation_sessions ENABLE ROW LEVEL SECURITY;
+ALTER TABLE error_events ENABLE ROW LEVEL SECURITY;
+ALTER TABLE metrics_snapshots ENABLE ROW LEVEL SECURITY;
 
 REVOKE ALL ON ALL TABLES IN SCHEMA public FROM anon;
 REVOKE ALL ON ALL TABLES IN SCHEMA public FROM authenticated;
@@ -1101,6 +1141,26 @@ CREATE POLICY "activity_select" ON activity_events FOR SELECT TO authenticated
   USING (account_id IN (SELECT public.user_account_ids()));
 CREATE POLICY "packs_select" ON config_packs FOR SELECT TO authenticated
   USING (true);
+
+-- Observability policies (system admins only)
+CREATE POLICY "error_events_select" ON error_events FOR SELECT TO authenticated
+  USING (
+    EXISTS (
+      SELECT 1 FROM profiles p
+      JOIN persons per ON per.id = p.person_id
+      WHERE per.auth_uid = auth.uid()
+        AND p.system_role IN ('system_admin', 'system_operator')
+    )
+  );
+CREATE POLICY "metrics_snapshots_select" ON metrics_snapshots FOR SELECT TO authenticated
+  USING (
+    EXISTS (
+      SELECT 1 FROM profiles p
+      JOIN persons per ON per.id = p.person_id
+      WHERE per.auth_uid = auth.uid()
+        AND p.system_role IN ('system_admin', 'system_operator')
+    )
+  );
 
 -- ════════════════════════════════════════════════════════════════════════════
 -- TEMPLATE PACKS: Built-in config packs (Admin → Template Packs)

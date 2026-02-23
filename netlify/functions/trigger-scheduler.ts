@@ -2,9 +2,11 @@ import { schedule } from '@netlify/functions'
 import { db } from './_shared/db'
 import { executeAction, evaluateConditions } from './_shared/action-executor'
 import { nextCronDate } from './_shared/cron'
+import { logError } from './_shared/errors'
 
 async function handler() {
   const now = new Date().toISOString()
+  const runId = crypto.randomUUID()
   let executed = 0
   let errors = 0
 
@@ -51,6 +53,7 @@ async function handler() {
       } catch (err: any) {
         errors++
         console.error(`[scheduler] one_time "${trigger.name}" failed:`, err.message)
+        await logError({ requestId: runId, functionName: 'trigger-scheduler', errorCode: 'internal', message: `one_time "${trigger.name}": ${err.message}`, stack: err.stack, accountId: trigger.account_id })
       }
     }
 
@@ -104,6 +107,7 @@ async function handler() {
       } catch (err: any) {
         errors++
         console.error(`[scheduler] recurring "${trigger.name}" failed:`, err.message)
+        await logError({ requestId: runId, functionName: 'trigger-scheduler', errorCode: 'internal', message: `recurring "${trigger.name}": ${err.message}`, stack: err.stack, accountId: trigger.account_id })
       }
     }
 
@@ -179,13 +183,15 @@ async function handler() {
           }).eq('id', instance.id)
         } catch (_) { /* ignore */ }
         console.error(`[scheduler] instance ${instance.id} failed:`, err.message)
+        await logError({ requestId: runId, functionName: 'trigger-scheduler', errorCode: 'internal', message: `instance ${instance.id}: ${err.message}`, stack: err.stack, accountId: instance.account_id })
       }
     }
   } catch (err: any) {
     console.error('[scheduler] Top-level error:', err.message)
+    await logError({ requestId: runId, functionName: 'trigger-scheduler', errorCode: 'internal', message: err.message, stack: err.stack })
   }
 
-  console.log(`[scheduler] Done. Executed: ${executed}, Errors: ${errors}`)
+  console.log(`[${runId}] [scheduler] Done. Executed: ${executed}, Errors: ${errors}`)
   return { statusCode: 200 }
 }
 

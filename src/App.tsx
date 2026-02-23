@@ -36,6 +36,7 @@ import { AccountBrowserPage } from '@/pages/admin/AccountBrowser'
 import { ImpersonationProvider } from '@/hooks/useImpersonation'
 import { ImpersonationBanner } from '@/components/layout/ImpersonationBanner'
 import { SearchPage } from '@/pages/Search'
+import { SystemHealthPage } from '@/pages/SystemHealth'
 import { PublicHomePage } from '@/pages/public/PublicHome'
 import { PublicListingPage } from '@/pages/public/PublicListing'
 import { PublicItemDetailPage } from '@/pages/public/PublicItemDetail'
@@ -114,6 +115,7 @@ export default function App() {
           <Route path="/admin/custom-actions" element={<CustomActionTypesPage />} />
           <Route path="/admin/nav-extensions" element={<NavExtensionsPage />} />
           <Route path="/admin/account-browser" element={<AccountBrowserPage />} />
+          <Route path="/admin/system-health" element={<SystemHealthPage />} />
           <Route path="/x/:slug" element={<ExtensionPage />} />
         </Route>
       </Routes>

@@ -72,6 +72,7 @@ export async function emitOutboxEvent(
   entityType: string | null,
   entityId: string | null,
   payload: Record<string, unknown>,
+  requestId?: string,
 ) {
   try {
     await db.from('outbox_events').insert({
@@ -79,7 +80,7 @@ export async function emitOutboxEvent(
       event_type: eventType,
       entity_type: entityType,
       entity_id: entityId,
-      payload,
+      payload: requestId ? { ...payload, _request_id: requestId } : payload,
     })
   } catch (err: any) {
     console.error('outbox emit failed:', err.message)

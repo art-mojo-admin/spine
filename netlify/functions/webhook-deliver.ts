@@ -1,6 +1,7 @@
 import { db } from './_shared/db'
 import crypto from 'crypto'
 import { validateOutboundUrl } from './_shared/security'
+import { logError } from './_shared/errors'
 
 const HEADER_PREFIX = `X-${(process.env.VITE_APP_NAME || 'Spine').replace(/\s+/g, '-')}`
 
@@ -88,6 +89,7 @@ export default async function handler() {
       event_type: event.event_type,
       payload: event.payload,
       delivery_id: delivery.id,
+      request_id: event.payload?._request_id || null,
       timestamp: new Date().toISOString(),
     })
 
@@ -142,6 +144,9 @@ export default async function handler() {
       }).eq('id', delivery.id)
 
       console.log(`[webhook-deliver] ${delivery.id} error: ${err.message}, attempt ${attempt}/${MAX_ATTEMPTS}`)
+      if (isDeadLetter) {
+        await logError({ requestId: delivery.id, functionName: 'webhook-deliver', errorCode: 'external_service', message: `Dead letter: ${err.message}`, accountId: event.payload?.account_id || null, metadata: { delivery_id: delivery.id, url: sub.url } })
+      }
     }
 
     processed++
