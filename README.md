@@ -120,3 +120,5 @@ npm run build
 ├── netlify.toml
 └── package.json
 ```
+
+# Testing GIT flow
