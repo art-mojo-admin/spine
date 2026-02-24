@@ -9,11 +9,12 @@ interface ApiOptions {
   method?: string
   body?: unknown
   params?: Record<string, string>
+  tokenOverride?: string | null
 }
 
 export async function api<T = unknown>(endpoint: string, options: ApiOptions = {}): Promise<T> {
-  const { method = 'GET', body, params } = options
-  const token = await getAccessToken()
+  const { method = 'GET', body, params, tokenOverride } = options
+  const token = tokenOverride ?? await getAccessToken()
   const requestId = generateRequestId()
 
   let url = `${API_BASE}/${endpoint}`
@@ -66,8 +67,10 @@ export class ApiError extends Error {
 export const apiGet = <T = unknown>(endpoint: string, params?: Record<string, string>) =>
   api<T>(endpoint, { params })
 
-export const apiPost = <T = unknown>(endpoint: string, body: unknown) =>
-  api<T>(endpoint, { method: 'POST', body })
+type ApiPostOptions = Pick<ApiOptions, 'params' | 'tokenOverride'>
+
+export const apiPost = <T = unknown>(endpoint: string, body: unknown, options?: ApiPostOptions) =>
+  api<T>(endpoint, { method: 'POST', body, ...(options || {}) })
 
 export const apiPatch = <T = unknown>(endpoint: string, body: unknown, params?: Record<string, string>) =>
   api<T>(endpoint, { method: 'PATCH', body, params })

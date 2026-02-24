@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
-import { signIn, signUp } from '@/lib/auth'
+import { signIn, signUp, supabase } from '@/lib/auth'
 import { APP_NAME } from '@/lib/config'
 import { apiPost } from '@/lib/api'
 import { Button } from '@/components/ui/button'
@@ -26,27 +26,56 @@ export function LoginPage() {
     setLoading(true)
     setError(null)
 
-    const { error: authError } = isSignUp
-      ? await signUp(email, password)
-      : await signIn(email, password)
+    try {
+      if (isSignUp) {
+        const { data: signUpData, error: signUpError } = await signUp(email, password)
+        if (signUpError) {
+          setError(signUpError.message)
+          return
+        }
 
-    if (authError) {
-      setError(authError.message)
-      setLoading(false)
-      return
-    }
+        let session = signUpData.session || null
 
-    if (isSignUp) {
-      try {
-        await apiPost('provision-user', inviteToken ? { invite_token: inviteToken } : {})
-      } catch (provErr: any) {
-        if (!provErr.message?.includes('already_provisioned')) {
-          console.warn('Provisioning note:', provErr.message)
+        if (!session) {
+          const { data: signInData, error: signInError } = await signIn(email, password)
+          if (signInError || !signInData.session) {
+            setError(signInError?.message || 'Check your email to confirm the signup before continuing.')
+            return
+          }
+          session = signInData.session
+        }
+
+        try {
+          const token = session?.access_token || null
+          await apiPost('provision-user', inviteToken ? { invite_token: inviteToken } : {}, { tokenOverride: token })
+        } catch (provErr: any) {
+          if (!provErr.message?.includes('already_provisioned')) {
+            console.warn('Provisioning note:', provErr.message)
+          }
+        }
+      } else {
+        const { data: signInData, error: signInError } = await signIn(email, password)
+        if (signInError) {
+          setError(signInError.message)
+          return
+        }
+
+        try {
+          const token = signInData.session?.access_token || null
+          if (token) {
+            await apiPost('provision-user', inviteToken ? { invite_token: inviteToken } : {}, { tokenOverride: token })
+          }
+        } catch (provErr: any) {
+          if (!provErr.message?.includes('already_provisioned')) {
+            console.warn('Provisioning note:', provErr.message)
+          }
         }
       }
-    }
 
-    navigate('/')
+      navigate('/')
+    } finally {
+      setLoading(false)
+    }
   }
 
   return (
