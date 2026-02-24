@@ -186,11 +186,33 @@ SET search_path TO spine_v1, extensions;
 
 Then paste the entire file into the Supabase SQL Editor and click **Run**. Repeat with a different schema name (e.g. `spine_v2`) for each additional instance.
 
+After the installer succeeds, run the helper migration to make sure the RPC and security-definer helpers exist inside every schema:
+
+```sql
+-- Run in the Supabase SQL editor
+\i supabase/migrations/033_schema_helper_functions.sql
+```
+
+> **Shortcut:** you can also copy the contents of `033_schema_helper_functions.sql` into the SQL editor and run it manually.
 ### 2. Expose the Schema via PostgREST
 
 In the Supabase dashboard, go to **Settings → API → Exposed schemas** and add your schema name (e.g. `spine_v1`). This allows the Supabase client to query tables in that schema.
 
-### 3. Set Environment Variables
+### 3. Refresh Schema Grants
+
+Make sure the built-in roles have the right permissions in your new schema by running the grant block from `scripts/schema-grants.sql` or reusing the SQL we executed in the prior project:
+
+```sql
+GRANT USAGE ON SCHEMA spine_v1 TO anon, authenticated, service_role;
+GRANT USAGE, SELECT ON ALL SEQUENCES IN SCHEMA spine_v1 TO anon, authenticated, service_role;
+GRANT SELECT, INSERT, UPDATE, DELETE ON ALL TABLES IN SCHEMA spine_v1 TO anon, authenticated, service_role;
+ALTER DEFAULT PRIVILEGES IN SCHEMA spine_v1 GRANT SELECT, INSERT, UPDATE, DELETE ON TABLES TO anon, authenticated, service_role;
+GRANT EXECUTE ON ALL FUNCTIONS IN SCHEMA spine_v1 TO anon, authenticated, service_role;
+```
+
+Repeat for each schema you install (swap `spine_v1` for your schema name).
+
+### 4. Set Environment Variables
 
 For each deployed instance, set the schema env vars:
 

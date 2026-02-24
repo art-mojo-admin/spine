@@ -143,6 +143,22 @@ CREATE INDEX IF NOT EXISTS idx_audit_log_entity ON audit_log(entity_type, entity
 CREATE INDEX IF NOT EXISTS idx_audit_log_created_at ON audit_log(created_at DESC);
 CREATE INDEX IF NOT EXISTS idx_audit_log_request_id ON audit_log(request_id);
 
+CREATE TABLE IF NOT EXISTS audit_event_batches (
+  id                 uuid PRIMARY KEY DEFAULT uuid_generate_v4(),
+  account_id         uuid NOT NULL REFERENCES accounts(id) ON DELETE CASCADE,
+  source             text NOT NULL,
+  batch_identifier   text,
+  event_count        integer NOT NULL DEFAULT 0,
+  payload            jsonb NOT NULL DEFAULT '{}',
+  processing_status  text NOT NULL DEFAULT 'pending' CHECK (processing_status IN ('pending', 'processing', 'completed', 'failed')),
+  error_message      text,
+  created_at         timestamptz NOT NULL DEFAULT now(),
+  processed_at       timestamptz
+);
+
+CREATE INDEX IF NOT EXISTS idx_audit_event_batches_account ON audit_event_batches(account_id);
+CREATE INDEX IF NOT EXISTS idx_audit_event_batches_status ON audit_event_batches(processing_status);
+
 -- ════════════════════════════════════════════════════════════════════════════
 -- 007: ACTIVITY EVENTS
 -- ════════════════════════════════════════════════════════════════════════════
