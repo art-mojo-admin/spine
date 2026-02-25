@@ -22,12 +22,16 @@ export default createHandler({
       return json(data)
     }
 
-    const { data } = await db
+    const includeInactive = params.get('include_inactive') === 'true' && ctx.accountRole === 'admin'
+    let query = db
       .from('workflow_definitions')
       .select('*, stage_definitions(count)')
       .eq('account_id', ctx.accountId)
       .order('created_at', { ascending: false })
 
+    if (!includeInactive) query = query.eq('is_active', true)
+
+    const { data } = await query
     return json(data || [])
   },
 

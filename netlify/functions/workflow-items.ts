@@ -26,13 +26,18 @@ export default createHandler({
     }
 
     const workflowId = params.get('workflow_definition_id')
+    const parentId = params.get('parent_id')
+    const includeInactive = params.get('include_inactive') === 'true' && ctx.accountRole === 'admin'
     let query = db
       .from('workflow_items')
       .select('*, stage_definitions(id, name, position, is_terminal), workflow_definitions(id, name), persons:owner_person_id(id, full_name)')
       .eq('account_id', ctx.accountId)
       .order('created_at', { ascending: false })
 
+    if (!includeInactive) query = query.eq('is_active', true)
     if (workflowId) query = query.eq('workflow_definition_id', workflowId)
+    if (parentId === 'null') query = query.is('parent_workflow_item_id', null)
+    else if (parentId) query = query.eq('parent_workflow_item_id', parentId)
 
     const { data } = await query.limit(200)
     return json(data || [])
@@ -76,6 +81,7 @@ export default createHandler({
         entity_id: body.entity_id || null,
         priority: body.priority || 'medium',
         metadata: body.metadata || {},
+        parent_workflow_item_id: body.parent_workflow_item_id || null,
       })
       .select()
       .single()
@@ -115,6 +121,7 @@ export default createHandler({
     if (body.entity_type !== undefined) updates.entity_type = body.entity_type
     if (body.entity_id !== undefined) updates.entity_id = body.entity_id
     if (body.metadata !== undefined) updates.metadata = body.metadata
+    if (body.parent_workflow_item_id !== undefined) updates.parent_workflow_item_id = body.parent_workflow_item_id
 
     let transitionDef: any = null
     const isStageChange = body.stage_definition_id && body.stage_definition_id !== before.stage_definition_id

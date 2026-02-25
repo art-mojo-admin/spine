@@ -1794,6 +1794,187 @@ INSERT INTO config_packs (name, description, is_system, pack_data) VALUES
 ON CONFLICT (name) DO NOTHING;
 
 -- ════════════════════════════════════════════════════════════════════════════
+-- 034: WORKFLOW ITEM HIERARCHY
+-- ════════════════════════════════════════════════════════════════════════════
+ALTER TABLE workflow_items
+  ADD COLUMN IF NOT EXISTS parent_workflow_item_id uuid REFERENCES workflow_items(id) ON DELETE SET NULL;
+
+CREATE INDEX IF NOT EXISTS idx_workflow_items_parent ON workflow_items(parent_workflow_item_id);
+
+-- ════════════════════════════════════════════════════════════════════════════
+-- 035: KB ARTICLE HIERARCHY
+-- ════════════════════════════════════════════════════════════════════════════
+ALTER TABLE knowledge_base_articles
+  ADD COLUMN IF NOT EXISTS parent_article_id uuid REFERENCES knowledge_base_articles(id) ON DELETE SET NULL;
+
+ALTER TABLE knowledge_base_articles
+  ADD COLUMN IF NOT EXISTS position integer NOT NULL DEFAULT 0;
+
+CREATE INDEX IF NOT EXISTS idx_kb_articles_parent ON knowledge_base_articles(parent_article_id);
+CREATE INDEX IF NOT EXISTS idx_kb_articles_position ON knowledge_base_articles(parent_article_id, position);
+
+-- ════════════════════════════════════════════════════════════════════════════
+-- 036: ENTITY COMMENTS
+-- ════════════════════════════════════════════════════════════════════════════
+CREATE TABLE IF NOT EXISTS entity_comments (
+  id            uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  account_id    uuid NOT NULL REFERENCES accounts(id) ON DELETE CASCADE,
+  entity_type   text NOT NULL,
+  entity_id     uuid NOT NULL,
+  person_id     uuid REFERENCES persons(id) ON DELETE SET NULL,
+  role          text NOT NULL DEFAULT 'user' CHECK (role IN ('user', 'system', 'assistant')),
+  body          text NOT NULL,
+  is_internal   boolean NOT NULL DEFAULT false,
+  metadata      jsonb NOT NULL DEFAULT '{}',
+  created_at    timestamptz NOT NULL DEFAULT now()
+);
+
+CREATE INDEX IF NOT EXISTS idx_entity_comments_entity ON entity_comments(account_id, entity_type, entity_id, created_at);
+CREATE INDEX IF NOT EXISTS idx_entity_comments_person ON entity_comments(person_id);
+
+ALTER TABLE entity_comments ENABLE ROW LEVEL SECURITY;
+
+-- ════════════════════════════════════════════════════════════════════════════
+-- 037: ENTITY WATCHERS
+-- ════════════════════════════════════════════════════════════════════════════
+CREATE TABLE IF NOT EXISTS entity_watchers (
+  id            uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  account_id    uuid NOT NULL REFERENCES accounts(id) ON DELETE CASCADE,
+  entity_type   text NOT NULL,
+  entity_id     uuid NOT NULL,
+  person_id     uuid NOT NULL REFERENCES persons(id) ON DELETE CASCADE,
+  created_at    timestamptz NOT NULL DEFAULT now(),
+  UNIQUE(account_id, entity_type, entity_id, person_id)
+);
+
+CREATE INDEX IF NOT EXISTS idx_entity_watchers_entity ON entity_watchers(account_id, entity_type, entity_id);
+CREATE INDEX IF NOT EXISTS idx_entity_watchers_person ON entity_watchers(person_id);
+
+ALTER TABLE entity_watchers ENABLE ROW LEVEL SECURITY;
+
+-- ════════════════════════════════════════════════════════════════════════════
+-- 038: ENTITY ATTACHMENTS
+-- ════════════════════════════════════════════════════════════════════════════
+CREATE TABLE IF NOT EXISTS entity_attachments (
+  id            uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  account_id    uuid NOT NULL REFERENCES accounts(id) ON DELETE CASCADE,
+  entity_type   text NOT NULL,
+  entity_id     uuid NOT NULL,
+  filename      text NOT NULL,
+  mime_type     text,
+  size_bytes    integer,
+  storage_path  text NOT NULL,
+  uploaded_by   uuid REFERENCES persons(id) ON DELETE SET NULL,
+  metadata      jsonb NOT NULL DEFAULT '{}',
+  created_at    timestamptz NOT NULL DEFAULT now()
+);
+
+CREATE INDEX IF NOT EXISTS idx_entity_attachments_entity ON entity_attachments(account_id, entity_type, entity_id);
+CREATE INDEX IF NOT EXISTS idx_entity_attachments_uploaded_by ON entity_attachments(uploaded_by);
+
+ALTER TABLE entity_attachments ENABLE ROW LEVEL SECURITY;
+
+-- ════════════════════════════════════════════════════════════════════════════
+-- 039: NAV OVERRIDES
+-- ════════════════════════════════════════════════════════════════════════════
+CREATE TABLE IF NOT EXISTS nav_overrides (
+  id                uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  account_id        uuid NOT NULL REFERENCES accounts(id) ON DELETE CASCADE,
+  nav_key           text NOT NULL,
+  label             text,
+  hidden            boolean NOT NULL DEFAULT false,
+  min_role          text NOT NULL DEFAULT 'member' CHECK (min_role IN ('portal', 'member', 'operator', 'admin')),
+  default_entity_id uuid,
+  position          integer NOT NULL DEFAULT 0,
+  UNIQUE(account_id, nav_key)
+);
+
+CREATE INDEX IF NOT EXISTS idx_nav_overrides_account ON nav_overrides(account_id);
+
+ALTER TABLE nav_overrides ENABLE ROW LEVEL SECURITY;
+
+-- ════════════════════════════════════════════════════════════════════════════
+-- 040: ENROLLMENTS + LESSON COMPLETIONS
+-- ════════════════════════════════════════════════════════════════════════════
+CREATE TABLE IF NOT EXISTS enrollments (
+  id            uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  account_id    uuid NOT NULL REFERENCES accounts(id) ON DELETE CASCADE,
+  course_id     uuid NOT NULL REFERENCES knowledge_base_articles(id) ON DELETE CASCADE,
+  person_id     uuid NOT NULL REFERENCES persons(id) ON DELETE CASCADE,
+  status        text NOT NULL DEFAULT 'active' CHECK (status IN ('active', 'completed', 'dropped')),
+  enrolled_at   timestamptz NOT NULL DEFAULT now(),
+  completed_at  timestamptz,
+  metadata      jsonb NOT NULL DEFAULT '{}',
+  UNIQUE(account_id, course_id, person_id)
+);
+
+CREATE INDEX IF NOT EXISTS idx_enrollments_account ON enrollments(account_id);
+CREATE INDEX IF NOT EXISTS idx_enrollments_course ON enrollments(course_id);
+CREATE INDEX IF NOT EXISTS idx_enrollments_person ON enrollments(person_id);
+
+ALTER TABLE enrollments ENABLE ROW LEVEL SECURITY;
+
+CREATE TABLE IF NOT EXISTS lesson_completions (
+  id              uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  account_id      uuid NOT NULL REFERENCES accounts(id) ON DELETE CASCADE,
+  enrollment_id   uuid NOT NULL REFERENCES enrollments(id) ON DELETE CASCADE,
+  article_id      uuid NOT NULL REFERENCES knowledge_base_articles(id) ON DELETE CASCADE,
+  person_id       uuid NOT NULL REFERENCES persons(id) ON DELETE CASCADE,
+  completed_at    timestamptz NOT NULL DEFAULT now(),
+  metadata        jsonb NOT NULL DEFAULT '{}',
+  UNIQUE(enrollment_id, article_id)
+);
+
+CREATE INDEX IF NOT EXISTS idx_lesson_completions_enrollment ON lesson_completions(enrollment_id);
+CREATE INDEX IF NOT EXISTS idx_lesson_completions_article ON lesson_completions(article_id);
+CREATE INDEX IF NOT EXISTS idx_lesson_completions_person ON lesson_completions(person_id);
+
+ALTER TABLE lesson_completions ENABLE ROW LEVEL SECURITY;
+
+-- ════════════════════════════════════════════════════════════════════════════
+-- 041: DASHBOARDS
+-- ════════════════════════════════════════════════════════════════════════════
+CREATE TABLE IF NOT EXISTS dashboard_definitions (
+  id            uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  account_id    uuid NOT NULL REFERENCES accounts(id) ON DELETE CASCADE,
+  slug          text NOT NULL,
+  title         text NOT NULL,
+  description   text,
+  layout        jsonb NOT NULL DEFAULT '[]',
+  is_default    boolean NOT NULL DEFAULT false,
+  min_role      text NOT NULL DEFAULT 'member' CHECK (min_role IN ('portal', 'member', 'operator', 'admin')),
+  created_by    uuid REFERENCES persons(id) ON DELETE SET NULL,
+  created_at    timestamptz NOT NULL DEFAULT now(),
+  updated_at    timestamptz NOT NULL DEFAULT now(),
+  UNIQUE(account_id, slug)
+);
+
+CREATE INDEX IF NOT EXISTS idx_dashboard_definitions_account ON dashboard_definitions(account_id);
+CREATE INDEX IF NOT EXISTS idx_dashboard_definitions_default ON dashboard_definitions(account_id, is_default) WHERE is_default = true;
+
+DROP TRIGGER IF EXISTS trg_dashboard_definitions_updated_at ON dashboard_definitions;
+CREATE TRIGGER trg_dashboard_definitions_updated_at
+  BEFORE UPDATE ON dashboard_definitions
+  FOR EACH ROW EXECUTE FUNCTION update_updated_at();
+
+ALTER TABLE dashboard_definitions ENABLE ROW LEVEL SECURITY;
+
+CREATE TABLE IF NOT EXISTS dashboard_widgets (
+  id              uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  dashboard_id    uuid NOT NULL REFERENCES dashboard_definitions(id) ON DELETE CASCADE,
+  widget_type     text NOT NULL,
+  title           text NOT NULL,
+  config          jsonb NOT NULL DEFAULT '{}',
+  position        jsonb NOT NULL DEFAULT '{}',
+  min_role        text NOT NULL DEFAULT 'member' CHECK (min_role IN ('portal', 'member', 'operator', 'admin')),
+  created_at      timestamptz NOT NULL DEFAULT now()
+);
+
+CREATE INDEX IF NOT EXISTS idx_dashboard_widgets_dashboard ON dashboard_widgets(dashboard_id);
+
+ALTER TABLE dashboard_widgets ENABLE ROW LEVEL SECURITY;
+
+-- ════════════════════════════════════════════════════════════════════════════
 -- INSTALLATION COMPLETE
 -- ════════════════════════════════════════════════════════════════════════════
 -- This script is safe to re-run. Existing data is never modified or deleted.

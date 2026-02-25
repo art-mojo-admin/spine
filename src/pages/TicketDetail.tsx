@@ -5,6 +5,9 @@ import { useAuth } from '@/hooks/useAuth'
 import { EditableField } from '@/components/shared/EditableField'
 import { CustomFieldsRenderer } from '@/components/shared/CustomFieldsRenderer'
 import { EntityLinksPanel } from '@/components/shared/EntityLinksPanel'
+import { EntityCommentsPanel } from '@/components/shared/EntityCommentsPanel'
+import { WatchButton } from '@/components/shared/WatchButton'
+import { EntityAttachmentsPanel } from '@/components/shared/EntityAttachmentsPanel'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
@@ -159,11 +162,16 @@ export function TicketDetailPage() {
             {isNew ? 'New Ticket' : 'Ticket'}
           </h1>
         </div>
-        {!isNew && !editing && (
-          <Button variant="outline" size="sm" onClick={() => setEditing(true)}>
-            <Pencil className="mr-1 h-4 w-4" />Edit
-          </Button>
-        )}
+        <div className="flex items-center gap-2">
+          {!isNew && !editing && ticketId && ticketId !== 'new' && (
+            <WatchButton entityType="ticket" entityId={ticketId} />
+          )}
+          {!isNew && !editing && (
+            <Button variant="outline" size="sm" onClick={() => setEditing(true)}>
+              <Pencil className="mr-1 h-4 w-4" />Edit
+            </Button>
+          )}
+        </div>
       </div>
 
       {errorMessage && (
@@ -259,6 +267,14 @@ export function TicketDetailPage() {
 
       {!isNew && !editing && ticketId && ticketId !== 'new' && (
         <EntityLinksPanel entityType="ticket" entityId={ticketId} />
+      )}
+
+      {!isNew && !editing && ticketId && ticketId !== 'new' && (
+        <EntityCommentsPanel entityType="ticket" entityId={ticketId} />
+      )}
+
+      {!isNew && !editing && ticketId && ticketId !== 'new' && (
+        <EntityAttachmentsPanel entityType="ticket" entityId={ticketId} />
       )}
 
       {/* Messages thread */}

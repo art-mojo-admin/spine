@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState, type ReactNode } from 'react'
+import { useEffect, useState, type ReactNode } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import { apiGet, apiPost, apiPatch } from '@/lib/api'
 import { useAuth } from '@/hooks/useAuth'
@@ -8,7 +8,7 @@ import { EntityLinksPanel } from '@/components/shared/EntityLinksPanel'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
-import { Building2, Users, GitBranch, KanbanSquare, Ticket, BookOpen, Activity as ActivityIcon, Pencil, Save, X, ArrowLeft } from 'lucide-react'
+import { Building2, Users, GitBranch, Activity as ActivityIcon, Pencil, Save, X, ArrowLeft } from 'lucide-react'
 
 const ACCOUNT_TYPES = [
   { value: 'organization', label: 'Organization' },
@@ -40,9 +40,6 @@ export function AccountDetailPage() {
   const [account, setAccount] = useState<AccountRecord | null>(null)
   const [people, setPeople] = useState<any[]>([])
   const [workflows, setWorkflows] = useState<any[]>([])
-  const [workflowItems, setWorkflowItems] = useState<any[]>([])
-  const [tickets, setTickets] = useState<any[]>([])
-  const [articles, setArticles] = useState<any[]>([])
   const [activity, setActivity] = useState<any[]>([])
   const [loading, setLoading] = useState(!isNew)
   const [errorMessage, setErrorMessage] = useState<string | null>(null)
@@ -71,13 +68,10 @@ export function AccountDetailPage() {
 
     async function loadData() {
       try {
-        const [accountRes, personsRes, workflowsRes, itemsRes, ticketsRes, articlesRes, activityRes] = await Promise.all([
+        const [accountRes, personsRes, workflowsRes, activityRes] = await Promise.all([
           apiGet<AccountRecord>('accounts', { id: ensuredAccountId }),
           apiGet<any[]>('persons'),
           apiGet<any[]>('workflow-definitions'),
-          apiGet<any[]>('workflow-items'),
-          apiGet<any[]>('tickets'),
-          apiGet<any[]>('kb-articles'),
           apiGet<any[]>('activity-events', { limit: '10' }),
         ])
         setAccount(accountRes)
@@ -87,9 +81,6 @@ export function AccountDetailPage() {
         setMetadata(accountRes.metadata || {})
         setPeople(personsRes)
         setWorkflows(workflowsRes)
-        setWorkflowItems(itemsRes)
-        setTickets(ticketsRes)
-        setArticles(articlesRes)
         setActivity(activityRes)
       } catch (err: any) {
         console.error('Failed to load account detail', err)
@@ -142,15 +133,6 @@ export function AccountDetailPage() {
       setSaving(false)
     }
   }
-
-  const workflowItemsByDefinition = useMemo(() => {
-    const map = new Map<string, number>()
-    for (const item of workflowItems) {
-      const defName = item.workflow_definitions?.name || 'Workflow'
-      map.set(defName, (map.get(defName) || 0) + 1)
-    }
-    return Array.from(map.entries()).map(([name, count]) => ({ name, count }))
-  }, [workflowItems])
 
   if (!accountId) {
     return (
@@ -229,7 +211,7 @@ export function AccountDetailPage() {
                     <EditableField label="Account ID" value={account!.id} editing={false} mono />
                     <EditableField label="Created" value={new Date(account!.created_at).toLocaleString()} editing={false} />
                     <EditableField label="People" value={String(people.length)} editing={false} />
-                    <EditableField label="Active Workflows" value={String(workflows.length)} editing={false} />
+                    <EditableField label="Workflows" value={String(workflows.length)} editing={false} />
                   </>
                 )}
               </div>
@@ -285,59 +267,14 @@ export function AccountDetailPage() {
                 id: wf.id,
                 primary: wf.name,
                 secondary: wf.description || 'No description',
-                badges: [`${workflowItemsByDefinition.find((x) => x.name === wf.name)?.count || 0} items`, wf.status],
+                badges: [wf.status].filter(Boolean),
               }))}
-              onRowClick={(id) => navigate(`/workflows?id=${id}`)}
+              onRowClick={(id) => navigate(`/workflows/${id}`)}
               onViewAll={() => navigate('/workflows')}
             />
           </div>
 
           <div className="grid gap-4 lg:grid-cols-2">
-            <EntityCard
-              title="Deals & Workflow Items"
-              icon={<KanbanSquare className="h-4 w-4" />}
-              empty="No workflow items yet."
-              rows={workflowItems.slice(0, 5).map((item: any) => ({
-                id: item.id,
-                primary: item.title,
-                secondary: `${item.workflow_definitions?.name || 'Workflow'} • ${item.stage_definitions?.name || 'Stage'}`,
-                meta: item.metadata?.company?.name,
-                badges: [item.priority, item.persons?.full_name].filter(Boolean),
-              }))}
-              onRowClick={(id) => navigate(`/workflow-items/${id}`)}
-              onViewAll={() => navigate('/workflows')}
-            />
-
-            <EntityCard
-              title="Tickets"
-              icon={<Ticket className="h-4 w-4" />}
-              empty="No tickets open."
-              rows={tickets.slice(0, 5).map((ticket: any) => ({
-                id: ticket.id,
-                primary: ticket.subject,
-                secondary: `Opened ${new Date(ticket.created_at).toLocaleDateString()}`,
-                badges: [ticket.priority, ticket.status],
-              }))}
-              onRowClick={(id) => navigate(`/tickets/${id}`)}
-              onViewAll={() => navigate('/tickets')}
-            />
-          </div>
-
-          <div className="grid gap-4 lg:grid-cols-2">
-            <EntityCard
-              title="Knowledge Base"
-              icon={<BookOpen className="h-4 w-4" />}
-              empty="No KB articles."
-              rows={articles.slice(0, 5).map((a: any) => ({
-                id: a.id,
-                primary: a.title,
-                secondary: a.category || 'Uncategorized',
-                badges: [a.status, a.author?.full_name].filter(Boolean),
-              }))}
-              onRowClick={(id) => navigate(`/kb/${id}`)}
-              onViewAll={() => navigate('/kb')}
-            />
-
             <EntityCard
               title="Recent Activity"
               icon={<ActivityIcon className="h-4 w-4" />}

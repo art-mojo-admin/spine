@@ -5,10 +5,13 @@ import { useAuth } from '@/hooks/useAuth'
 import { EditableField } from '@/components/shared/EditableField'
 import { CustomFieldsRenderer } from '@/components/shared/CustomFieldsRenderer'
 import { EntityLinksPanel } from '@/components/shared/EntityLinksPanel'
+import { EntityCommentsPanel } from '@/components/shared/EntityCommentsPanel'
+import { WatchButton } from '@/components/shared/WatchButton'
+import { EntityAttachmentsPanel } from '@/components/shared/EntityAttachmentsPanel'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
-import { ArrowLeft, Pencil, Save, X, KanbanSquare, ArrowRight, MessageSquare } from 'lucide-react'
+import { ArrowLeft, Pencil, Save, X, KanbanSquare, ArrowRight, MessageSquare, GitFork } from 'lucide-react'
 import { Textarea } from '@/components/ui/textarea'
 
 const PRIORITIES = [
@@ -37,6 +40,8 @@ export function WorkflowItemDetailPage() {
   const [transitioning, setTransitioning] = useState(false)
   const [commentTransition, setCommentTransition] = useState<any>(null)
   const [transitionComment, setTransitionComment] = useState('')
+  const [parentItem, setParentItem] = useState<any>(null)
+  const [childItems, setChildItems] = useState<any[]>([])
 
   // Draft fields
   const [title, setTitle] = useState('')
@@ -88,6 +93,20 @@ export function WorkflowItemDetailPage() {
             setStages(stageRes || [])
             setTransitions(transRes || [])
           }
+
+          // Load parent item if exists
+          if (itemRes.parent_workflow_item_id) {
+            apiGet<any>('workflow-items', { id: itemRes.parent_workflow_item_id })
+              .then(setParentItem)
+              .catch(() => {})
+          } else {
+            setParentItem(null)
+          }
+
+          // Load child items
+          apiGet<any[]>('workflow-items', { parent_id: itemRes.id })
+            .then(setChildItems)
+            .catch(() => setChildItems([]))
         }
       } catch (err: any) {
         setErrorMessage(err?.message || 'Failed to load')
@@ -219,11 +238,16 @@ export function WorkflowItemDetailPage() {
             {isNew ? 'New Workflow Item' : 'Workflow Item'}
           </h1>
         </div>
-        {!isNew && !editing && (
-          <Button variant="outline" size="sm" onClick={() => setEditing(true)}>
-            <Pencil className="mr-1 h-4 w-4" />Edit
-          </Button>
-        )}
+        <div className="flex items-center gap-2">
+          {!isNew && !editing && itemId && itemId !== 'new' && (
+            <WatchButton entityType="workflow_item" entityId={itemId} />
+          )}
+          {!isNew && !editing && (
+            <Button variant="outline" size="sm" onClick={() => setEditing(true)}>
+              <Pencil className="mr-1 h-4 w-4" />Edit
+            </Button>
+          )}
+        </div>
       </div>
 
       {errorMessage && (
@@ -329,8 +353,60 @@ export function WorkflowItemDetailPage() {
         />
       )}
 
+      {/* Parent Breadcrumb */}
+      {!isNew && !editing && parentItem && (
+        <Card>
+          <CardContent className="py-3">
+            <p className="text-xs font-medium text-muted-foreground mb-1">Parent Item</p>
+            <Button variant="link" size="sm" className="h-auto p-0" onClick={() => navigate(`/workflow-items/${parentItem.id}`)}>
+              {parentItem.title}
+            </Button>
+            {parentItem.stage_definitions && (
+              <Badge variant="secondary" className="ml-2 text-[10px]">{parentItem.stage_definitions.name}</Badge>
+            )}
+          </CardContent>
+        </Card>
+      )}
+
+      {/* Child Items */}
+      {!isNew && !editing && childItems.length > 0 && (
+        <Card>
+          <CardHeader className="pb-2">
+            <CardTitle className="flex items-center gap-2 text-base">
+              <GitFork className="h-4 w-4" />
+              Sub-Items ({childItems.length})
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="space-y-2">
+              {childItems.map((child: any) => (
+                <div
+                  key={child.id}
+                  className="flex items-center justify-between rounded-md border px-3 py-2 text-sm cursor-pointer hover:bg-accent"
+                  onClick={() => navigate(`/workflow-items/${child.id}`)}
+                >
+                  <span className="font-medium">{child.title}</span>
+                  <div className="flex items-center gap-2">
+                    <Badge variant="secondary" className="text-[10px]">{child.stage_definitions?.name}</Badge>
+                    <Badge className="text-[10px]">{child.priority}</Badge>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
       {!isNew && !editing && itemId && itemId !== 'new' && (
         <EntityLinksPanel entityType="workflow_item" entityId={itemId} />
+      )}
+
+      {!isNew && !editing && itemId && itemId !== 'new' && (
+        <EntityCommentsPanel entityType="workflow_item" entityId={itemId} />
+      )}
+
+      {!isNew && !editing && itemId && itemId !== 'new' && (
+        <EntityAttachmentsPanel entityType="workflow_item" entityId={itemId} />
       )}
 
       {/* Transition Buttons */}

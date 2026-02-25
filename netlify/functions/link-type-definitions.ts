@@ -29,11 +29,14 @@ export default createHandler({
       return json(data)
     }
 
+    const includeInactive = params.get('include_inactive') === 'true' && ctx.accountRole === 'admin'
     let query = db
       .from('link_type_definitions')
       .select('*')
       .eq('account_id', ctx.accountId)
       .order('name')
+
+    if (!includeInactive) query = query.eq('is_active', true)
 
     const sourceType = params.get('source_entity_type')
     if (sourceType) query = query.eq('source_entity_type', sourceType)

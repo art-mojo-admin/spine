@@ -1,50 +1,72 @@
+import { lazy, Suspense } from 'react'
 import { Routes, Route, Navigate } from 'react-router-dom'
 import { AuthProvider, useAuth } from '@/hooks/useAuth'
 import { Shell } from '@/components/layout/Shell'
 import { PortalShell } from '@/components/layout/PortalShell'
-import { LoginPage } from '@/pages/Login'
-import { DashboardPage } from '@/pages/Dashboard'
-import { AccountsPage } from '@/pages/Accounts'
-import { AccountDetailPage } from '@/pages/AccountDetail'
-import { PersonsPage } from '@/pages/Persons'
-import { PersonDetailPage } from '@/pages/PersonDetail'
-import { WorkflowsPage } from '@/pages/Workflows'
-import { WorkflowDetailPage } from '@/pages/WorkflowDetail'
-import { WorkflowBuilderPage } from '@/pages/WorkflowBuilder'
-import { WorkflowItemDetailPage } from '@/pages/WorkflowItemDetail'
-import { TicketsPage } from '@/pages/Tickets'
-import { TicketDetailPage } from '@/pages/TicketDetail'
-import { KnowledgeBasePage } from '@/pages/KnowledgeBase'
-import { KBArticleDetailPage } from '@/pages/KBArticleDetail'
-import { ActivityPage } from '@/pages/Activity'
-import { ThemeEditorPage } from '@/pages/admin/ThemeEditor'
-import { WebhooksPage } from '@/pages/admin/Webhooks'
-import { SettingsPage } from '@/pages/admin/Settings'
-import { RolesPage } from '@/pages/admin/Roles'
-import { MembersPage } from '@/pages/admin/Members'
-import { AutomationsPage } from '@/pages/admin/Automations'
-import { InboundWebhooksPage } from '@/pages/admin/InboundWebhooks'
-import { CustomFieldDefinitionsPage } from '@/pages/admin/CustomFieldDefinitions'
-import { ScheduledTriggersPage } from '@/pages/admin/ScheduledTriggers'
-import { LinkTypeDefinitionsPage } from '@/pages/admin/LinkTypeDefinitions'
-import { ConfigPacksPage } from '@/pages/admin/ConfigPacks'
-import { AccountModulesPage } from '@/pages/admin/AccountModules'
-import { CustomActionTypesPage } from '@/pages/admin/CustomActionTypes'
-import { NavExtensionsPage } from '@/pages/admin/NavExtensions'
-import { ExtensionPage } from '@/pages/ExtensionPage'
-import { AccountBrowserPage } from '@/pages/admin/AccountBrowser'
 import { ImpersonationProvider } from '@/hooks/useImpersonation'
 import { ImpersonationBanner } from '@/components/layout/ImpersonationBanner'
-import { SearchPage } from '@/pages/Search'
-import { SystemHealthPage } from '@/pages/SystemHealth'
-import { PublicHomePage } from '@/pages/public/PublicHome'
-import { PublicListingPage } from '@/pages/public/PublicListing'
-import { PublicItemDetailPage } from '@/pages/public/PublicItemDetail'
-import { PortalDashboardPage } from '@/pages/portal/PortalDashboard'
-import { MyItemsPage } from '@/pages/portal/MyItems'
-import { MyTicketsPage } from '@/pages/portal/MyTickets'
-import { PortalBrowsePage } from '@/pages/portal/PortalBrowse'
-import { PortalProfilePage } from '@/pages/portal/PortalProfile'
+
+// Lazy-loaded pages — each becomes its own chunk
+const LoginPage = lazy(() => import('@/pages/Login').then(m => ({ default: m.LoginPage })))
+const DashboardPage = lazy(() => import('@/pages/Dashboard').then(m => ({ default: m.DashboardPage })))
+const AccountsPage = lazy(() => import('@/pages/Accounts').then(m => ({ default: m.AccountsPage })))
+const AccountDetailPage = lazy(() => import('@/pages/AccountDetail').then(m => ({ default: m.AccountDetailPage })))
+const PersonsPage = lazy(() => import('@/pages/Persons').then(m => ({ default: m.PersonsPage })))
+const PersonDetailPage = lazy(() => import('@/pages/PersonDetail').then(m => ({ default: m.PersonDetailPage })))
+const WorkflowsPage = lazy(() => import('@/pages/Workflows').then(m => ({ default: m.WorkflowsPage })))
+const WorkflowDetailPage = lazy(() => import('@/pages/WorkflowDetail').then(m => ({ default: m.WorkflowDetailPage })))
+const WorkflowBuilderPage = lazy(() => import('@/pages/WorkflowBuilder').then(m => ({ default: m.WorkflowBuilderPage })))
+const WorkflowItemDetailPage = lazy(() => import('@/pages/WorkflowItemDetail').then(m => ({ default: m.WorkflowItemDetailPage })))
+const TicketsPage = lazy(() => import('@/pages/Tickets').then(m => ({ default: m.TicketsPage })))
+const TicketDetailPage = lazy(() => import('@/pages/TicketDetail').then(m => ({ default: m.TicketDetailPage })))
+const DocumentsPage = lazy(() => import('@/pages/KnowledgeBase').then(m => ({ default: m.DocumentsPage })))
+const DocumentDetailPage = lazy(() => import('@/pages/KBArticleDetail').then(m => ({ default: m.DocumentDetailPage })))
+const ActivityPage = lazy(() => import('@/pages/Activity').then(m => ({ default: m.ActivityPage })))
+const CoursesPage = lazy(() => import('@/pages/Courses').then(m => ({ default: m.CoursesPage })))
+const CourseDetailPage = lazy(() => import('@/pages/CourseDetail').then(m => ({ default: m.CourseDetailPage })))
+const LessonViewerPage = lazy(() => import('@/pages/LessonViewer').then(m => ({ default: m.LessonViewerPage })))
+const SearchPage = lazy(() => import('@/pages/Search').then(m => ({ default: m.SearchPage })))
+const ExtensionPage = lazy(() => import('@/pages/ExtensionPage').then(m => ({ default: m.ExtensionPage })))
+const SystemHealthPage = lazy(() => import('@/pages/SystemHealth').then(m => ({ default: m.SystemHealthPage })))
+
+// Admin pages
+const ThemeEditorPage = lazy(() => import('@/pages/admin/ThemeEditor').then(m => ({ default: m.ThemeEditorPage })))
+const WebhooksPage = lazy(() => import('@/pages/admin/Webhooks').then(m => ({ default: m.WebhooksPage })))
+const SettingsPage = lazy(() => import('@/pages/admin/Settings').then(m => ({ default: m.SettingsPage })))
+const RolesPage = lazy(() => import('@/pages/admin/Roles').then(m => ({ default: m.RolesPage })))
+const MembersPage = lazy(() => import('@/pages/admin/Members').then(m => ({ default: m.MembersPage })))
+const AutomationsPage = lazy(() => import('@/pages/admin/Automations').then(m => ({ default: m.AutomationsPage })))
+const InboundWebhooksPage = lazy(() => import('@/pages/admin/InboundWebhooks').then(m => ({ default: m.InboundWebhooksPage })))
+const CustomFieldDefinitionsPage = lazy(() => import('@/pages/admin/CustomFieldDefinitions').then(m => ({ default: m.CustomFieldDefinitionsPage })))
+const ScheduledTriggersPage = lazy(() => import('@/pages/admin/ScheduledTriggers').then(m => ({ default: m.ScheduledTriggersPage })))
+const LinkTypeDefinitionsPage = lazy(() => import('@/pages/admin/LinkTypeDefinitions').then(m => ({ default: m.LinkTypeDefinitionsPage })))
+const ConfigPacksPage = lazy(() => import('@/pages/admin/ConfigPacks').then(m => ({ default: m.ConfigPacksPage })))
+const AccountModulesPage = lazy(() => import('@/pages/admin/AccountModules').then(m => ({ default: m.AccountModulesPage })))
+const CustomActionTypesPage = lazy(() => import('@/pages/admin/CustomActionTypes').then(m => ({ default: m.CustomActionTypesPage })))
+const NavExtensionsPage = lazy(() => import('@/pages/admin/NavExtensions').then(m => ({ default: m.NavExtensionsPage })))
+const NavOverridesPage = lazy(() => import('@/pages/admin/NavOverrides').then(m => ({ default: m.NavOverridesPage })))
+const DashboardsPage = lazy(() => import('@/pages/admin/Dashboards').then(m => ({ default: m.DashboardsPage })))
+const AccountBrowserPage = lazy(() => import('@/pages/admin/AccountBrowser').then(m => ({ default: m.AccountBrowserPage })))
+
+// Public pages
+const PublicHomePage = lazy(() => import('@/pages/public/PublicHome').then(m => ({ default: m.PublicHomePage })))
+const PublicListingPage = lazy(() => import('@/pages/public/PublicListing').then(m => ({ default: m.PublicListingPage })))
+const PublicItemDetailPage = lazy(() => import('@/pages/public/PublicItemDetail').then(m => ({ default: m.PublicItemDetailPage })))
+
+// Portal pages
+const PortalDashboardPage = lazy(() => import('@/pages/portal/PortalDashboard').then(m => ({ default: m.PortalDashboardPage })))
+const MyItemsPage = lazy(() => import('@/pages/portal/MyItems').then(m => ({ default: m.MyItemsPage })))
+const MyTicketsPage = lazy(() => import('@/pages/portal/MyTickets').then(m => ({ default: m.MyTicketsPage })))
+const PortalBrowsePage = lazy(() => import('@/pages/portal/PortalBrowse').then(m => ({ default: m.PortalBrowsePage })))
+const PortalProfilePage = lazy(() => import('@/pages/portal/PortalProfile').then(m => ({ default: m.PortalProfilePage })))
+
+function PageLoader() {
+  return (
+    <div className="flex h-[50vh] items-center justify-center">
+      <div className="text-muted-foreground">Loading...</div>
+    </div>
+  )
+}
 
 function ProtectedRoutes() {
   const { session, loading, currentRole } = useAuth()
@@ -73,6 +95,7 @@ export default function App() {
     <AuthProvider>
       <ImpersonationProvider>
         <ImpersonationBanner />
+        <Suspense fallback={<PageLoader />}>
         <Routes>
           <Route path="/login" element={<LoginPage />} />
           <Route path="/p/:accountSlug" element={<PublicHomePage />} />
@@ -96,8 +119,14 @@ export default function App() {
           <Route path="/workflow-items/:itemId" element={<WorkflowItemDetailPage />} />
           <Route path="/tickets" element={<TicketsPage />} />
           <Route path="/tickets/:ticketId" element={<TicketDetailPage />} />
-          <Route path="/kb" element={<KnowledgeBasePage />} />
-          <Route path="/kb/:articleId" element={<KBArticleDetailPage />} />
+          <Route path="/documents" element={<DocumentsPage />} />
+          <Route path="/documents/:articleId" element={<DocumentDetailPage />} />
+          {/* Redirects from old /kb paths */}
+          <Route path="/kb" element={<Navigate to="/documents" replace />} />
+          <Route path="/kb/:articleId" element={<Navigate to="/documents" replace />} />
+          <Route path="/courses" element={<CoursesPage />} />
+          <Route path="/courses/:courseId" element={<CourseDetailPage />} />
+          <Route path="/courses/:courseId/lessons/:lessonId" element={<LessonViewerPage />} />
           <Route path="/activity" element={<ActivityPage />} />
           <Route path="/search" element={<SearchPage />} />
           <Route path="/admin/theme" element={<ThemeEditorPage />} />
@@ -114,11 +143,14 @@ export default function App() {
           <Route path="/admin/modules" element={<AccountModulesPage />} />
           <Route path="/admin/custom-actions" element={<CustomActionTypesPage />} />
           <Route path="/admin/nav-extensions" element={<NavExtensionsPage />} />
+          <Route path="/admin/nav-overrides" element={<NavOverridesPage />} />
+          <Route path="/admin/dashboards" element={<DashboardsPage />} />
           <Route path="/admin/account-browser" element={<AccountBrowserPage />} />
           <Route path="/admin/system-health" element={<SystemHealthPage />} />
           <Route path="/x/:slug" element={<ExtensionPage />} />
         </Route>
       </Routes>
+      </Suspense>
       </ImpersonationProvider>
     </AuthProvider>
   )

@@ -5,10 +5,10 @@ import { useAuth } from '@/hooks/useAuth'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
-import { Plus, BookOpen } from 'lucide-react'
+import { Plus, FileText } from 'lucide-react'
 import { APP_NAME } from '@/lib/config'
 
-export function KnowledgeBasePage() {
+export function DocumentsPage() {
   const navigate = useNavigate()
   const { currentAccountId } = useAuth()
   const [articles, setArticles] = useState<any[]>([])
@@ -27,11 +27,11 @@ export function KnowledgeBasePage() {
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-3xl font-bold tracking-tight">Knowledge Base</h1>
-          <p className="mt-1 text-muted-foreground">Articles and documentation</p>
+          <h1 className="text-3xl font-bold tracking-tight">Documents</h1>
+          <p className="mt-1 text-muted-foreground">Documents, SOPs, policies, and templates</p>
         </div>
-        <Button onClick={() => navigate('/kb/new')} size="sm">
-          <Plus className="mr-2 h-4 w-4" /> New Article
+        <Button onClick={() => navigate('/documents/new')} size="sm">
+          <Plus className="mr-2 h-4 w-4" /> New Document
         </Button>
       </div>
 
@@ -42,10 +42,10 @@ export function KnowledgeBasePage() {
           <p className="text-sm text-muted-foreground">No articles yet</p>
         ) : (
           articles.map((a: any) => (
-            <Card key={a.id} className="cursor-pointer transition-shadow hover:shadow-md" onClick={() => navigate(`/kb/${a.id}`)}>
+            <Card key={a.id} className="cursor-pointer transition-shadow hover:shadow-md" onClick={() => navigate(`/documents/${a.id}`)}>
               <CardContent className="flex items-center gap-4 py-4">
                 <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-primary/10">
-                  <BookOpen className="h-5 w-5 text-primary" />
+                  <FileText className="h-5 w-5 text-primary" />
                 </div>
                 <div className="flex-1">
                   <p className="font-medium">{a.title}</p>

@@ -4,10 +4,13 @@ import { apiGet, apiPost, apiPatch } from '@/lib/api'
 import { useAuth } from '@/hooks/useAuth'
 import { EditableField } from '@/components/shared/EditableField'
 import { CustomFieldsRenderer } from '@/components/shared/CustomFieldsRenderer'
+import { EntityCommentsPanel } from '@/components/shared/EntityCommentsPanel'
+import { WatchButton } from '@/components/shared/WatchButton'
+import { EntityAttachmentsPanel } from '@/components/shared/EntityAttachmentsPanel'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
-import { ArrowLeft, Pencil, Save, X, BookOpen } from 'lucide-react'
+import { ArrowLeft, Pencil, Save, X, BookOpen, GitFork } from 'lucide-react'
 import { APP_NAME } from '@/lib/config'
 
 const KB_STATUSES = [
@@ -16,7 +19,7 @@ const KB_STATUSES = [
   { value: 'archived', label: 'Archived' },
 ]
 
-export function KBArticleDetailPage() {
+export function DocumentDetailPage() {
   const { articleId } = useParams<{ articleId: string }>()
   const navigate = useNavigate()
   const { currentAccountId, profile } = useAuth()
@@ -27,6 +30,8 @@ export function KBArticleDetailPage() {
   const [loading, setLoading] = useState(!isNew)
   const [saving, setSaving] = useState(false)
   const [errorMessage, setErrorMessage] = useState<string | null>(null)
+  const [parentArticle, setParentArticle] = useState<any>(null)
+  const [childArticles, setChildArticles] = useState<any[]>([])
 
   const [title, setTitle] = useState('')
   const [slug, setSlug] = useState('')
@@ -48,6 +53,20 @@ export function KBArticleDetailPage() {
         setCategory(res.category || '')
         setStatus(res.status || 'draft')
         setMetadata(res.metadata || {})
+
+        // Load parent if exists
+        if (res.parent_article_id) {
+          apiGet<any>('kb-articles', { id: res.parent_article_id })
+            .then(setParentArticle)
+            .catch(() => {})
+        } else {
+          setParentArticle(null)
+        }
+
+        // Load children
+        apiGet<any[]>('kb-articles', { parent_id: res.id })
+          .then(setChildArticles)
+          .catch(() => setChildArticles([]))
       })
       .catch((err: any) => setErrorMessage(err?.message || 'Failed to load'))
       .finally(() => setLoading(false))
@@ -81,7 +100,7 @@ export function KBArticleDetailPage() {
           category: category || undefined,
           status,
         })
-        navigate(`/kb/${created.id}`, { replace: true })
+        navigate(`/documents/${created.id}`, { replace: true })
       } else {
         const updated = await apiPatch<any>('kb-articles', {
           title,
@@ -108,7 +127,7 @@ export function KBArticleDetailPage() {
           <Button variant="ghost" size="sm" onClick={() => navigate(-1)}>
             <ArrowLeft className="mr-1 h-4 w-4" />Back
           </Button>
-          <h1 className="text-3xl font-bold tracking-tight">KB Article</h1>
+          <h1 className="text-3xl font-bold tracking-tight">Document</h1>
         </div>
         <Card><CardContent className="py-6 text-sm text-muted-foreground">Loading...</CardContent></Card>
       </div>
@@ -123,14 +142,19 @@ export function KBArticleDetailPage() {
             <ArrowLeft className="mr-1 h-4 w-4" />Back
           </Button>
           <h1 className="text-3xl font-bold tracking-tight">
-            {isNew ? 'New Article' : 'KB Article'}
+            {isNew ? 'New Document' : 'Document'}
           </h1>
         </div>
-        {!isNew && !editing && (!article?.is_global || profile?.system_role === 'system_admin') && (
-          <Button variant="outline" size="sm" onClick={() => setEditing(true)}>
-            <Pencil className="mr-1 h-4 w-4" />Edit
-          </Button>
-        )}
+        <div className="flex items-center gap-2">
+          {!isNew && !editing && articleId && articleId !== 'new' && (
+            <WatchButton entityType="kb_article" entityId={articleId} />
+          )}
+          {!isNew && !editing && (!article?.is_global || profile?.system_role === 'system_admin') && (
+            <Button variant="outline" size="sm" onClick={() => setEditing(true)}>
+              <Pencil className="mr-1 h-4 w-4" />Edit
+            </Button>
+          )}
+        </div>
       </div>
 
       {errorMessage && (
@@ -193,6 +217,44 @@ export function KBArticleDetailPage() {
         </CardContent>
       </Card>
 
+      {/* Parent Breadcrumb */}
+      {!isNew && !editing && parentArticle && (
+        <Card>
+          <CardContent className="py-3">
+            <p className="text-xs font-medium text-muted-foreground mb-1">Parent Article</p>
+            <Button variant="link" size="sm" className="h-auto p-0" onClick={() => navigate(`/documents/${parentArticle.id}`)}>
+              {parentArticle.title}
+            </Button>
+          </CardContent>
+        </Card>
+      )}
+
+      {/* Child Articles */}
+      {!isNew && !editing && childArticles.length > 0 && (
+        <Card>
+          <CardHeader className="pb-2">
+            <CardTitle className="flex items-center gap-2 text-base">
+              <GitFork className="h-4 w-4" />
+              Sub-Articles ({childArticles.length})
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="space-y-2">
+              {childArticles.map((child: any) => (
+                <div
+                  key={child.id}
+                  className="flex items-center justify-between rounded-md border px-3 py-2 text-sm cursor-pointer hover:bg-accent"
+                  onClick={() => navigate(`/documents/${child.id}`)}
+                >
+                  <span className="font-medium">{child.title}</span>
+                  <Badge variant={child.status === 'published' ? 'default' : 'secondary'}>{child.status}</Badge>
+                </div>
+              ))}
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
       {!isNew && (
         <CustomFieldsRenderer
           entityType="kb_article"
@@ -213,6 +275,14 @@ export function KBArticleDetailPage() {
             </Button>
           )}
         </div>
+      )}
+
+      {!isNew && !editing && articleId && articleId !== 'new' && (
+        <EntityCommentsPanel entityType="kb_article" entityId={articleId} />
+      )}
+
+      {!isNew && !editing && articleId && articleId !== 'new' && (
+        <EntityAttachmentsPanel entityType="kb_article" entityId={articleId} />
       )}
     </div>
   )

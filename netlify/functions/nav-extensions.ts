@@ -16,6 +16,7 @@ export default createHandler({
       .from('nav_extensions')
       .select('*')
       .eq('account_id', ctx.accountId)
+      .eq('is_active', true)
       .order('position', { ascending: true })
 
     if (location) {

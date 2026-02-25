@@ -51,11 +51,16 @@ export default createHandler({
     const personIds = (memberships || []).map((m: any) => m.person_id)
     if (personIds.length === 0) return json([])
 
-    const { data: persons } = await db
+    const includeInactive = params.get('include_inactive') === 'true' && ctx.accountRole === 'admin'
+    let personsQuery = db
       .from('persons')
       .select('*, profiles(*)')
       .in('id', personIds)
       .order('full_name')
+
+    if (!includeInactive) personsQuery = personsQuery.eq('is_active', true)
+
+    const { data: persons } = await personsQuery
 
     const membershipMap = new Map((memberships || []).map((m: any) => [m.person_id, m]))
 

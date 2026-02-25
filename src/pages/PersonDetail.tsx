@@ -5,6 +5,7 @@ import { useAuth } from '@/hooks/useAuth'
 import { EditableField } from '@/components/shared/EditableField'
 import { CustomFieldsRenderer } from '@/components/shared/CustomFieldsRenderer'
 import { EntityLinksPanel } from '@/components/shared/EntityLinksPanel'
+import { EntityCommentsPanel } from '@/components/shared/EntityCommentsPanel'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
@@ -12,7 +13,6 @@ import {
   User,
   Mail,
   KanbanSquare,
-  Ticket,
   Activity as ActivityIcon,
   Building2,
   ArrowLeft,
@@ -37,7 +37,6 @@ export function PersonDetailPage() {
 
   const [person, setPerson] = useState<any>(null)
   const [workflowItems, setWorkflowItems] = useState<any[]>([])
-  const [tickets, setTickets] = useState<any[]>([])
   const [activity, setActivity] = useState<any[]>([])
   const [memberships, setMemberships] = useState<any[]>([])
   const [accounts, setAccounts] = useState<any[]>([])
@@ -61,11 +60,10 @@ export function PersonDetailPage() {
 
     async function loadData() {
       try {
-        const [personRes, itemsRes, ticketsRes, activityRes, membershipsRes, accountsRes] =
+        const [personRes, itemsRes, activityRes, membershipsRes, accountsRes] =
           await Promise.all([
             apiGet<any>('persons', { id: pid }),
             apiGet<any[]>('workflow-items'),
-            apiGet<any[]>('tickets'),
             apiGet<any[]>('activity-events', { limit: '20' }),
             apiGet<any[]>('memberships'),
             apiGet<any[]>('accounts'),
@@ -81,14 +79,6 @@ export function PersonDetailPage() {
         setWorkflowItems(
           (itemsRes || []).filter(
             (i: any) => i.owner_person_id === pid,
-          ),
-        )
-
-        setTickets(
-          (ticketsRes || []).filter(
-            (t: any) =>
-              t.opened_by_person_id === pid ||
-              t.assigned_to_person_id === pid,
           ),
         )
 
@@ -249,10 +239,6 @@ export function PersonDetailPage() {
                     <p className="text-xs text-muted-foreground">Workflow Items</p>
                   </div>
                   <div className="text-center">
-                    <p className="text-2xl font-bold">{tickets.length}</p>
-                    <p className="text-xs text-muted-foreground">Tickets</p>
-                  </div>
-                  <div className="text-center">
                     <p className="text-2xl font-bold">{activity.length}</p>
                     <p className="text-xs text-muted-foreground">Activities</p>
                   </div>
@@ -272,6 +258,10 @@ export function PersonDetailPage() {
 
           {!isNew && !editing && personId && personId !== 'new' && (
             <EntityLinksPanel entityType="person" entityId={personId} />
+          )}
+
+          {!isNew && !editing && personId && personId !== 'new' && (
+            <EntityCommentsPanel entityType="person" entityId={personId} />
           )}
 
           {editing && (
@@ -373,21 +363,6 @@ export function PersonDetailPage() {
           </div>
 
           <div className="grid gap-4 lg:grid-cols-2">
-            {/* Tickets */}
-            <SectionCard
-              title="Tickets"
-              icon={<Ticket className="h-4 w-4" />}
-              empty="No tickets for this person."
-              rows={tickets.slice(0, 5).map((t: any) => ({
-                id: t.id,
-                primary: t.subject,
-                secondary: `Opened ${new Date(t.created_at).toLocaleDateString()}`,
-                badges: [t.priority, t.status],
-              }))}
-              onRowClick={(id) => navigate(`/tickets/${id}`)}
-              onViewAll={() => navigate('/tickets')}
-            />
-
             {/* Activity */}
             <SectionCard
               title="Recent Activity"

@@ -28,12 +28,16 @@ export default createHandler({
     }
 
     if (ctx.systemRole && ['system_admin', 'system_operator'].includes(ctx.systemRole)) {
-      const { data: accounts } = await db
+      const includeInactive = params.get('include_inactive') === 'true'
+      let sysQuery = db
         .from('accounts')
         .select('*')
         .order('created_at', { ascending: false })
         .limit(100)
 
+      if (!includeInactive) sysQuery = sysQuery.eq('is_active', true)
+
+      const { data: accounts } = await sysQuery
       return json(accounts || [])
     }
 
@@ -46,12 +50,16 @@ export default createHandler({
     const accountIds = (memberships || []).map((m: any) => m.account_id)
     if (accountIds.length === 0) return json([])
 
-    const { data: accounts } = await db
+    let acctQuery = db
       .from('accounts')
       .select('*')
       .in('id', accountIds)
       .order('created_at', { ascending: false })
 
+    const includeInactive = params.get('include_inactive') === 'true' && ctx.accountRole === 'admin'
+    if (!includeInactive) acctQuery = acctQuery.eq('is_active', true)
+
+    const { data: accounts } = await acctQuery
     return json(accounts || [])
   },
 

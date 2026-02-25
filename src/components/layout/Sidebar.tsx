@@ -7,8 +7,7 @@ import {
   Building2,
   Users,
   GitBranch,
-  TicketCheck,
-  BookOpen,
+  FileText,
   Activity,
   Palette,
   Webhook,
@@ -46,32 +45,44 @@ interface NavExtensionItem {
   position: number
 }
 
-const navItems = [
-  { to: '/', icon: LayoutDashboard, label: 'Dashboard' },
-  { to: '/accounts', icon: Building2, label: 'Accounts' },
-  { to: '/persons', icon: Users, label: 'Persons' },
-  { to: '/workflows', icon: GitBranch, label: 'Workflows' },
-  { to: '/tickets', icon: TicketCheck, label: 'Tickets' },
-  { to: '/kb', icon: BookOpen, label: 'Knowledge Base' },
-  { to: '/activity', icon: Activity, label: 'Activity' },
-  { to: '/search', icon: Search, label: 'Search' },
+interface NavOverrideItem {
+  id: string
+  nav_key: string
+  label: string | null
+  hidden: boolean
+  min_role: string
+  default_entity_id: string | null
+  position: number
+}
+
+const defaultNavItems = [
+  { key: 'dashboard', to: '/', icon: LayoutDashboard, label: 'Dashboard', position: 0 },
+  { key: 'accounts', to: '/accounts', icon: Building2, label: 'Accounts', position: 1 },
+  { key: 'persons', to: '/persons', icon: Users, label: 'Persons', position: 2 },
+  { key: 'workflows', to: '/workflows', icon: GitBranch, label: 'Workflows', position: 3 },
+  { key: 'documents', to: '/documents', icon: FileText, label: 'Documents', position: 4 },
+  { key: 'activity', to: '/activity', icon: Activity, label: 'Activity', position: 7 },
+  { key: 'search', to: '/search', icon: Search, label: 'Search', position: 8 },
 ]
 
 const adminItems = [
+  { to: '/admin/account-browser', icon: ShieldAlert, label: 'Account Browser' },
+  { to: '/admin/automations', icon: Zap, label: 'Automations' },
+  { to: '/admin/custom-actions', icon: PlugZap, label: 'Custom Actions' },
+  { to: '/admin/custom-fields', icon: SlidersHorizontal, label: 'Custom Fields' },
+  { to: '/admin/dashboards', icon: LayoutDashboard, label: 'Dashboards' },
+  { to: '/admin/inbound-webhooks', icon: ArrowDownToLine, label: 'Inbound Hooks' },
+  { to: '/admin/link-types', icon: Link2, label: 'Link Types' },
+  { to: '/admin/members', icon: UserPlus, label: 'Members' },
+  { to: '/admin/modules', icon: Blocks, label: 'Modules' },
+  { to: '/admin/nav-extensions', icon: PanelLeftDashed, label: 'Nav Extensions' },
+  { to: '/admin/nav-overrides', icon: PanelLeftDashed, label: 'Nav Overrides' },
+  { to: '/admin/packs', icon: Package, label: 'Templates' },
+  { to: '/admin/roles', icon: Shield, label: 'Roles' },
+  { to: '/admin/schedules', icon: Clock, label: 'Schedules' },
+  { to: '/admin/settings', icon: Settings, label: 'Settings' },
   { to: '/admin/theme', icon: Palette, label: 'Theme' },
   { to: '/admin/webhooks', icon: Webhook, label: 'Webhooks' },
-  { to: '/admin/settings', icon: Settings, label: 'Settings' },
-  { to: '/admin/roles', icon: Shield, label: 'Roles' },
-  { to: '/admin/members', icon: UserPlus, label: 'Members' },
-  { to: '/admin/automations', icon: Zap, label: 'Automations' },
-  { to: '/admin/inbound-webhooks', icon: ArrowDownToLine, label: 'Inbound Hooks' },
-  { to: '/admin/custom-fields', icon: SlidersHorizontal, label: 'Custom Fields' },
-  { to: '/admin/schedules', icon: Clock, label: 'Schedules' },
-  { to: '/admin/link-types', icon: Link2, label: 'Link Types' },
-  { to: '/admin/packs', icon: Package, label: 'Templates' },
-  { to: '/admin/modules', icon: Blocks, label: 'Modules' },
-  { to: '/admin/custom-actions', icon: PlugZap, label: 'Custom Actions' },
-  { to: '/admin/nav-extensions', icon: PanelLeftDashed, label: 'Nav Extensions' },
 ]
 
 export function Sidebar() {
@@ -83,18 +94,46 @@ export function Sidebar() {
   const showTenantSwitcher = memberships.length > 1
 
   const [sidebarExtensions, setSidebarExtensions] = useState<NavExtensionItem[]>([])
+  const [navOverrides, setNavOverrides] = useState<NavOverrideItem[]>([])
 
   useEffect(() => {
-    async function loadExtensions() {
+    async function loadNav() {
       try {
-        const data = await apiGet<NavExtensionItem[]>('nav-extensions', { location: 'sidebar' })
-        setSidebarExtensions(data)
+        const [extData, overrideData] = await Promise.all([
+          apiGet<NavExtensionItem[]>('nav-extensions', { location: 'sidebar' }),
+          apiGet<NavOverrideItem[]>('nav-overrides'),
+        ])
+        setSidebarExtensions(extData)
+        setNavOverrides(overrideData)
       } catch {
-        // Silently ignore — extensions are optional
+        // Silently ignore — extensions/overrides are optional
       }
     }
-    if (currentAccountId) loadExtensions()
+    if (currentAccountId) loadNav()
   }, [currentAccountId])
+
+  // Build merged nav items applying overrides
+  const ROLE_RANK: Record<string, number> = { portal: 0, member: 1, operator: 2, admin: 3 }
+  const normalizedRole = (currentRole && ROLE_RANK[currentRole] !== undefined) ? currentRole : 'member'
+  const userRank = ROLE_RANK[normalizedRole]
+  const overrideMap = new Map(navOverrides.map((o) => [o.nav_key, o]))
+
+  const navItems = defaultNavItems
+    .map((item) => {
+      const override = overrideMap.get(item.key)
+      if (override?.hidden) return null
+      const minRole = override?.min_role || 'member'
+      if (userRank < (ROLE_RANK[minRole] ?? 0)) return null
+      const label = override?.label || item.label
+      const position = override?.position ?? item.position
+      let to = item.to
+      if (override?.default_entity_id && item.key === 'workflows') {
+        to = `/workflows/${override.default_entity_id}`
+      }
+      return { ...item, label, position, to }
+    })
+    .filter(Boolean)
+    .sort((a, b) => a!.position - b!.position) as typeof defaultNavItems
 
   return (
     <aside className="flex h-full w-64 flex-col border-r bg-card">
@@ -129,7 +168,7 @@ export function Sidebar() {
       )}
 
       <nav className="flex-1 space-y-1 overflow-y-auto p-3">
-        {navItems.map(({ to, icon: Icon, label }) => (
+        {navItems.map(({ key, to, icon: Icon, label }) => (
           <NavLink
             key={to}
             to={to}

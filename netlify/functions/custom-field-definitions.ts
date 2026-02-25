@@ -29,6 +29,7 @@ export default createHandler({
       return json(data)
     }
 
+    const includeInactive = params.get('include_inactive') === 'true' && ctx.accountRole === 'admin'
     let query = db
       .from('custom_field_definitions')
       .select('*')
@@ -36,6 +37,8 @@ export default createHandler({
       .order('entity_type')
       .order('position', { ascending: true })
       .order('created_at', { ascending: true })
+
+    if (!includeInactive) query = query.eq('is_active', true)
 
     const entityType = params.get('entity_type')
     if (entityType) {

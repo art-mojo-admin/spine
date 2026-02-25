@@ -25,12 +25,14 @@ export default createHandler({
     }
 
     const status = params.get('status')
+    const includeInactive = params.get('include_inactive') === 'true' && ctx.accountRole === 'admin'
     let query = db
       .from('tickets')
       .select('*, opened_by:opened_by_person_id(id, full_name), assigned_to:assigned_to_person_id(id, full_name)')
       .eq('account_id', ctx.accountId)
       .order('created_at', { ascending: false })
 
+    if (!includeInactive) query = query.eq('is_active', true)
     if (status) query = query.eq('status', status)
 
     const { data } = await query.limit(200)

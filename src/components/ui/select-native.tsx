@@ -2,12 +2,14 @@ import * as React from 'react'
 import { cn } from '@/lib/utils'
 
 export interface SelectNativeProps extends React.SelectHTMLAttributes<HTMLSelectElement> {
-  options: { value: string; label: string }[]
+  options?: { value: string; label: string }[]
   placeholder?: string
 }
 
 const SelectNative = React.forwardRef<HTMLSelectElement, SelectNativeProps>(
-  ({ className, options, placeholder, ...props }, ref) => {
+  ({ className, options, placeholder, children, ...props }, ref) => {
+    const hasOptions = Array.isArray(options) && options.length > 0
+
     return (
       <select
         className={cn(
@@ -22,11 +24,13 @@ const SelectNative = React.forwardRef<HTMLSelectElement, SelectNativeProps>(
             {placeholder}
           </option>
         )}
-        {options.map((opt) => (
-          <option key={opt.value} value={opt.value}>
-            {opt.label}
-          </option>
-        ))}
+        {hasOptions
+          ? options!.map(opt => (
+              <option key={opt.value} value={opt.value}>
+                {opt.label}
+              </option>
+            ))
+          : children}
       </select>
     )
   },

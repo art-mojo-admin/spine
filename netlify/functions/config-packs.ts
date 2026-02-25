@@ -1,6 +1,306 @@
+import { randomUUID } from 'crypto'
+
 import { createHandler, requireAuth, requireTenant, requireRole, json, error, parseBody } from './_shared/middleware'
 import { db } from './_shared/db'
-import { emitAudit, emitActivity } from './_shared/audit'
+import { emitActivity } from './_shared/audit'
+
+// Tables that have pack_id and is_active columns for toggling
+const PACK_TABLES = [
+  'workflow_definitions',
+  'stage_definitions',
+  'transition_definitions',
+  'workflow_actions',
+  'workflow_items',
+  'automation_rules',
+  'custom_field_definitions',
+  'link_type_definitions',
+  'entity_links',
+  'account_modules',
+  'custom_action_types',
+  'nav_extensions',
+  'nav_overrides',
+  'dashboard_definitions',
+  'dashboard_widgets',
+  'knowledge_base_articles',
+  'enrollments',
+  'tickets',
+] as const
+
+// Shared test data tables (no pack_id — shared across packs)
+const SHARED_TEST_TABLES = ['accounts', 'persons', 'memberships'] as const
+const TEMPLATE_ACCOUNT_ID = '00000000-0000-0000-0000-000000000001'
+
+// Tables that DO have an account_id column (for scoping to tenant)
+const TABLES_WITH_ACCOUNT_ID = new Set([
+  'workflow_definitions', 'workflow_items', 'automation_rules',
+  'custom_field_definitions', 'link_type_definitions', 'entity_links',
+  'account_modules', 'custom_action_types', 'nav_extensions', 'nav_overrides',
+  'dashboard_definitions', 'knowledge_base_articles', 'enrollments', 'tickets',
+])
+// Tables WITHOUT account_id — children linked via parent FK
+// stage_definitions, transition_definitions, workflow_actions, dashboard_widgets
+
+const CLONE_SEQUENCE: { table: typeof PACK_TABLES[number]; entityType: string }[] = [
+  { table: 'workflow_definitions', entityType: 'workflow_definition' },
+  { table: 'stage_definitions', entityType: 'stage_definition' },
+  { table: 'transition_definitions', entityType: 'transition_definition' },
+  { table: 'workflow_actions', entityType: 'workflow_action' },
+  { table: 'automation_rules', entityType: 'automation_rule' },
+  { table: 'custom_field_definitions', entityType: 'custom_field_definition' },
+  { table: 'link_type_definitions', entityType: 'link_type_definition' },
+  { table: 'dashboard_definitions', entityType: 'dashboard_definition' },
+  { table: 'dashboard_widgets', entityType: 'dashboard_widget' },
+  { table: 'nav_extensions', entityType: 'nav_extension' },
+  { table: 'nav_overrides', entityType: 'nav_override' },
+  { table: 'account_modules', entityType: 'account_module' },
+  { table: 'custom_action_types', entityType: 'custom_action_type' },
+  { table: 'knowledge_base_articles', entityType: 'knowledge_base_article' },
+  { table: 'workflow_items', entityType: 'workflow_item' },
+  { table: 'entity_links', entityType: 'entity_link' },
+  { table: 'tickets', entityType: 'ticket' },
+  { table: 'enrollments', entityType: 'enrollment' },
+]
+
+function combineCounts(...datasets: Record<string, number>[]) {
+  const result: Record<string, number> = {}
+  for (const data of datasets) {
+    for (const [key, value] of Object.entries(data)) {
+      result[key] = (result[key] || 0) + (value || 0)
+    }
+  }
+  return result
+}
+
+async function fetchMappings(accountId: string, packId: string) {
+  const { data } = await db
+    .from('pack_entity_mappings')
+    .select('entity_type, template_id, cloned_id')
+    .eq('account_id', accountId)
+    .eq('pack_id', packId)
+
+  const mapByTemplate: Record<string, string> = {}
+  const mapByClone: Record<string, { entity_type: string; template_id: string }> = {}
+  for (const row of data || []) {
+    mapByTemplate[row.template_id] = row.cloned_id
+    mapByClone[row.cloned_id] = { entity_type: row.entity_type, template_id: row.template_id }
+  }
+
+  return { mapByTemplate, mapByClone }
+}
+
+async function removeMapping(accountId: string, packId: string, entityType: string, templateId: string) {
+  await db
+    .from('pack_entity_mappings')
+    .delete()
+    .eq('account_id', accountId)
+    .eq('pack_id', packId)
+    .eq('entity_type', entityType)
+    .eq('template_id', templateId)
+}
+
+async function upsertMapping(accountId: string, packId: string, entityType: string, templateId: string, clonedId: string) {
+  await db
+    .from('pack_entity_mappings')
+    .upsert({
+      account_id: accountId,
+      pack_id: packId,
+      entity_type: entityType,
+      template_id: templateId,
+      cloned_id: clonedId,
+    }, { onConflict: 'account_id,entity_type,template_id' })
+}
+
+async function fetchPackTemplates(packId: string, templateAccountId: string) {
+  const templates: Record<string, any[]> = {}
+
+  for (const table of PACK_TABLES) {
+    let query = (db.from(table) as any)
+      .select('*')
+      .eq('pack_id', packId)
+
+    // Only filter by account_id for tables that have the column
+    if (TABLES_WITH_ACCOUNT_ID.has(table)) {
+      query = query.eq('account_id', templateAccountId)
+    }
+
+    const { data } = await query
+    templates[table] = data || []
+  }
+
+  return templates
+}
+
+async function cloneTemplateRow(table: string, template: any, accountId: string, packId: string, entityMap: Record<string, string>) {
+  const newId = randomUUID()
+  const cloned = { ...template }
+
+  cloned.id = newId
+
+  if ('account_id' in cloned) {
+    cloned.account_id = accountId
+  }
+  if ('pack_id' in cloned) cloned.pack_id = packId
+  if ('is_active' in cloned) cloned.is_active = template.is_active ?? false
+  if ('is_test_data' in cloned) cloned.is_test_data = template.is_test_data ?? false
+
+  for (const key of Object.keys(cloned)) {
+    if (!key.endsWith('_id')) continue
+    if (key === 'account_id' || key === 'pack_id') continue
+    const value = cloned[key]
+    if (typeof value === 'string' && entityMap[value]) {
+      cloned[key] = entityMap[value]
+    }
+  }
+
+  delete cloned.created_at
+  delete cloned.updated_at
+
+  await (db.from(table) as any).insert(cloned)
+
+  return newId
+}
+
+async function cloneTemplatesForPack(packId: string, accountId: string, isTestData: boolean) {
+  const templates = await fetchPackTemplates(packId, TEMPLATE_ACCOUNT_ID)
+
+  const { mapByTemplate } = await fetchMappings(accountId, packId)
+  const entityMap = { ...mapByTemplate }
+
+  for (const { table, entityType } of CLONE_SEQUENCE) {
+    const rows = templates[table] || []
+    for (const template of rows) {
+      const templateIsTest = template.is_test_data === true
+      if (templateIsTest !== isTestData) continue
+
+      const mappedId = entityMap[template.id]
+      if (mappedId) {
+        const { data: stillExists } = await (db.from(table) as any)
+          .select('id')
+          .eq('id', mappedId)
+          .maybeSingle()
+        if (stillExists) continue
+
+        await removeMapping(accountId, packId, entityType, template.id)
+        delete entityMap[template.id]
+      }
+
+      const clonedId = await cloneTemplateRow(table, template, accountId, packId, entityMap)
+      entityMap[template.id] = clonedId
+
+      await upsertMapping(accountId, packId, entityType, template.id, clonedId)
+    }
+  }
+}
+
+async function ensurePackConfigCloned(packId: string, accountId: string) {
+  await cloneTemplatesForPack(packId, accountId, false)
+}
+
+async function ensurePackTestDataCloned(packId: string, accountId: string) {
+  await cloneTemplatesForPack(packId, accountId, true)
+}
+
+async function setClonedEntitiesActive(accountId: string, packId: string, active: boolean, testDataOnly: boolean | null) {
+  const { mapByTemplate } = await fetchMappings(accountId, packId)
+  const clonedIds = Object.values(mapByTemplate)
+  if (clonedIds.length === 0) return {} as Record<string, number>
+
+  const counts: Record<string, number> = {}
+
+  for (const table of PACK_TABLES) {
+    let query = (db.from(table) as any)
+      .update({ is_active: active })
+      .eq('pack_id', packId)
+
+    if (TABLES_WITH_ACCOUNT_ID.has(table)) {
+      query = query.eq('account_id', accountId)
+    } else {
+      // For child tables without account_id, scope to cloned IDs
+      query = query.in('id', clonedIds)
+    }
+
+    if (testDataOnly === true) {
+      query = query.eq('is_test_data', true)
+    } else if (testDataOnly === false) {
+      query = query.eq('is_test_data', false)
+    }
+
+    const { data } = await query.select('id')
+    counts[table] = data?.length || 0
+  }
+
+  return counts
+}
+
+async function setPackConfigActive(accountId: string, packId: string, active: boolean) {
+  return setClonedEntitiesActive(accountId, packId, active, false)
+}
+
+async function setPackTestDataActive(accountId: string, packId: string, active: boolean) {
+  return setClonedEntitiesActive(accountId, packId, active, true)
+}
+
+async function setSharedTestDataActive(active: boolean, accountId?: string) {
+  for (const table of SHARED_TEST_TABLES) {
+    if (table === 'memberships') continue // handled below
+    await (db.from(table) as any)
+      .update({ is_active: active })
+      .eq('is_test_data', true)
+      .is('pack_id', null)
+  }
+
+  const [{ data: testPersons }, { data: testAccounts }] = await Promise.all([
+    db.from('persons').select('id').eq('is_test_data', true).is('pack_id', null),
+    db.from('accounts').select('id').eq('is_test_data', true).is('pack_id', null),
+  ])
+
+  const testPersonIds = (testPersons || []).map((p: any) => p.id)
+  const sharedAccountIds = (testAccounts || []).map((a: any) => a.id)
+
+  if (testPersonIds.length === 0) return
+
+  const targetAccountIds = new Set<string>(sharedAccountIds)
+  if (accountId) targetAccountIds.add(accountId)
+
+  if (targetAccountIds.size === 0) return
+
+  if (active) {
+    for (const targetId of targetAccountIds) {
+      for (const personId of testPersonIds) {
+        await (db.from('memberships') as any)
+          .upsert({
+            person_id: personId,
+            account_id: targetId,
+            account_role: 'member',
+            status: 'active',
+            is_active: true,
+            is_test_data: true,
+          }, { onConflict: 'person_id,account_id' })
+      }
+    }
+    return
+  }
+
+  await (db.from('memberships') as any)
+    .update({ is_active: false })
+    .in('account_id', Array.from(targetAccountIds))
+    .eq('is_test_data', true)
+}
+
+async function anyPackHasTestDataActive(excludePackId?: string): Promise<boolean> {
+  let query = db
+    .from('pack_activations')
+    .select('id')
+    .eq('test_data_active', true)
+    .limit(1)
+
+  if (excludePackId) {
+    query = query.neq('pack_id', excludePackId)
+  }
+
+  const { data } = await query
+  return (data?.length || 0) > 0
+}
 
 export default createHandler({
   async GET(req, ctx, params) {
@@ -8,18 +308,95 @@ export default createHandler({
     if (authCheck) return authCheck
 
     const id = params.get('id')
-    if (id) {
-      const { data } = await db.from('config_packs').select('*').eq('id', id).single()
-      if (!data) return error('Not found', 404)
-      return json(data)
+    const action = params.get('action')
+
+    // Export a pack as JSON
+    if (id && action === 'export') {
+      const { data: pack } = await db.from('config_packs').select('*').eq('id', id).single()
+      if (!pack) return error('Not found', 404)
+
+      const [workflows, stages, transitions, fields, linkTypes, automations, navExts, navOvrs, dashboards, docs] = await Promise.all([
+        db.from('workflow_definitions').select('*').eq('pack_id', id).eq('is_test_data', false),
+        db.from('stage_definitions').select('*').eq('pack_id', id).eq('is_test_data', false),
+        db.from('transition_definitions').select('*').eq('pack_id', id).eq('is_test_data', false),
+        db.from('custom_field_definitions').select('*').eq('pack_id', id).eq('is_test_data', false),
+        db.from('link_type_definitions').select('*').eq('pack_id', id).eq('is_test_data', false),
+        db.from('automation_rules').select('*').eq('pack_id', id).eq('is_test_data', false),
+        db.from('nav_extensions').select('*').eq('pack_id', id).eq('is_test_data', false),
+        db.from('nav_overrides').select('*').eq('pack_id', id).eq('is_test_data', false),
+        db.from('dashboard_definitions').select('*, widgets:dashboard_widgets(*)').eq('pack_id', id).eq('is_test_data', false),
+        db.from('knowledge_base_articles').select('*').eq('pack_id', id).eq('is_test_data', false),
+      ])
+
+      const [testItems, testLinks] = await Promise.all([
+        db.from('workflow_items').select('*').eq('pack_id', id).eq('is_test_data', true),
+        db.from('entity_links').select('*').eq('pack_id', id).eq('is_test_data', true),
+      ])
+
+      return json({
+        spine_pack_version: 1,
+        name: pack.name,
+        slug: pack.slug,
+        description: pack.description,
+        icon: pack.icon,
+        category: pack.category,
+        config: {
+          workflows: workflows.data || [],
+          stages: stages.data || [],
+          transitions: transitions.data || [],
+          custom_fields: fields.data || [],
+          link_types: linkTypes.data || [],
+          automations: automations.data || [],
+          nav_extensions: navExts.data || [],
+          nav_overrides: navOvrs.data || [],
+          dashboards: dashboards.data || [],
+          documents: docs.data || [],
+        },
+        test_data: {
+          workflow_items: testItems.data || [],
+          entity_links: testLinks.data || [],
+        },
+      })
     }
 
-    const { data } = await db
+    // Get single pack
+    if (id) {
+      const { data: pack } = await db.from('config_packs').select('*').eq('id', id).single()
+      if (!pack) return error('Not found', 404)
+      return json(pack)
+    }
+
+    // List all packs with activation state for current account
+    const { data: packs } = await db
       .from('config_packs')
-      .select('id, name, description, is_system, created_at')
+      .select('id, name, slug, icon, category, description, is_system, pack_data, created_at')
       .order('name')
 
-    return json(data || [])
+    // Get activations for current account
+    let activations: any[] = []
+    if (ctx.accountId) {
+      const { data } = await db
+        .from('pack_activations')
+        .select('*')
+        .eq('account_id', ctx.accountId)
+
+      activations = data || []
+    }
+
+    const activationMap = new Map(activations.map((a: any) => [a.pack_id, a]))
+
+    const result = (packs || []).map((pack: any) => {
+      const activation = activationMap.get(pack.id)
+      return {
+        ...pack,
+        config_active: activation?.config_active || false,
+        test_data_active: activation?.test_data_active || false,
+        activated_by: activation?.activated_by || null,
+        activated_at: activation?.activated_at || null,
+      }
+    })
+
+    return json(result)
   },
 
   async POST(req, ctx) {
@@ -32,215 +409,123 @@ export default createHandler({
 
     const body = await parseBody<any>(req)
     const action = body.action
+    const packId = body.pack_id
+    const accountId = ctx.accountId!
 
-    if (action === 'install') {
-      // Install a pack into the current account
-      const packId = body.pack_id
+    // ── Toggle Config ─────────────────────────────────────────────────
+    if (action === 'toggle_config') {
       if (!packId) return error('pack_id required')
+      const active = body.active === true
 
-      const { data: pack } = await db.from('config_packs').select('*').eq('id', packId).single()
+      const { data: pack } = await db.from('config_packs').select('id, name').eq('id', packId).single()
       if (!pack) return error('Pack not found', 404)
 
-      const packData = pack.pack_data
-      const accountId = ctx.accountId!
-      const results: string[] = []
+      if (active) {
+        await ensurePackConfigCloned(packId, accountId)
 
-      // Install workflows + stages + transitions
-      if (packData.workflows) {
-        for (const wfDef of packData.workflows) {
-          const { data: wf } = await db
-            .from('workflow_definitions')
-            .insert({
-              account_id: accountId,
-              name: wfDef.name,
-              description: wfDef.description || null,
-              config: wfDef.config || {},
-              public_config: wfDef.public_config || {},
-            })
-            .select()
-            .single()
+        const counts = await setPackConfigActive(accountId, packId, true)
 
-          if (!wf) continue
-          results.push(`Workflow: ${wf.name}`)
+        const { data: activation } = await db
+          .from('pack_activations')
+          .select('test_data_active')
+          .eq('account_id', accountId)
+          .eq('pack_id', packId)
+          .maybeSingle()
 
-          const stageIdMap: Record<string, string> = {}
-
-          if (wfDef.stages) {
-            for (const stageDef of wfDef.stages) {
-              const { data: stage } = await db
-                .from('stage_definitions')
-                .insert({
-                  workflow_definition_id: wf.id,
-                  name: stageDef.name,
-                  description: stageDef.description || null,
-                  position: stageDef.position ?? 0,
-                  is_initial: stageDef.is_initial || false,
-                  is_terminal: stageDef.is_terminal || false,
-                  is_public: stageDef.is_public || false,
-                  config: stageDef.config || {},
-                })
-                .select()
-                .single()
-
-              if (stage && stageDef._ref) {
-                stageIdMap[stageDef._ref] = stage.id
-              }
-              if (stage) results.push(`  Stage: ${stage.name}`)
-            }
-          }
-
-          if (wfDef.transitions) {
-            for (const transDef of wfDef.transitions) {
-              const fromId = stageIdMap[transDef._from_ref] || transDef.from_stage_id
-              const toId = stageIdMap[transDef._to_ref] || transDef.to_stage_id
-              if (!fromId || !toId) continue
-
-              await db.from('transition_definitions').insert({
-                workflow_definition_id: wf.id,
-                name: transDef.name,
-                from_stage_id: fromId,
-                to_stage_id: toId,
-                conditions: transDef.conditions || [],
-                require_comment: transDef.require_comment || false,
-                config: transDef.config || {},
-              })
-              results.push(`  Transition: ${transDef.name}`)
-            }
-          }
+        if (!activation?.test_data_active) {
+          await setPackTestDataActive(accountId, packId, false)
         }
-      }
 
-      // Install custom fields
-      if (packData.custom_fields) {
-        for (const fieldDef of packData.custom_fields) {
-          const { data: existing } = await db
-            .from('custom_field_definitions')
-            .select('id')
-            .eq('account_id', accountId)
-            .eq('entity_type', fieldDef.entity_type)
-            .eq('field_key', fieldDef.field_key)
-            .single()
+        await db.from('pack_activations').upsert({
+          account_id: accountId,
+          pack_id: packId,
+          config_active: true,
+          test_data_active: activation?.test_data_active ?? false,
+          activated_by: ctx.personId,
+          activated_at: new Date().toISOString(),
+        }, { onConflict: 'account_id,pack_id' })
 
-          if (!existing) {
-            await db.from('custom_field_definitions').insert({
-              account_id: accountId,
-              entity_type: fieldDef.entity_type,
-              name: fieldDef.name,
-              field_key: fieldDef.field_key,
-              field_type: fieldDef.field_type,
-              options: fieldDef.options || [],
-              required: fieldDef.required || false,
-              is_public: fieldDef.is_public || false,
-              position: fieldDef.position ?? 0,
-            })
-            results.push(`Field: ${fieldDef.name} (${fieldDef.entity_type})`)
-          }
+        await emitActivity(ctx, 'config_pack.config_enabled', `Enabled template config "${pack.name}"`, 'config_pack', packId)
+        return json({ success: true, action: 'config_enabled', counts })
+      } else {
+        const configCounts = await setPackConfigActive(accountId, packId, false)
+        const testCounts = await setPackTestDataActive(accountId, packId, false)
+        const counts = combineCounts(configCounts, testCounts)
+
+        await db.from('pack_activations').upsert({
+          account_id: accountId,
+          pack_id: packId,
+          config_active: false,
+          test_data_active: false,
+        }, { onConflict: 'account_id,pack_id' })
+
+        // If no other packs have test data active, deactivate shared test data
+        const otherActive = await anyPackHasTestDataActive(packId)
+        if (!otherActive) {
+          await setSharedTestDataActive(false, accountId)
         }
+
+        await emitActivity(ctx, 'config_pack.config_disabled', `Disabled template config "${pack.name}"`, 'config_pack', packId)
+        return json({ success: true, action: 'config_disabled', counts })
       }
-
-      // Install link type definitions
-      if (packData.link_types) {
-        for (const ltDef of packData.link_types) {
-          const { data: existing } = await db
-            .from('link_type_definitions')
-            .select('id')
-            .eq('account_id', accountId)
-            .eq('slug', ltDef.slug)
-            .single()
-
-          if (!existing) {
-            await db.from('link_type_definitions').insert({
-              account_id: accountId,
-              name: ltDef.name,
-              slug: ltDef.slug,
-              source_entity_type: ltDef.source_entity_type || null,
-              target_entity_type: ltDef.target_entity_type || null,
-              color: ltDef.color || null,
-            })
-            results.push(`Link Type: ${ltDef.name}`)
-          }
-        }
-      }
-
-      // Install automation rules
-      if (packData.automations) {
-        for (const autoDef of packData.automations) {
-          await db.from('automation_rules').insert({
-            account_id: accountId,
-            name: autoDef.name,
-            description: autoDef.description || null,
-            trigger_event: autoDef.trigger_event,
-            conditions: autoDef.conditions || [],
-            action_type: autoDef.action_type,
-            action_config: autoDef.action_config || {},
-            enabled: true,
-          })
-          results.push(`Automation: ${autoDef.name}`)
-        }
-      }
-
-      // Install modules
-      if (packData.modules) {
-        for (const modDef of packData.modules) {
-          const { data: existing } = await db
-            .from('account_modules')
-            .select('id')
-            .eq('account_id', accountId)
-            .eq('module_slug', modDef.module_slug)
-            .single()
-
-          if (!existing) {
-            await db.from('account_modules').insert({
-              account_id: accountId,
-              module_slug: modDef.module_slug,
-              label: modDef.label,
-              description: modDef.description || null,
-              enabled: true,
-              config: modDef.config || {},
-            })
-            results.push(`Module: ${modDef.label}`)
-          }
-        }
-      }
-
-      // Install nav extensions
-      if (packData.nav_extensions) {
-        for (const navDef of packData.nav_extensions) {
-          const { data: existing } = await db
-            .from('nav_extensions')
-            .select('id')
-            .eq('account_id', accountId)
-            .eq('label', navDef.label)
-            .single()
-
-          if (!existing) {
-            await db.from('nav_extensions').insert({
-              account_id: accountId,
-              label: navDef.label,
-              icon: navDef.icon || null,
-              url: navDef.url,
-              location: navDef.location || 'sidebar',
-              position: navDef.position ?? 0,
-              min_role: navDef.min_role || 'member',
-              module_slug: navDef.module_slug || null,
-            })
-            results.push(`Nav Extension: ${navDef.label}`)
-          }
-        }
-      }
-
-      await emitActivity(
-        ctx,
-        'config_pack.installed',
-        `Installed config pack "${pack.name}"`,
-        'config_pack',
-        pack.id,
-        { items_created: results.length },
-      )
-
-      return json({ success: true, installed: results })
     }
 
-    return error('Unknown action. Use { action: "install", pack_id: "..." }')
+    // ── Toggle Test Data ──────────────────────────────────────────────
+    if (action === 'toggle_test_data') {
+      if (!packId) return error('pack_id required')
+      const active = body.active === true
+
+      const { data: pack } = await db.from('config_packs').select('id, name').eq('id', packId).single()
+      if (!pack) return error('Pack not found', 404)
+
+      // Check config is active first
+      const { data: activation } = await db
+        .from('pack_activations')
+        .select('config_active')
+        .eq('account_id', accountId)
+        .eq('pack_id', packId)
+        .maybeSingle()
+
+      if (active && !activation?.config_active) {
+        return error('Template config must be enabled before enabling test data')
+      }
+
+      if (active) {
+        await ensurePackTestDataCloned(packId, accountId)
+
+        const counts = await setPackTestDataActive(accountId, packId, true)
+
+        // Activate shared test data (persons, accounts)
+        await setSharedTestDataActive(true, accountId)
+
+        await db.from('pack_activations').upsert({
+          account_id: accountId,
+          pack_id: packId,
+          test_data_active: true,
+        }, { onConflict: 'account_id,pack_id' })
+
+        await emitActivity(ctx, 'config_pack.test_data_enabled', `Enabled test data for "${pack.name}"`, 'config_pack', packId)
+        return json({ success: true, action: 'test_data_enabled', counts })
+      } else {
+        const counts = await setPackTestDataActive(accountId, packId, false)
+
+        await db.from('pack_activations').upsert({
+          account_id: accountId,
+          pack_id: packId,
+          test_data_active: false,
+        }, { onConflict: 'account_id,pack_id' })
+
+        // If no other packs have test data active, deactivate shared test data
+        const otherActive = await anyPackHasTestDataActive(packId)
+        if (!otherActive) {
+          await setSharedTestDataActive(false, accountId)
+        }
+
+        await emitActivity(ctx, 'config_pack.test_data_disabled', `Disabled test data for "${pack.name}"`, 'config_pack', packId)
+        return json({ success: true, action: 'test_data_disabled', counts })
+      }
+    }
+
+    return error('Unknown action. Use toggle_config or toggle_test_data')
   },
 })

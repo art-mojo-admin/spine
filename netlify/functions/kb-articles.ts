@@ -24,16 +24,42 @@ export default createHandler({
     }
 
     const status = params.get('status')
+    const parentId = params.get('parent_id')
+    const tree = params.get('tree')
+    const includeInactive = params.get('include_inactive') === 'true' && ctx.accountRole === 'admin'
     let query = db
       .from('knowledge_base_articles')
-      .select('id, title, slug, status, category, is_global, published_at, created_at, updated_at, author:author_person_id(id, full_name)')
+      .select('id, title, slug, status, category, is_global, parent_article_id, position, published_at, created_at, updated_at, author:author_person_id(id, full_name)')
       .or(`account_id.eq.${ctx.accountId},is_global.eq.true`)
-      .order('created_at', { ascending: false })
+
+    if (!includeInactive) query = query.eq('is_active', true)
 
     if (status) query = query.eq('status', status)
+    if (parentId === 'null') query = query.is('parent_article_id', null)
+    else if (parentId) query = query.eq('parent_article_id', parentId)
 
-    const { data } = await query.limit(200)
-    return json(data || [])
+    query = query.order('position', { ascending: true }).order('created_at', { ascending: false })
+
+    const { data } = await query.limit(500)
+    const articles = data || []
+
+    // Tree mode: return nested structure
+    if (tree === 'true' && !parentId) {
+      const map = new Map<string, any>()
+      for (const a of articles) { map.set(a.id, { ...a, children: [] }) }
+      const roots: any[] = []
+      for (const a of articles) {
+        const node = map.get(a.id)!
+        if (a.parent_article_id && map.has(a.parent_article_id)) {
+          map.get(a.parent_article_id)!.children.push(node)
+        } else {
+          roots.push(node)
+        }
+      }
+      return json(roots)
+    }
+
+    return json(articles)
   },
 
   async POST(req, ctx) {
@@ -59,6 +85,8 @@ export default createHandler({
         status: body.status || 'draft',
         category: body.category || null,
         author_person_id: ctx.personId,
+        parent_article_id: body.parent_article_id || null,
+        position: body.position ?? 0,
       })
       .select()
       .single()
@@ -95,6 +123,8 @@ export default createHandler({
     if (body.body !== undefined) updates.body = body.body
     if (body.category !== undefined) updates.category = body.category
     if (body.metadata !== undefined) updates.metadata = { ...(before.metadata || {}), ...body.metadata }
+    if (body.parent_article_id !== undefined) updates.parent_article_id = body.parent_article_id
+    if (body.position !== undefined) updates.position = body.position
     if (body.status !== undefined) {
       updates.status = body.status
       if (body.status === 'published' && !before.published_at) {

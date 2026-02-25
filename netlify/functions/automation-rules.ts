@@ -23,12 +23,14 @@ export default createHandler({
     }
 
     const workflowId = params.get('workflow_definition_id')
+    const includeInactive = params.get('include_inactive') === 'true' && ctx.accountRole === 'admin'
     let query = db
       .from('automation_rules')
       .select('*')
       .eq('account_id', ctx.accountId)
       .order('created_at', { ascending: false })
 
+    if (!includeInactive) query = query.eq('is_active', true)
     if (workflowId) query = query.eq('workflow_definition_id', workflowId)
 
     const { data } = await query.limit(200)

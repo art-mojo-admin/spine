@@ -2,7 +2,7 @@ import { createHandler, requireAuth, requireTenant, json, error, parseBody } fro
 import { db } from './_shared/db'
 import { emitAudit, emitActivity, emitOutboxEvent } from './_shared/audit'
 
-const VALID_ENTITY_TYPES = ['person', 'account', 'workflow_item', 'ticket', 'kb_article']
+const VALID_ENTITY_TYPES = ['person', 'account', 'workflow_item', 'ticket', 'kb_article', 'entity_comment', 'enrollment']
 
 export default createHandler({
   async GET(req, ctx, params) {
@@ -36,6 +36,8 @@ export default createHandler({
 
     let results: any[] = []
 
+    const includeInactive = params.get('include_inactive') === 'true' && ctx.accountRole === 'admin'
+
     if (!direction || direction === 'source') {
       let q = db
         .from('entity_links')
@@ -43,6 +45,7 @@ export default createHandler({
         .eq('account_id', ctx.accountId)
         .eq('source_type', entityType)
         .eq('source_id', entityId)
+      if (!includeInactive) q = q.eq('is_active', true)
       if (linkType) q = q.eq('link_type', linkType)
       const { data } = await q.order('created_at', { ascending: false })
       if (data) results.push(...data.map((d: any) => ({ ...d, _direction: 'outgoing' })))
@@ -55,6 +58,7 @@ export default createHandler({
         .eq('account_id', ctx.accountId)
         .eq('target_type', entityType)
         .eq('target_id', entityId)
+      if (!includeInactive) q = q.eq('is_active', true)
       if (linkType) q = q.eq('link_type', linkType)
       const { data } = await q.order('created_at', { ascending: false })
       if (data) results.push(...data.map((d: any) => ({ ...d, _direction: 'incoming' })))
