@@ -2,6 +2,7 @@ node_modules
 dist
 .netlify
 .env
+.env.example
 .env.local
 .env.production
 *.log

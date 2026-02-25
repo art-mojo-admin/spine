@@ -5,7 +5,7 @@
 
   [build.environment]
     # Supabase VITE variables are meant to be public in the browser
-    SECRETS_SCAN_OMIT_KEYS = "VITE_SUPABASE_URL,VITE_SUPABASE_ANON_KEY,VITE_DB_SCHEMA,VITE_APP_NAME,SUPABASE_URL"
+    SECRETS_SCAN_OMIT_KEYS = "VITE_SUPABASE_URL,VITE_SUPABASE_ANON_KEY,VITE_DB_SCHEMA,VITE_APP_NAME,SUPABASE_URL,DB_SCHEMA"
 
 [dev]
   command = "npm run dev"
