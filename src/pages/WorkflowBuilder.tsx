@@ -149,7 +149,7 @@ export function WorkflowBuilderPage() {
       if (!sourceStage || !targetStage) return
 
       try {
-        await apiPost('transition-definitions', {
+        const newTransition = await apiPost<any>('transition-definitions', {
           workflow_definition_id: workflowId,
           name: `To ${targetStage.name}`,
           from_stage_id: sourceStage.id,
@@ -159,7 +159,10 @@ export function WorkflowBuilderPage() {
             targetHandle: connection.targetHandle,
           },
         })
-        await loadAll()
+        // Add to local state to avoid full reload
+        if (newTransition) {
+          setTransitions((prev) => [...prev, newTransition])
+        }
       } catch (err) {
         console.error('Failed to create transition', err)
       }
@@ -169,7 +172,7 @@ export function WorkflowBuilderPage() {
 
   const onReconnect = useCallback(
     async (oldEdge: Edge, newConnection: Connection) => {
-      // Optimistically update the UI
+      // Optimistically update the UI edges
       setEdges((els) => reconnectEdge(oldEdge, newConnection, els))
       
       const transition = transitions.find(t => t.id === oldEdge.id)
@@ -181,6 +184,16 @@ export function WorkflowBuilderPage() {
           sourceHandle: newConnection.sourceHandle,
           targetHandle: newConnection.targetHandle,
         }
+
+        // Update local transitions state to avoid full reload
+        setTransitions((prev) => 
+          prev.map((t) => 
+            t.id === transition.id 
+              ? { ...t, from_stage_id: newConnection.source, to_stage_id: newConnection.target, config }
+              : t
+          )
+        )
+
         await apiPatch(
           'transition-definitions',
           { 
@@ -190,14 +203,12 @@ export function WorkflowBuilderPage() {
           },
           { id: transition.id }
         )
-        // Refresh to ensure full state sync
-        await loadAll()
       } catch (err) {
         console.error('Failed to reconnect transition', err)
         await loadAll() // Revert on failure
       }
     },
-    [transitions, setEdges],
+    [transitions, setEdges, loadAll],
   )
 
   const onNodeDragStop = useCallback(
