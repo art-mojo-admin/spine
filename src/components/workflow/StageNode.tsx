@@ -1,13 +1,15 @@
 import { memo } from 'react'
 import { Handle, Position, type NodeProps } from '@xyflow/react'
 import { Badge } from '@/components/ui/badge'
-import { Zap } from 'lucide-react'
+import { Zap, LogIn, LogOut } from 'lucide-react'
 
 export interface StageNodeData {
   label: string
   isInitial?: boolean
   isTerminal?: boolean
   actionCount?: number
+  enterActionCount?: number
+  exitActionCount?: number
   color?: string
   [key: string]: unknown
 }
@@ -43,10 +45,27 @@ function StageNodeComponent({ data, selected }: NodeProps) {
           </Badge>
         )}
         {(d.actionCount ?? 0) > 0 && (
-          <span className="flex items-center gap-0.5 text-[10px] text-muted-foreground">
-            <Zap className="h-3 w-3" />
-            {d.actionCount}
-          </span>
+          <div className="flex items-center gap-1.5 ml-auto">
+            {(d.enterActionCount ?? 0) > 0 && (
+              <span className="flex items-center gap-0.5 text-[10px] text-muted-foreground" title="On Enter Actions">
+                <LogIn className="h-3 w-3" />
+                {d.enterActionCount}
+              </span>
+            )}
+            {(d.exitActionCount ?? 0) > 0 && (
+              <span className="flex items-center gap-0.5 text-[10px] text-muted-foreground" title="On Exit Actions">
+                <LogOut className="h-3 w-3" />
+                {d.exitActionCount}
+              </span>
+            )}
+            {/* Fallback if actions exist but not specifically enter/exit (e.g. legacy) */}
+            {(d.enterActionCount ?? 0) === 0 && (d.exitActionCount ?? 0) === 0 && (
+              <span className="flex items-center gap-0.5 text-[10px] text-muted-foreground" title="Actions">
+                <Zap className="h-3 w-3" />
+                {d.actionCount}
+              </span>
+            )}
+          </div>
         )}
       </div>
 

@@ -75,9 +75,17 @@ export function WorkflowBuilderPage() {
     if (loading) return
 
     const actionCountByRef = new Map<string, number>()
+    const enterActionCountByRef = new Map<string, number>()
+    const exitActionCountByRef = new Map<string, number>()
+
     for (const a of allActions) {
       if (a.trigger_ref_id) {
         actionCountByRef.set(a.trigger_ref_id, (actionCountByRef.get(a.trigger_ref_id) || 0) + 1)
+        if (a.trigger_type === 'on_enter_stage') {
+          enterActionCountByRef.set(a.trigger_ref_id, (enterActionCountByRef.get(a.trigger_ref_id) || 0) + 1)
+        } else if (a.trigger_type === 'on_exit_stage') {
+          exitActionCountByRef.set(a.trigger_ref_id, (exitActionCountByRef.get(a.trigger_ref_id) || 0) + 1)
+        }
       }
     }
 
@@ -93,6 +101,8 @@ export function WorkflowBuilderPage() {
         isInitial: stage.is_initial,
         isTerminal: stage.is_terminal,
         actionCount: actionCountByRef.get(stage.id) || 0,
+        enterActionCount: enterActionCountByRef.get(stage.id) || 0,
+        exitActionCount: exitActionCountByRef.get(stage.id) || 0,
       },
     }))
 
@@ -102,7 +112,11 @@ export function WorkflowBuilderPage() {
       target: t.to_stage_id,
       type: 'transition',
       markerEnd: { type: MarkerType.ArrowClosed, width: 16, height: 16 },
-      data: { label: t.name },
+      data: { 
+        label: t.name,
+        hasConditions: Array.isArray(t.conditions) && t.conditions.length > 0,
+        actionCount: actionCountByRef.get(t.id) || 0,
+      },
     }))
 
     setNodes(newNodes)
