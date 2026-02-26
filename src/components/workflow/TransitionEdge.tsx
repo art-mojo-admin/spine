@@ -48,21 +48,36 @@ function TransitionEdgeComponent({
     let sy = sourceY
     let tx = targetX
     let ty = targetY
+    let cx: number | undefined
+    let cy: number | undefined
 
     // Offset logic to avoid overlapping bidirectional or duplicate edges
     if (totalEdges > 1) {
-      const offset = (edgeIndex - (totalEdges - 1) / 2) * 25 // 25px gap between parallel edges
+      const offset = (edgeIndex - (totalEdges - 1) / 2) * 35 // 35px gap between parallel edges
 
+      // Offset the start and end points slightly
       if (sourcePosition === Position.Top || sourcePosition === Position.Bottom) {
-        sx += offset
+        sx += offset * 0.5
       } else {
-        sy += offset
+        sy += offset * 0.5
       }
 
       if (targetPosition === Position.Top || targetPosition === Position.Bottom) {
-        tx += offset
+        tx += offset * 0.5
       } else {
-        ty += offset
+        ty += offset * 0.5
+      }
+
+      // Offset the middle routing segments significantly
+      // Determine primary direction of the edge
+      const isHorizontal = Math.abs(targetX - sourceX) > Math.abs(targetY - sourceY)
+      
+      if (isHorizontal) {
+        // If primarily moving left/right, the middle segment is horizontal, so we offset its Y
+        cy = (sourceY + targetY) / 2 + offset
+      } else {
+        // If primarily moving up/down, the middle segment is vertical, so we offset its X
+        cx = (sourceX + targetX) / 2 + offset
       }
     }
 
@@ -73,6 +88,8 @@ function TransitionEdgeComponent({
       targetX: tx,
       targetY: ty,
       targetPosition,
+      centerX: cx,
+      centerY: cy,
       borderRadius: 16,
       offset: 20, // distance from node to first bend
     })
