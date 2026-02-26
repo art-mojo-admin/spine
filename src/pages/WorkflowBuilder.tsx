@@ -128,6 +128,8 @@ export function WorkflowBuilderPage() {
           actionCount: actionCountByRef.get(t.id) || 0,
           edgeIndex,
           totalEdges,
+          sourceId: t.from_stage_id,
+          targetId: t.to_stage_id,
         },
       }
     })
