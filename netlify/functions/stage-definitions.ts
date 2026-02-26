@@ -19,6 +19,7 @@ export default createHandler({
       .from('stage_definitions')
       .select('*')
       .eq('workflow_definition_id', workflowId)
+      .eq('is_active', true)
       .order('position', { ascending: true })
 
     return json(data || [])

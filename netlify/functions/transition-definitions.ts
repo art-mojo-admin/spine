@@ -34,11 +34,14 @@ export default createHandler({
 
     if (!wf) return error('Workflow not found', 404)
 
-    const { data } = await db
+    let query = db
       .from('transition_definitions')
       .select('*')
       .eq('workflow_definition_id', workflowId)
+      .eq('is_active', true)
       .order('position', { ascending: true })
+
+    const { data } = await query
 
     return json(data || [])
   },

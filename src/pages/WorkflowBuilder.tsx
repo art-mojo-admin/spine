@@ -106,18 +106,31 @@ export function WorkflowBuilderPage() {
       },
     }))
 
-    const newEdges: Edge[] = transitions.map((t) => ({
-      id: t.id,
-      source: t.from_stage_id,
-      target: t.to_stage_id,
-      type: 'transition',
-      markerEnd: { type: MarkerType.ArrowClosed, width: 16, height: 16 },
-      data: { 
-        label: t.name,
-        hasConditions: Array.isArray(t.conditions) && t.conditions.length > 0,
-        actionCount: actionCountByRef.get(t.id) || 0,
-      },
-    }))
+    const newEdges: Edge[] = transitions.map((t) => {
+      const edgesBetween = transitions.filter(
+        (other) =>
+          (other.from_stage_id === t.from_stage_id && other.to_stage_id === t.to_stage_id) ||
+          (other.from_stage_id === t.to_stage_id && other.to_stage_id === t.from_stage_id)
+      ).sort((a, b) => a.id.localeCompare(b.id))
+
+      const edgeIndex = edgesBetween.findIndex((e) => e.id === t.id)
+      const totalEdges = edgesBetween.length
+
+      return {
+        id: t.id,
+        source: t.from_stage_id,
+        target: t.to_stage_id,
+        type: 'transition',
+        markerEnd: { type: MarkerType.ArrowClosed, width: 16, height: 16 },
+        data: { 
+          label: t.name,
+          hasConditions: Array.isArray(t.conditions) && t.conditions.length > 0,
+          actionCount: actionCountByRef.get(t.id) || 0,
+          edgeIndex,
+          totalEdges,
+        },
+      }
+    })
 
     setNodes(newNodes)
     setEdges(newEdges)

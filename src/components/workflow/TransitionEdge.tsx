@@ -3,6 +3,7 @@ import {
   BaseEdge,
   EdgeLabelRenderer,
   getSmoothStepPath,
+  getBezierPath,
   type EdgeProps,
 } from '@xyflow/react'
 import { Zap, Filter } from 'lucide-react'
@@ -19,15 +20,52 @@ function TransitionEdgeComponent({
   selected,
   markerEnd,
 }: EdgeProps) {
-  const [edgePath, labelX, labelY] = getSmoothStepPath({
-    sourceX,
-    sourceY,
-    sourcePosition,
-    targetX,
-    targetY,
-    targetPosition,
-    borderRadius: 16,
-  })
+  const edgeIndex = (data as any)?.edgeIndex || 0
+  const totalEdges = (data as any)?.totalEdges || 1
+
+  // Use SmoothStep by default.
+  // If there are overlapping/bidirectional edges, SmoothStep draws them on top of each other.
+  // To work around this, we can curve them slightly differently using a bezier or offset.
+  // We'll use getBezierPath with an offset control point for overlapping lines, and smoothstep for singles.
+
+  let edgePath = ''
+  let labelX = 0
+  let labelY = 0
+
+  if (totalEdges > 1) {
+    // If multiple edges exist between these two nodes (e.g., A->B and B->A),
+    // use a bezier curve to bow them outwards based on their index.
+    const curvature = 0.3 + (edgeIndex * 0.2) // increase curvature for each additional edge
+    
+    // We can just rely on the default xyflow getBezierPath which has an internal curvature
+    // But since they would still overlap if exact same nodes but opposite direction, 
+    // we manually bow them out.
+    const path = getBezierPath({
+      sourceX,
+      sourceY,
+      sourcePosition,
+      targetX,
+      targetY,
+      targetPosition,
+      curvature,
+    })
+    edgePath = path[0]
+    labelX = path[1]
+    labelY = path[2]
+  } else {
+    const path = getSmoothStepPath({
+      sourceX,
+      sourceY,
+      sourcePosition,
+      targetX,
+      targetY,
+      targetPosition,
+      borderRadius: 16,
+    })
+    edgePath = path[0]
+    labelX = path[1]
+    labelY = path[2]
+  }
 
   const label = (data as any)?.label || ''
   const hasConditions = (data as any)?.hasConditions || false

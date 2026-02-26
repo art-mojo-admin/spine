@@ -38,6 +38,7 @@ export default createHandler({
       .from('workflow_actions')
       .select('*')
       .eq('workflow_definition_id', workflowId)
+      .eq('is_active', true)
       .order('position', { ascending: true })
 
     const triggerType = params.get('trigger_type')
