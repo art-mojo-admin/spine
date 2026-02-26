@@ -19,14 +19,68 @@ function StageNodeComponent({ data, selected }: NodeProps) {
   const borderColor = selected ? 'border-primary ring-2 ring-primary/20' : 'border-border'
   const bgColor = d.color || 'bg-card'
 
+  const handleClasses = "!w-3 !h-3 !border-2 !border-background hover:!w-4 hover:!h-4 hover:!bg-primary transition-all"
+  const sourceHandleColor = "!bg-primary/80"
+  const targetHandleColor = "!bg-muted-foreground/40"
+
   return (
     <div
-      className={`rounded-lg border-2 ${borderColor} ${bgColor} px-4 py-3 shadow-sm min-w-[160px] transition-all`}
+      className={`rounded-lg border-2 ${borderColor} ${bgColor} px-4 py-3 shadow-sm min-w-[160px] transition-all relative group`}
     >
+      {/* Top Handles */}
       <Handle
         type="target"
         position={Position.Top}
-        className="!w-3 !h-3 !bg-muted-foreground/40 !border-2 !border-background"
+        id="top"
+        className={`${handleClasses} ${targetHandleColor}`}
+      />
+      <Handle
+        type="source"
+        position={Position.Top}
+        id="top-source"
+        className={`${handleClasses} ${sourceHandleColor} !-translate-y-2 opacity-0 group-hover:opacity-100 pointer-events-none group-hover:pointer-events-auto`}
+      />
+
+      {/* Right Handles */}
+      <Handle
+        type="target"
+        position={Position.Right}
+        id="right-target"
+        className={`${handleClasses} ${targetHandleColor} !translate-x-2 opacity-0 group-hover:opacity-100 pointer-events-none group-hover:pointer-events-auto`}
+      />
+      <Handle
+        type="source"
+        position={Position.Right}
+        id="right"
+        className={`${handleClasses} ${sourceHandleColor}`}
+      />
+
+      {/* Bottom Handles */}
+      <Handle
+        type="target"
+        position={Position.Bottom}
+        id="bottom-target"
+        className={`${handleClasses} ${targetHandleColor} !translate-y-2 opacity-0 group-hover:opacity-100 pointer-events-none group-hover:pointer-events-auto`}
+      />
+      <Handle
+        type="source"
+        position={Position.Bottom}
+        id="bottom"
+        className={`${handleClasses} ${sourceHandleColor}`}
+      />
+
+      {/* Left Handles */}
+      <Handle
+        type="target"
+        position={Position.Left}
+        id="left"
+        className={`${handleClasses} ${targetHandleColor}`}
+      />
+      <Handle
+        type="source"
+        position={Position.Left}
+        id="left-source"
+        className={`${handleClasses} ${sourceHandleColor} !-translate-x-2 opacity-0 group-hover:opacity-100 pointer-events-none group-hover:pointer-events-auto`}
       />
 
       <div className="flex items-center gap-2">
@@ -68,12 +122,6 @@ function StageNodeComponent({ data, selected }: NodeProps) {
           </div>
         )}
       </div>
-
-      <Handle
-        type="source"
-        position={Position.Bottom}
-        className="!w-3 !h-3 !bg-primary !border-2 !border-background"
-      />
     </div>
   )
 }

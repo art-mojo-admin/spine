@@ -7,6 +7,7 @@ import {
   MiniMap,
   useNodesState,
   useEdgesState,
+  reconnectEdge,
   type Connection,
   type Node,
   type Edge,
@@ -120,6 +121,8 @@ export function WorkflowBuilderPage() {
         id: t.id,
         source: t.from_stage_id,
         target: t.to_stage_id,
+        sourceHandle: (t.config as any)?.sourceHandle || 'bottom',
+        targetHandle: (t.config as any)?.targetHandle || 'top',
         type: 'transition',
         markerEnd: { type: MarkerType.ArrowClosed, width: 16, height: 16 },
         data: { 
@@ -148,9 +151,13 @@ export function WorkflowBuilderPage() {
       try {
         await apiPost('transition-definitions', {
           workflow_definition_id: workflowId,
-          name: sourceStage.name + ' \u2192 ' + targetStage.name,
-          from_stage_id: connection.source,
-          to_stage_id: connection.target,
+          name: `To ${targetStage.name}`,
+          from_stage_id: sourceStage.id,
+          to_stage_id: targetStage.id,
+          config: {
+            sourceHandle: connection.sourceHandle,
+            targetHandle: connection.targetHandle,
+          },
         })
         await loadAll()
       } catch (err) {
@@ -158,6 +165,39 @@ export function WorkflowBuilderPage() {
       }
     },
     [workflowId, stages],
+  )
+
+  const onReconnect = useCallback(
+    async (oldEdge: Edge, newConnection: Connection) => {
+      // Optimistically update the UI
+      setEdges((els) => reconnectEdge(oldEdge, newConnection, els))
+      
+      const transition = transitions.find(t => t.id === oldEdge.id)
+      if (!transition) return
+
+      try {
+        const config = {
+          ...(transition.config || {}),
+          sourceHandle: newConnection.sourceHandle,
+          targetHandle: newConnection.targetHandle,
+        }
+        await apiPatch(
+          'transition-definitions',
+          { 
+            from_stage_id: newConnection.source,
+            to_stage_id: newConnection.target,
+            config 
+          },
+          { id: transition.id }
+        )
+        // Refresh to ensure full state sync
+        await loadAll()
+      } catch (err) {
+        console.error('Failed to reconnect transition', err)
+        await loadAll() // Revert on failure
+      }
+    },
+    [transitions, setEdges],
   )
 
   const onNodeDragStop = useCallback(
@@ -253,6 +293,7 @@ export function WorkflowBuilderPage() {
             onNodesChange={onNodesChange}
             onEdgesChange={onEdgesChange}
             onConnect={onConnect}
+            onReconnect={onReconnect}
             onNodeDragStop={onNodeDragStop}
             onNodeClick={onNodeClick}
             onEdgeClick={onEdgeClick}
