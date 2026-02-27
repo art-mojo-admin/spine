@@ -25,6 +25,7 @@ const CourseDetailPage = lazy(() => import('@/pages/CourseDetail').then(m => ({ 
 const LessonViewerPage = lazy(() => import('@/pages/LessonViewer').then(m => ({ default: m.LessonViewerPage })))
 const SearchPage = lazy(() => import('@/pages/Search').then(m => ({ default: m.SearchPage })))
 const ExtensionPage = lazy(() => import('@/pages/ExtensionPage').then(m => ({ default: m.ExtensionPage })))
+const ViewRendererPage = lazy(() => import('@/pages/ViewRenderer').then(m => ({ default: m.ViewRendererPage })))
 const SystemHealthPage = lazy(() => import('@/pages/SystemHealth').then(m => ({ default: m.SystemHealthPage })))
 
 // Admin pages
@@ -140,6 +141,7 @@ export default function App() {
           <Route path="/admin/views" element={<ViewDefinitionsPage />} />
           <Route path="/admin/account-browser" element={<AccountBrowserPage />} />
           <Route path="/admin/system-health" element={<SystemHealthPage />} />
+          <Route path="/v/:viewSlug" element={<ViewRendererPage />} />
           <Route path="/x/:slug" element={<ExtensionPage />} />
         </Route>
       </Routes>
