@@ -32,13 +32,13 @@ function StageNodeComponent({ data, selected }: NodeProps) {
         type="target"
         position={Position.Top}
         id="top"
-        className={`${handleClasses} ${targetHandleColor}`}
+        className={`${handleClasses} ${targetHandleColor} z-0`}
       />
       <Handle
         type="source"
         position={Position.Top}
         id="top-source"
-        className={`${handleClasses} ${sourceHandleColor} !-translate-y-2 opacity-0 group-hover:opacity-100 pointer-events-none group-hover:pointer-events-auto`}
+        className={`${handleClasses} ${sourceHandleColor} z-10 opacity-0 group-hover:opacity-100 pointer-events-none group-hover:pointer-events-auto`}
       />
 
       {/* Right Handles */}
@@ -46,13 +46,13 @@ function StageNodeComponent({ data, selected }: NodeProps) {
         type="target"
         position={Position.Right}
         id="right-target"
-        className={`${handleClasses} ${targetHandleColor} !translate-x-2 opacity-0 group-hover:opacity-100 pointer-events-none group-hover:pointer-events-auto`}
+        className={`${handleClasses} ${targetHandleColor} z-0 opacity-0 group-hover:opacity-100 pointer-events-none group-hover:pointer-events-auto`}
       />
       <Handle
         type="source"
         position={Position.Right}
         id="right"
-        className={`${handleClasses} ${sourceHandleColor}`}
+        className={`${handleClasses} ${sourceHandleColor} z-10`}
       />
 
       {/* Bottom Handles */}
@@ -60,13 +60,13 @@ function StageNodeComponent({ data, selected }: NodeProps) {
         type="target"
         position={Position.Bottom}
         id="bottom-target"
-        className={`${handleClasses} ${targetHandleColor} !translate-y-2 opacity-0 group-hover:opacity-100 pointer-events-none group-hover:pointer-events-auto`}
+        className={`${handleClasses} ${targetHandleColor} z-0 opacity-0 group-hover:opacity-100 pointer-events-none group-hover:pointer-events-auto`}
       />
       <Handle
         type="source"
         position={Position.Bottom}
         id="bottom"
-        className={`${handleClasses} ${sourceHandleColor}`}
+        className={`${handleClasses} ${sourceHandleColor} z-10`}
       />
 
       {/* Left Handles */}
@@ -74,13 +74,13 @@ function StageNodeComponent({ data, selected }: NodeProps) {
         type="target"
         position={Position.Left}
         id="left"
-        className={`${handleClasses} ${targetHandleColor}`}
+        className={`${handleClasses} ${targetHandleColor} z-0`}
       />
       <Handle
         type="source"
         position={Position.Left}
         id="left-source"
-        className={`${handleClasses} ${sourceHandleColor} !-translate-x-2 opacity-0 group-hover:opacity-100 pointer-events-none group-hover:pointer-events-auto`}
+        className={`${handleClasses} ${sourceHandleColor} z-10 opacity-0 group-hover:opacity-100 pointer-events-none group-hover:pointer-events-auto`}
       />
 
       <div className="flex items-center gap-2">

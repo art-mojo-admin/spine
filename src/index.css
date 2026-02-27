@@ -64,3 +64,8 @@
 }
 
 /* stylelint-enable at-rule-no-unknown */
+
+.react-flow__edge:not(.selected) .react-flow__edgeupdater {
+  display: none;
+  pointer-events: none;
+}

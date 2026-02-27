@@ -149,11 +149,23 @@ export function BuilderSidePanel({
     setEditingAction(null)
     setShowNewAction(false)
     await loadActions()
+    
+    if (tab === 'on_enter' || tab === 'on_exit') {
+      onStageUpdated()
+    } else if (tab === 'actions' && type === 'transition') {
+      onTransitionUpdated()
+    }
   }
 
   async function deleteAction(actionId: string) {
     await apiDelete('workflow-actions', { id: actionId })
     await loadActions()
+
+    if (tab === 'on_enter' || tab === 'on_exit') {
+      onStageUpdated()
+    } else if (tab === 'actions' && type === 'transition') {
+      onTransitionUpdated()
+    }
   }
 
   if (!type || !data) return null

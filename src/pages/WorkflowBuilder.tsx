@@ -90,22 +90,25 @@ export function WorkflowBuilderPage() {
       }
     }
 
-    const newNodes: Node[] = stages.map((stage, idx) => ({
-      id: stage.id,
-      type: 'stage',
-      position: {
-        x: stage.config?.position_x ?? 100 + (idx % 4) * 220,
-        y: stage.config?.position_y ?? 80 + Math.floor(idx / 4) * 160,
-      },
-      data: {
-        label: stage.name,
-        isInitial: stage.is_initial,
-        isTerminal: stage.is_terminal,
-        actionCount: actionCountByRef.get(stage.id) || 0,
-        enterActionCount: enterActionCountByRef.get(stage.id) || 0,
-        exitActionCount: exitActionCountByRef.get(stage.id) || 0,
-      },
-    }))
+    const newNodes: Node[] = stages.map((stage, idx) => {
+      const existingNode = nodes.find(n => n.id === stage.id)
+      return {
+        id: stage.id,
+        type: 'stage',
+        position: existingNode?.position || {
+          x: stage.config?.position_x ?? 100 + (idx % 4) * 220,
+          y: stage.config?.position_y ?? 80 + Math.floor(idx / 4) * 160,
+        },
+        data: {
+          label: stage.name,
+          isInitial: stage.is_initial,
+          isTerminal: stage.is_terminal,
+          actionCount: actionCountByRef.get(stage.id) || 0,
+          enterActionCount: enterActionCountByRef.get(stage.id) || 0,
+          exitActionCount: exitActionCountByRef.get(stage.id) || 0,
+        },
+      }
+    })
 
     const newEdges: Edge[] = transitions.map((t) => {
       const edgesBetween = transitions.filter(
