@@ -5,12 +5,11 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
-import { Search as SearchIcon, FileText, GitBranch, TicketCheck } from 'lucide-react'
+import { Search as SearchIcon, FileText, GitBranch } from 'lucide-react'
 
 const ENTITY_ICONS: Record<string, any> = {
-  ticket: TicketCheck,
-  kb_article: FileText,
-  workflow_item: GitBranch,
+  item: GitBranch,
+  document: FileText,
 }
 
 export function SearchPage() {
@@ -47,7 +46,7 @@ export function SearchPage() {
         <CardContent className="pt-6 space-y-3">
           <div className="flex gap-3">
             <Input
-              placeholder="Search tickets, articles, workflow items..."
+              placeholder="Search items, documents..."
               value={query}
               onChange={e => setQuery(e.target.value)}
               onKeyDown={e => e.key === 'Enter' && handleSearch()}
@@ -59,9 +58,8 @@ export function SearchPage() {
               className="rounded-md border bg-background px-3 py-2 text-sm"
             >
               <option value="">All types</option>
-              <option value="ticket">Tickets</option>
-              <option value="kb_article">KB Articles</option>
-              <option value="workflow_item">Workflow Items</option>
+              <option value="item">Items</option>
+              <option value="document">Documents</option>
             </select>
             <Button onClick={handleSearch} disabled={loading}>
               <SearchIcon className="mr-2 h-4 w-4" />

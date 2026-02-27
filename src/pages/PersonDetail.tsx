@@ -5,7 +5,7 @@ import { useAuth } from '@/hooks/useAuth'
 import { EditableField } from '@/components/shared/EditableField'
 import { CustomFieldsRenderer } from '@/components/shared/CustomFieldsRenderer'
 import { EntityLinksPanel } from '@/components/shared/EntityLinksPanel'
-import { EntityCommentsPanel } from '@/components/shared/EntityCommentsPanel'
+import { ThreadPanel } from '@/components/shared/ThreadPanel'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
@@ -261,7 +261,7 @@ export function PersonDetailPage() {
           )}
 
           {!isNew && !editing && personId && personId !== 'new' && (
-            <EntityCommentsPanel entityType="person" entityId={personId} />
+            <ThreadPanel targetType="person" targetId={personId} />
           )}
 
           {editing && (

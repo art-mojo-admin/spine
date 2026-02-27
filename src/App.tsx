@@ -17,8 +17,6 @@ const WorkflowsPage = lazy(() => import('@/pages/Workflows').then(m => ({ defaul
 const WorkflowDetailPage = lazy(() => import('@/pages/WorkflowDetail').then(m => ({ default: m.WorkflowDetailPage })))
 const WorkflowBuilderPage = lazy(() => import('@/pages/WorkflowBuilder').then(m => ({ default: m.WorkflowBuilderPage })))
 const WorkflowItemDetailPage = lazy(() => import('@/pages/WorkflowItemDetail').then(m => ({ default: m.WorkflowItemDetailPage })))
-const TicketsPage = lazy(() => import('@/pages/Tickets').then(m => ({ default: m.TicketsPage })))
-const TicketDetailPage = lazy(() => import('@/pages/TicketDetail').then(m => ({ default: m.TicketDetailPage })))
 const DocumentsPage = lazy(() => import('@/pages/KnowledgeBase').then(m => ({ default: m.DocumentsPage })))
 const DocumentDetailPage = lazy(() => import('@/pages/KBArticleDetail').then(m => ({ default: m.DocumentDetailPage })))
 const ActivityPage = lazy(() => import('@/pages/Activity').then(m => ({ default: m.ActivityPage })))
@@ -43,9 +41,7 @@ const LinkTypeDefinitionsPage = lazy(() => import('@/pages/admin/LinkTypeDefinit
 const ConfigPacksPage = lazy(() => import('@/pages/admin/ConfigPacks').then(m => ({ default: m.ConfigPacksPage })))
 const AccountModulesPage = lazy(() => import('@/pages/admin/AccountModules').then(m => ({ default: m.AccountModulesPage })))
 const CustomActionTypesPage = lazy(() => import('@/pages/admin/CustomActionTypes').then(m => ({ default: m.CustomActionTypesPage })))
-const NavExtensionsPage = lazy(() => import('@/pages/admin/NavExtensions').then(m => ({ default: m.NavExtensionsPage })))
-const NavOverridesPage = lazy(() => import('@/pages/admin/NavOverrides').then(m => ({ default: m.NavOverridesPage })))
-const DashboardsPage = lazy(() => import('@/pages/admin/Dashboards').then(m => ({ default: m.DashboardsPage })))
+const ViewDefinitionsPage = lazy(() => import('@/pages/admin/ViewDefinitions').then(m => ({ default: m.ViewDefinitionsPage })))
 const AccountBrowserPage = lazy(() => import('@/pages/admin/AccountBrowser').then(m => ({ default: m.AccountBrowserPage })))
 
 // Public pages
@@ -56,7 +52,6 @@ const PublicItemDetailPage = lazy(() => import('@/pages/public/PublicItemDetail'
 // Portal pages
 const PortalDashboardPage = lazy(() => import('@/pages/portal/PortalDashboard').then(m => ({ default: m.PortalDashboardPage })))
 const MyItemsPage = lazy(() => import('@/pages/portal/MyItems').then(m => ({ default: m.MyItemsPage })))
-const MyTicketsPage = lazy(() => import('@/pages/portal/MyTickets').then(m => ({ default: m.MyTicketsPage })))
 const PortalBrowsePage = lazy(() => import('@/pages/portal/PortalBrowse').then(m => ({ default: m.PortalBrowsePage })))
 const PortalProfilePage = lazy(() => import('@/pages/portal/PortalProfile').then(m => ({ default: m.PortalProfilePage })))
 
@@ -104,7 +99,6 @@ export default function App() {
           <Route element={<ProtectedRoutes />}>
           {/* Portal routes */}
           <Route path="/my-items" element={<MyItemsPage />} />
-          <Route path="/my-tickets" element={<MyTicketsPage />} />
           <Route path="/browse" element={<PortalBrowsePage />} />
           <Route path="/profile" element={<PortalProfilePage />} />
           {/* Standard routes */}
@@ -117,8 +111,9 @@ export default function App() {
           <Route path="/workflows/:workflowId" element={<WorkflowDetailPage />} />
           <Route path="/workflows/:workflowId/builder" element={<WorkflowBuilderPage />} />
           <Route path="/workflow-items/:itemId" element={<WorkflowItemDetailPage />} />
-          <Route path="/tickets" element={<TicketsPage />} />
-          <Route path="/tickets/:ticketId" element={<TicketDetailPage />} />
+          {/* Redirects from old /tickets paths */}
+          <Route path="/tickets" element={<Navigate to="/workflows" replace />} />
+          <Route path="/tickets/:ticketId" element={<Navigate to="/workflows" replace />} />
           <Route path="/documents" element={<DocumentsPage />} />
           <Route path="/documents/:articleId" element={<DocumentDetailPage />} />
           {/* Redirects from old /kb paths */}
@@ -142,9 +137,7 @@ export default function App() {
           <Route path="/admin/packs" element={<ConfigPacksPage />} />
           <Route path="/admin/modules" element={<AccountModulesPage />} />
           <Route path="/admin/custom-actions" element={<CustomActionTypesPage />} />
-          <Route path="/admin/nav-extensions" element={<NavExtensionsPage />} />
-          <Route path="/admin/nav-overrides" element={<NavOverridesPage />} />
-          <Route path="/admin/dashboards" element={<DashboardsPage />} />
+          <Route path="/admin/views" element={<ViewDefinitionsPage />} />
           <Route path="/admin/account-browser" element={<AccountBrowserPage />} />
           <Route path="/admin/system-health" element={<SystemHealthPage />} />
           <Route path="/x/:slug" element={<ExtensionPage />} />

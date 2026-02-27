@@ -25,16 +25,16 @@ INSERT INTO config_packs (name, description, is_system, pack_data) VALUES
     ]
   }],
   "custom_fields": [
-    {"entity_type": "workflow_item", "name": "Deal Value", "field_key": "deal_value", "field_type": "number"},
-    {"entity_type": "workflow_item", "name": "Source", "field_key": "source", "field_type": "select", "options": ["Website", "Referral", "Cold Outreach", "Event", "Other"]},
-    {"entity_type": "workflow_item", "name": "Close Date", "field_key": "close_date", "field_type": "date"},
+    {"entity_type": "item", "name": "Deal Value", "field_key": "deal_value", "field_type": "number"},
+    {"entity_type": "item", "name": "Source", "field_key": "source", "field_type": "select", "options": ["Website", "Referral", "Cold Outreach", "Event", "Other"]},
+    {"entity_type": "item", "name": "Close Date", "field_key": "close_date", "field_type": "date"},
     {"entity_type": "person", "name": "Company", "field_key": "company", "field_type": "text"},
     {"entity_type": "person", "name": "Phone", "field_key": "phone", "field_type": "text"},
     {"entity_type": "person", "name": "Job Title", "field_key": "job_title", "field_type": "text"}
   ],
   "link_types": [
-    {"name": "Contact", "slug": "contact", "source_entity_type": "workflow_item", "target_entity_type": "person", "color": "#3b82f6"},
-    {"name": "Company", "slug": "company", "source_entity_type": "workflow_item", "target_entity_type": "account", "color": "#8b5cf6"}
+    {"name": "Contact", "slug": "contact", "source_entity_type": "item", "target_entity_type": "person", "color": "#3b82f6"},
+    {"name": "Company", "slug": "company", "source_entity_type": "item", "target_entity_type": "account", "color": "#8b5cf6"}
   ],
   "automations": []
 }'::jsonb),
@@ -60,14 +60,14 @@ INSERT INTO config_packs (name, description, is_system, pack_data) VALUES
     ]
   }],
   "custom_fields": [
-    {"entity_type": "ticket", "name": "Product", "field_key": "product", "field_type": "select", "options": ["Core", "API", "Mobile", "Integrations"]},
-    {"entity_type": "ticket", "name": "Environment", "field_key": "environment", "field_type": "select", "options": ["Production", "Staging", "Development"]},
-    {"entity_type": "ticket", "name": "Severity", "field_key": "severity", "field_type": "select", "options": ["Critical", "Major", "Minor", "Cosmetic"]},
+    {"entity_type": "item", "name": "Product", "field_key": "product", "field_type": "select", "options": ["Core", "API", "Mobile", "Integrations"]},
+    {"entity_type": "item", "name": "Environment", "field_key": "environment", "field_type": "select", "options": ["Production", "Staging", "Development"]},
+    {"entity_type": "item", "name": "Severity", "field_key": "severity", "field_type": "select", "options": ["Critical", "Major", "Minor", "Cosmetic"]},
     {"entity_type": "person", "name": "Plan Tier", "field_key": "plan_tier", "field_type": "select", "options": ["Free", "Pro", "Enterprise"]}
   ],
   "link_types": [
-    {"name": "Related Ticket", "slug": "related_ticket", "source_entity_type": "ticket", "target_entity_type": "ticket", "color": "#f59e0b"},
-    {"name": "Affected Customer", "slug": "affected_customer", "source_entity_type": "ticket", "target_entity_type": "person", "color": "#ef4444"}
+    {"name": "Related Ticket", "slug": "related_ticket", "source_entity_type": "item", "target_entity_type": "item", "color": "#f59e0b"},
+    {"name": "Affected Customer", "slug": "affected_customer", "source_entity_type": "item", "target_entity_type": "person", "color": "#ef4444"}
   ],
   "automations": []
 }'::jsonb),
@@ -98,17 +98,17 @@ INSERT INTO config_packs (name, description, is_system, pack_data) VALUES
     ]
   }],
   "custom_fields": [
-    {"entity_type": "workflow_item", "name": "Department", "field_key": "department", "field_type": "select", "options": ["Engineering", "Design", "Marketing", "Sales", "Operations"], "is_public": true},
-    {"entity_type": "workflow_item", "name": "Location", "field_key": "location", "field_type": "text", "is_public": true},
-    {"entity_type": "workflow_item", "name": "Salary Range", "field_key": "salary_range", "field_type": "text", "is_public": true},
+    {"entity_type": "item", "name": "Department", "field_key": "department", "field_type": "select", "options": ["Engineering", "Design", "Marketing", "Sales", "Operations"], "is_public": true},
+    {"entity_type": "item", "name": "Location", "field_key": "location", "field_type": "text", "is_public": true},
+    {"entity_type": "item", "name": "Salary Range", "field_key": "salary_range", "field_type": "text", "is_public": true},
     {"entity_type": "person", "name": "Resume URL", "field_key": "resume_url", "field_type": "url"},
     {"entity_type": "person", "name": "Skills", "field_key": "skills", "field_type": "multi_select", "options": ["JavaScript", "Python", "React", "Node.js", "SQL", "AWS", "Design", "Marketing"]},
     {"entity_type": "person", "name": "Years of Experience", "field_key": "years_experience", "field_type": "number"}
   ],
   "link_types": [
-    {"name": "Candidate", "slug": "candidate", "source_entity_type": "person", "target_entity_type": "workflow_item", "color": "#10b981"},
-    {"name": "Recruiter", "slug": "recruiter", "source_entity_type": "person", "target_entity_type": "workflow_item", "color": "#6366f1"},
-    {"name": "Hiring Manager", "slug": "hiring_manager", "source_entity_type": "person", "target_entity_type": "workflow_item", "color": "#f97316"}
+    {"name": "Candidate", "slug": "candidate", "source_entity_type": "person", "target_entity_type": "item", "color": "#10b981"},
+    {"name": "Recruiter", "slug": "recruiter", "source_entity_type": "person", "target_entity_type": "item", "color": "#6366f1"},
+    {"name": "Hiring Manager", "slug": "hiring_manager", "source_entity_type": "person", "target_entity_type": "item", "color": "#f97316"}
   ],
   "automations": []
 }'::jsonb),
@@ -135,16 +135,16 @@ INSERT INTO config_packs (name, description, is_system, pack_data) VALUES
     ]
   }],
   "custom_fields": [
-    {"entity_type": "workflow_item", "name": "Event Date", "field_key": "event_date", "field_type": "date", "is_public": true},
-    {"entity_type": "workflow_item", "name": "Location", "field_key": "location", "field_type": "text", "is_public": true},
-    {"entity_type": "workflow_item", "name": "Difficulty", "field_key": "difficulty", "field_type": "select", "options": ["Easy", "Moderate", "Hard", "Expert"], "is_public": true},
-    {"entity_type": "workflow_item", "name": "Distance (km)", "field_key": "distance_km", "field_type": "number", "is_public": true},
-    {"entity_type": "workflow_item", "name": "Max Attendees", "field_key": "max_attendees", "field_type": "number", "is_public": true},
-    {"entity_type": "workflow_item", "name": "Meeting Point", "field_key": "meeting_point", "field_type": "text", "is_public": true}
+    {"entity_type": "item", "name": "Event Date", "field_key": "event_date", "field_type": "date", "is_public": true},
+    {"entity_type": "item", "name": "Location", "field_key": "location", "field_type": "text", "is_public": true},
+    {"entity_type": "item", "name": "Difficulty", "field_key": "difficulty", "field_type": "select", "options": ["Easy", "Moderate", "Hard", "Expert"], "is_public": true},
+    {"entity_type": "item", "name": "Distance (km)", "field_key": "distance_km", "field_type": "number", "is_public": true},
+    {"entity_type": "item", "name": "Max Attendees", "field_key": "max_attendees", "field_type": "number", "is_public": true},
+    {"entity_type": "item", "name": "Meeting Point", "field_key": "meeting_point", "field_type": "text", "is_public": true}
   ],
   "link_types": [
-    {"name": "Participant", "slug": "participant", "source_entity_type": "person", "target_entity_type": "workflow_item", "color": "#22c55e"},
-    {"name": "Organizer", "slug": "organizer", "source_entity_type": "person", "target_entity_type": "workflow_item", "color": "#a855f7"}
+    {"name": "Participant", "slug": "participant", "source_entity_type": "person", "target_entity_type": "item", "color": "#22c55e"},
+    {"name": "Organizer", "slug": "organizer", "source_entity_type": "person", "target_entity_type": "item", "color": "#a855f7"}
   ],
   "automations": []
 }'::jsonb);

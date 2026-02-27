@@ -34,23 +34,15 @@ const CORE_FIELDS: Record<string, FieldPath[]> = {
     { path: 'email', label: 'Email', fieldType: 'email' },
     { path: 'status', label: 'Status', fieldType: 'text' },
   ],
-  workflow_item: [
+  item: [
     { path: 'title', label: 'Title', fieldType: 'text' },
     { path: 'description', label: 'Description', fieldType: 'text' },
     { path: 'priority', label: 'Priority', fieldType: 'text' },
-    { path: 'status', label: 'Status', fieldType: 'text' },
+    { path: 'item_type', label: 'Item Type', fieldType: 'text' },
     { path: 'stage_definition_id', label: 'Stage ID', fieldType: 'text' },
-    { path: 'owner_person_id', label: 'Owner Person ID', fieldType: 'text' },
     { path: 'due_date', label: 'Due Date', fieldType: 'date' },
   ],
-  ticket: [
-    { path: 'subject', label: 'Subject', fieldType: 'text' },
-    { path: 'status', label: 'Status', fieldType: 'text' },
-    { path: 'priority', label: 'Priority', fieldType: 'text' },
-    { path: 'category', label: 'Category', fieldType: 'text' },
-    { path: 'assigned_to_person_id', label: 'Assigned To', fieldType: 'text' },
-  ],
-  kb_article: [
+  document: [
     { path: 'title', label: 'Title', fieldType: 'text' },
     { path: 'slug', label: 'Slug', fieldType: 'text' },
     { path: 'status', label: 'Status', fieldType: 'text' },

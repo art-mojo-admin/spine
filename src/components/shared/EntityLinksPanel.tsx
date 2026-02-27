@@ -11,17 +11,16 @@ import { Link2, Plus, X, Trash2, Search } from 'lucide-react'
 const ENTITY_TYPE_LABELS: Record<string, string> = {
   person: 'Person',
   account: 'Account',
-  workflow_item: 'Workflow Item',
-  ticket: 'Ticket',
-  kb_article: 'KB Article',
+  item: 'Item',
+  document: 'Document',
+  thread: 'Thread',
 }
 
 const ENTITY_TYPE_ROUTES: Record<string, string> = {
   person: '/persons',
   account: '/accounts',
-  workflow_item: '/workflow-items',
-  ticket: '/tickets',
-  kb_article: '/kb',
+  item: '/workflow-items',
+  document: '/documents',
 }
 
 interface EntityLinksPanelProps {
@@ -125,9 +124,8 @@ export function EntityLinksPanel({ entityType, entityId }: EntityLinksPanelProps
     const tableMap: Record<string, { table: string; nameField: string }> = {
       person: { table: 'persons', nameField: 'full_name' },
       account: { table: 'accounts', nameField: 'display_name' },
-      workflow_item: { table: 'workflow-items', nameField: 'title' },
-      ticket: { table: 'tickets', nameField: 'subject' },
-      kb_article: { table: 'kb-articles', nameField: 'title' },
+      item: { table: 'workflow-items', nameField: 'title' },
+      document: { table: 'kb-articles', nameField: 'title' },
     }
 
     for (const [type, ids] of byType.entries()) {
@@ -156,9 +154,8 @@ export function EntityLinksPanel({ entityType, entityId }: EntityLinksPanelProps
       const tableMap: Record<string, string> = {
         person: 'persons',
         account: 'accounts',
-        workflow_item: 'workflow-items',
-        ticket: 'tickets',
-        kb_article: 'kb-articles',
+        item: 'workflow-items',
+        document: 'kb-articles',
       }
       const endpoint = tableMap[targetType]
       if (!endpoint) return
@@ -166,7 +163,6 @@ export function EntityLinksPanel({ entityType, entityId }: EntityLinksPanelProps
       const results = await apiGet<any[]>(endpoint)
       const nameField = targetType === 'person' ? 'full_name'
         : targetType === 'account' ? 'display_name'
-        : targetType === 'ticket' ? 'subject'
         : 'title'
 
       const filtered = (results || []).filter((r: any) => {

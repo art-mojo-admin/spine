@@ -36,6 +36,8 @@
         "npm:autoprefixer@^10.4.20",
         "npm:class-variance-authority@~0.7.1",
         "npm:clsx@^2.1.1",
+        "npm:dagre@~0.8.5",
+        "npm:framer-motion@^12.34.3",
         "npm:lucide-react@0.474",
         "npm:marked@^17.0.3",
         "npm:postcss@^8.5.1",

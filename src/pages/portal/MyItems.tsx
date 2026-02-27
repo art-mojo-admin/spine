@@ -26,7 +26,7 @@ export function MyItemsPage() {
         })
 
         const itemLinks = (links || []).filter(
-          (l: any) => l.target_type === 'workflow_item',
+          (l: any) => l.target_type === 'item',
         )
 
         // Resolve item details

@@ -43,7 +43,7 @@ export function PublicItemDetailPage() {
       await apiPost('entity-links', {
         source_type: 'person',
         source_id: profile.person_id,
-        target_type: 'workflow_item',
+        target_type: 'item',
         target_id: itemId,
         link_type: linkType,
       })

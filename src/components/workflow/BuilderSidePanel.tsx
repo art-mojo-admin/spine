@@ -268,7 +268,7 @@ export function BuilderSidePanel({
         {/* Transition Conditions */}
         {type === 'transition' && tab === 'conditions' && (
           <>
-            <ConditionEditor conditions={transConditions} onChange={setTransConditions} entityType="workflow_item" />
+            <ConditionEditor conditions={transConditions} onChange={setTransConditions} entityType="item" />
             <Button size="sm" onClick={saveTransition}>Save Conditions</Button>
           </>
         )}
@@ -281,7 +281,7 @@ export function BuilderSidePanel({
                 action={editingAction}
                 onSave={saveAction}
                 onCancel={() => { setEditingAction(null); setShowNewAction(false) }}
-                entityType="workflow_item"
+                entityType="item"
               />
             ) : (
               <>

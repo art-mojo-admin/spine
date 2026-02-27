@@ -166,7 +166,7 @@ export function ActionEditor({ action, onSave, onCancel, entityType }: ActionEdi
                 <Input
                   value={actionConfig.entity_table || ''}
                   onChange={(e) => updateConfig({ entity_table: e.target.value })}
-                  placeholder="workflow_items (default)"
+                  placeholder="items (default)"
                 />
               </div>
               <div className="grid gap-3 sm:grid-cols-2">
@@ -213,7 +213,7 @@ export function ActionEditor({ action, onSave, onCancel, entityType }: ActionEdi
                 <Input
                   value={actionConfig.entity_type || ''}
                   onChange={(e) => updateConfig({ entity_type: e.target.value })}
-                  placeholder="e.g. workflow_item"
+                  placeholder="e.g. item"
                 />
               </div>
             </div>
@@ -229,11 +229,10 @@ export function ActionEditor({ action, onSave, onCancel, entityType }: ActionEdi
                 <label className="text-sm font-medium">Entity Type</label>
                 <select
                   className="w-full rounded-md border bg-background px-3 py-2 text-sm"
-                  value={actionConfig.entity_type || 'ticket'}
+                  value={actionConfig.entity_type || 'item'}
                   onChange={(e) => updateConfig({ entity_type: e.target.value })}
                 >
-                  <option value="ticket">Ticket</option>
-                  <option value="workflow_item">Workflow Item</option>
+                  <option value="item">Item</option>
                 </select>
               </div>
               <div className="space-y-1">
@@ -329,14 +328,13 @@ export function ActionEditor({ action, onSave, onCancel, entityType }: ActionEdi
                   <label className="text-sm font-medium">Source Type</label>
                   <select
                     className="w-full rounded-md border bg-background px-3 py-2 text-sm"
-                    value={actionConfig.source_type || 'workflow_item'}
+                    value={actionConfig.source_type || 'item'}
                     onChange={(e) => updateConfig({ source_type: e.target.value })}
                   >
                     <option value="person">Person</option>
                     <option value="account">Account</option>
-                    <option value="workflow_item">Workflow Item</option>
-                    <option value="ticket">Ticket</option>
-                    <option value="kb_article">KB Article</option>
+                    <option value="item">Item</option>
+                    <option value="document">Document</option>
                   </select>
                 </div>
                 <div className="space-y-1">
@@ -356,9 +354,8 @@ export function ActionEditor({ action, onSave, onCancel, entityType }: ActionEdi
                   >
                     <option value="person">Person</option>
                     <option value="account">Account</option>
-                    <option value="workflow_item">Workflow Item</option>
-                    <option value="ticket">Ticket</option>
-                    <option value="kb_article">KB Article</option>
+                    <option value="item">Item</option>
+                    <option value="document">Document</option>
                   </select>
                 </div>
                 <div className="space-y-1">
@@ -539,11 +536,10 @@ export function ActionEditor({ action, onSave, onCancel, entityType }: ActionEdi
                       <label className="text-sm font-medium">Entity Type</label>
                       <select
                         className="w-full rounded-md border bg-background px-3 py-2 text-sm"
-                        value={actionConfig.nested_action_config?.entity_type || 'ticket'}
+                        value={actionConfig.nested_action_config?.entity_type || 'item'}
                         onChange={(e) => updateConfig({ nested_action_config: { ...(actionConfig.nested_action_config || {}), entity_type: e.target.value } })}
                       >
-                        <option value="ticket">Ticket</option>
-                        <option value="workflow_item">Workflow Item</option>
+                        <option value="item">Item</option>
                       </select>
                     </div>
                     <div className="space-y-1">

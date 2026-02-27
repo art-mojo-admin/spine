@@ -25,8 +25,7 @@ const ACTION_TYPES = [
 ]
 
 const COMMON_EVENTS = [
-  'ticket.created', 'ticket.updated',
-  'workflow_item.created', 'workflow_item.stage_changed',
+  'item.created', 'item.updated', 'item.stage_changed',
   'kb.created', 'kb.updated',
   'user.signed_up',
 ]

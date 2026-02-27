@@ -5,7 +5,7 @@ import { useAuth } from '@/hooks/useAuth'
 import { EditableField } from '@/components/shared/EditableField'
 import { CustomFieldsRenderer } from '@/components/shared/CustomFieldsRenderer'
 import { EntityLinksPanel } from '@/components/shared/EntityLinksPanel'
-import { EntityCommentsPanel } from '@/components/shared/EntityCommentsPanel'
+import { ThreadPanel } from '@/components/shared/ThreadPanel'
 import { WatchButton } from '@/components/shared/WatchButton'
 import { EntityAttachmentsPanel } from '@/components/shared/EntityAttachmentsPanel'
 import { Button } from '@/components/ui/button'
@@ -95,8 +95,8 @@ export function WorkflowItemDetailPage() {
           }
 
           // Load parent item if exists
-          if (itemRes.parent_workflow_item_id) {
-            apiGet<any>('workflow-items', { id: itemRes.parent_workflow_item_id })
+          if (itemRes.parent_item_id) {
+            apiGet<any>('workflow-items', { id: itemRes.parent_item_id })
               .then(setParentItem)
               .catch(() => {})
           } else {
@@ -240,7 +240,7 @@ export function WorkflowItemDetailPage() {
         </div>
         <div className="flex items-center gap-2">
           {!isNew && !editing && itemId && itemId !== 'new' && (
-            <WatchButton entityType="workflow_item" entityId={itemId} />
+            <WatchButton entityType="item" entityId={itemId} />
           )}
           {!isNew && !editing && (
             <Button variant="outline" size="sm" onClick={() => setEditing(true)}>
@@ -346,7 +346,7 @@ export function WorkflowItemDetailPage() {
 
       {!isNew && (
         <CustomFieldsRenderer
-          entityType="workflow_item"
+          entityType="item"
           metadata={metadata}
           editing={editing}
           onChange={setMetadata}
@@ -398,15 +398,15 @@ export function WorkflowItemDetailPage() {
       )}
 
       {!isNew && !editing && itemId && itemId !== 'new' && (
-        <EntityLinksPanel entityType="workflow_item" entityId={itemId} />
+        <EntityLinksPanel entityType="item" entityId={itemId} />
       )}
 
       {!isNew && !editing && itemId && itemId !== 'new' && (
-        <EntityCommentsPanel entityType="workflow_item" entityId={itemId} />
+        <ThreadPanel targetType="item" targetId={itemId} />
       )}
 
       {!isNew && !editing && itemId && itemId !== 'new' && (
-        <EntityAttachmentsPanel entityType="workflow_item" entityId={itemId} />
+        <EntityAttachmentsPanel entityType="item" entityId={itemId} />
       )}
 
       {/* Transition Buttons */}

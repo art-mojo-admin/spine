@@ -4,7 +4,7 @@ import { apiGet, apiPost, apiPatch } from '@/lib/api'
 import { useAuth } from '@/hooks/useAuth'
 import { EditableField } from '@/components/shared/EditableField'
 import { CustomFieldsRenderer } from '@/components/shared/CustomFieldsRenderer'
-import { EntityCommentsPanel } from '@/components/shared/EntityCommentsPanel'
+import { ThreadPanel } from '@/components/shared/ThreadPanel'
 import { WatchButton } from '@/components/shared/WatchButton'
 import { EntityAttachmentsPanel } from '@/components/shared/EntityAttachmentsPanel'
 import { Button } from '@/components/ui/button'
@@ -147,7 +147,7 @@ export function DocumentDetailPage() {
         </div>
         <div className="flex items-center gap-2">
           {!isNew && !editing && articleId && articleId !== 'new' && (
-            <WatchButton entityType="kb_article" entityId={articleId} />
+            <WatchButton entityType="document" entityId={articleId} />
           )}
           {!isNew && !editing && (!article?.is_global || profile?.system_role === 'system_admin') && (
             <Button variant="outline" size="sm" onClick={() => setEditing(true)}>
@@ -257,7 +257,7 @@ export function DocumentDetailPage() {
 
       {!isNew && (
         <CustomFieldsRenderer
-          entityType="kb_article"
+          entityType="document"
           metadata={metadata}
           editing={editing}
           onChange={setMetadata}
@@ -278,11 +278,11 @@ export function DocumentDetailPage() {
       )}
 
       {!isNew && !editing && articleId && articleId !== 'new' && (
-        <EntityCommentsPanel entityType="kb_article" entityId={articleId} />
+        <ThreadPanel targetType="document" targetId={articleId} />
       )}
 
       {!isNew && !editing && articleId && articleId !== 'new' && (
-        <EntityAttachmentsPanel entityType="kb_article" entityId={articleId} />
+        <EntityAttachmentsPanel entityType="document" entityId={articleId} />
       )}
     </div>
   )

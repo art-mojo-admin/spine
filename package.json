@@ -5,6 +5,10 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
+    "assemble": "bash scripts/assemble-functions.sh",
+    "manifest": "bash scripts/build-manifest.sh",
+    "verify": "bash scripts/verify-integrity.sh",
+    "prebuild": "npm run assemble && npm run verify",
     "build": "tsc -b && vite build",
     "preview": "vite preview",
     "lint": "eslint ."

@@ -9,12 +9,9 @@ import { Plus, Zap, Trash2, Power } from 'lucide-react'
 import { ConditionEditor } from '@/components/workflow/ConditionEditor'
 
 const EVENT_TYPES = [
-  'workflow_item.created',
-  'workflow_item.updated',
-  'workflow_item.stage_changed',
-  'ticket.created',
-  'ticket.updated',
-  'ticket.replied',
+  'item.created',
+  'item.updated',
+  'item.stage_changed',
   'kb.created',
   'kb.updated',
   'kb.deleted',
@@ -106,7 +103,7 @@ export function AutomationsPage() {
           <CardContent className="space-y-4">
             <div className="space-y-1">
               <label className="text-sm font-medium">Name</label>
-              <Input value={name} onChange={e => setName(e.target.value)} placeholder="e.g. Auto-assign urgent tickets" />
+              <Input value={name} onChange={e => setName(e.target.value)} placeholder="e.g. Auto-assign urgent items" />
             </div>
 
             <div className="grid gap-4 sm:grid-cols-2">
@@ -136,7 +133,7 @@ export function AutomationsPage() {
             <ConditionEditor
               conditions={conditions}
               onChange={setConditions}
-              entityType={triggerEvent.startsWith('workflow_item') ? 'workflow_item' : triggerEvent.startsWith('ticket') ? 'ticket' : triggerEvent.startsWith('kb') ? 'kb_article' : triggerEvent.startsWith('account') ? 'account' : triggerEvent.startsWith('membership') ? 'person' : undefined}
+              entityType={triggerEvent.startsWith('item') ? 'item' : triggerEvent.startsWith('kb') ? 'document' : triggerEvent.startsWith('account') ? 'account' : triggerEvent.startsWith('membership') ? 'person' : undefined}
             />
 
             <div className="space-y-1">
@@ -145,7 +142,7 @@ export function AutomationsPage() {
                 className="flex min-h-[80px] w-full rounded-md border bg-background px-3 py-2 text-sm font-mono"
                 value={actionConfig}
                 onChange={e => setActionConfig(e.target.value)}
-                placeholder='{"event_type": "ticket.escalated"}'
+                placeholder='{"event_type": "item.escalated"}'
               />
             </div>
 

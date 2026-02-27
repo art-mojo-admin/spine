@@ -4,13 +4,13 @@ import { apiGet } from '@/lib/api'
 import { useAuth } from '@/hooks/useAuth'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
-import { KanbanSquare, TicketCheck, Link2 } from 'lucide-react'
+import { KanbanSquare, Inbox, Link2 } from 'lucide-react'
 
 export function PortalDashboardPage() {
   const navigate = useNavigate()
   const { profile, currentAccountId } = useAuth()
   const [linkedItems, setLinkedItems] = useState<any[]>([])
-  const [tickets, setTickets] = useState<any[]>([])
+  const [myItems, setMyItems] = useState<any[]>([])
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
@@ -19,28 +19,22 @@ export function PortalDashboardPage() {
 
     async function load() {
       try {
-        const [linksRes, ticketsRes] = await Promise.all([
+        const [linksRes, itemsRes] = await Promise.all([
           apiGet<any[]>('entity-links', {
             entity_type: 'person',
             entity_id: profile!.person_id,
             direction: 'source',
           }),
-          apiGet<any[]>('tickets'),
+          apiGet<any[]>('workflow-items', { item_type: 'ticket' }),
         ])
 
-        // Filter links to workflow items
+        // Filter links to items
         const itemLinks = (linksRes || []).filter(
-          (l: any) => l.target_type === 'workflow_item',
+          (l: any) => l.target_type === 'item',
         )
         setLinkedItems(itemLinks.slice(0, 5))
 
-        // Filter tickets opened by or assigned to this person
-        const myTickets = (ticketsRes || []).filter(
-          (t: any) =>
-            t.opened_by_person_id === profile!.person_id ||
-            t.assigned_to_person_id === profile!.person_id,
-        )
-        setTickets(myTickets.slice(0, 5))
+        setMyItems((itemsRes || []).slice(0, 5))
       } catch (err) {
         console.error('Portal dashboard load failed', err)
       } finally {
@@ -104,33 +98,32 @@ export function PortalDashboardPage() {
         <Card>
           <CardHeader className="pb-2">
             <CardTitle className="flex items-center gap-2 text-lg">
-              <TicketCheck className="h-4 w-4" />
+              <Inbox className="h-4 w-4" />
               My Tickets
-              <Badge variant="secondary" className="ml-auto">{tickets.length}</Badge>
+              <Badge variant="secondary" className="ml-auto">{myItems.length}</Badge>
             </CardTitle>
           </CardHeader>
           <CardContent className="space-y-2">
-            {tickets.length === 0 ? (
+            {myItems.length === 0 ? (
               <p className="text-sm text-muted-foreground">No tickets yet.</p>
             ) : (
-              tickets.map((ticket: any) => (
+              myItems.map((item: any) => (
                 <div
-                  key={ticket.id}
+                  key={item.id}
                   className="flex items-center justify-between rounded-md border px-3 py-2 text-sm cursor-pointer hover:bg-muted/50"
-                  onClick={() => navigate(`/tickets/${ticket.id}`)}
+                  onClick={() => navigate(`/workflow-items/${item.id}`)}
                 >
-                  <span className="font-medium truncate">{ticket.subject}</span>
+                  <span className="font-medium truncate">{item.title}</span>
                   <div className="flex gap-1 ml-2">
-                    <Badge variant="secondary" className="text-[10px]">{ticket.status}</Badge>
-                    <Badge variant="outline" className="text-[10px]">{ticket.priority}</Badge>
+                    <Badge variant="outline" className="text-[10px]">{item.priority}</Badge>
                   </div>
                 </div>
               ))
             )}
-            {tickets.length > 0 && (
+            {myItems.length > 0 && (
               <button
                 className="text-xs text-primary hover:underline"
-                onClick={() => navigate('/my-tickets')}
+                onClick={() => navigate('/my-items')}
               >
                 View all →
               </button>

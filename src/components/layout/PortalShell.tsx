@@ -7,7 +7,6 @@ import { cn } from '@/lib/utils'
 import {
   LayoutDashboard,
   KanbanSquare,
-  TicketCheck,
   Globe,
   User,
   LogOut,
@@ -17,7 +16,6 @@ import {
 const portalNavItems = [
   { to: '/', icon: LayoutDashboard, label: 'Dashboard' },
   { to: '/my-items', icon: KanbanSquare, label: 'My Items' },
-  { to: '/my-tickets', icon: TicketCheck, label: 'My Tickets' },
   { to: '/browse', icon: Globe, label: 'Browse' },
   { to: '/profile', icon: User, label: 'Profile' },
 ]

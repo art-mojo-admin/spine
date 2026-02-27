@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import { apiGet, apiPost, apiDelete } from '@/lib/api'
 import { useAuth } from '@/hooks/useAuth'
-import { EntityCommentsPanel } from '@/components/shared/EntityCommentsPanel'
+import { ThreadPanel } from '@/components/shared/ThreadPanel'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
@@ -178,7 +178,7 @@ export function LessonViewerPage() {
 
       {/* Discussion */}
       {lessonId && (
-        <EntityCommentsPanel entityType="kb_article" entityId={lessonId} />
+        <ThreadPanel targetType="document" targetId={lessonId} />
       )}
     </div>
   )

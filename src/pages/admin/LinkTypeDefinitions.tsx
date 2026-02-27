@@ -11,9 +11,9 @@ const ENTITY_TYPES = [
   { value: '', label: 'Any' },
   { value: 'person', label: 'Person' },
   { value: 'account', label: 'Account' },
-  { value: 'workflow_item', label: 'Workflow Item' },
-  { value: 'ticket', label: 'Ticket' },
-  { value: 'kb_article', label: 'KB Article' },
+  { value: 'item', label: 'Item' },
+  { value: 'document', label: 'Document' },
+  { value: 'thread', label: 'Thread' },
 ]
 
 interface LinkTypeDef {

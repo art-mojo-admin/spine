@@ -10,9 +10,9 @@ import { Plus, SlidersHorizontal, Trash2, Power, Pencil, GripVertical } from 'lu
 const ENTITY_TYPES = [
   { value: 'account', label: 'Account' },
   { value: 'person', label: 'Person' },
-  { value: 'workflow_item', label: 'Workflow Item' },
-  { value: 'ticket', label: 'Ticket' },
-  { value: 'kb_article', label: 'KB Article' },
+  { value: 'item', label: 'Item' },
+  { value: 'document', label: 'Document' },
+  { value: 'thread', label: 'Thread' },
 ]
 
 const FIELD_TYPES = [
@@ -29,7 +29,7 @@ const FIELD_TYPES = [
 
 export function CustomFieldDefinitionsPage() {
   const { currentAccountId } = useAuth()
-  const [tab, setTab] = useState('workflow_item')
+  const [tab, setTab] = useState('item')
   const [fields, setFields] = useState<any[]>([])
   const [loading, setLoading] = useState(true)
 
