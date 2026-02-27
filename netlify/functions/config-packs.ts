@@ -68,7 +68,7 @@ const TABLE_JSON_FIELDS_WITH_IDS: Record<string, string[]> = {
   items: ['metadata'],
 }
 
-function mapIdsDeep(value: any, entityMap: Record<string, string>) {
+function mapIdsDeep(value: any, entityMap: Record<string, string>): any {
   if (Array.isArray(value)) {
     return value.map((entry) => mapIdsDeep(entry, entityMap))
   }
@@ -169,6 +169,7 @@ async function cloneTemplateRow(table: string, template: any, accountId: string,
   if ('pack_id' in cloned) cloned.pack_id = packId
   if ('is_active' in cloned) cloned.is_active = template.is_active ?? false
   if ('is_test_data' in cloned) cloned.is_test_data = template.is_test_data ?? false
+  if ('ownership' in cloned) cloned.ownership = template.ownership ?? 'pack'
 
   for (const key of Object.keys(cloned)) {
     if (!key.endsWith('_id')) continue

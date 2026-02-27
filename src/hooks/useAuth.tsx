@@ -6,8 +6,9 @@ import type { Session, User } from '@supabase/supabase-js'
 
 interface Profile {
   id: string
-  person_id: string
-  display_name: string
+  person_id?: string
+  display_name: string | null
+  avatar_url: string | null
   system_role: string | null
 }
 
@@ -50,8 +51,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const loadProfile = useCallback(async () => {
     try {
-      const data = await apiGet<{ profile: Profile; memberships: Membership[] }>('me')
-      setProfile(data.profile)
+      const data = await apiGet<{ person: { id: string }; profile: Profile; memberships: Membership[] }>('me')
+      setProfile({ ...data.profile, person_id: data.profile.person_id || data.person?.id })
       setMemberships(data.memberships)
       if (data.memberships.length === 0) {
         setCurrentAccountIdState(null)
@@ -76,8 +77,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       if (err?.status === 401) {
         try {
           await apiPost('provision-user', {})
-          const data = await apiGet<{ profile: Profile; memberships: Membership[] }>('me')
-          setProfile(data.profile)
+          const data = await apiGet<{ person: { id: string }; profile: Profile; memberships: Membership[] }>('me')
+          setProfile({ ...data.profile, person_id: data.profile.person_id || data.person?.id })
           setMemberships(data.memberships)
           if (data.memberships.length > 0) {
             const stored = getActiveAccountId()
