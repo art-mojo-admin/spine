@@ -25,6 +25,7 @@ if [ -d "$CORE_DIR" ]; then
 fi
 
 # 3. Overlay custom functions (overrides + additions)
+mkdir -p "$CUSTOM_DIR"
 CUSTOM_COUNT=$(find "$CUSTOM_DIR" -name '*.ts' 2>/dev/null | wc -l | tr -d ' ')
 if [ "$CUSTOM_COUNT" -gt 0 ]; then
   cp -r "$CUSTOM_DIR"/*.ts "$TARGET_DIR"/ 2>/dev/null || true
