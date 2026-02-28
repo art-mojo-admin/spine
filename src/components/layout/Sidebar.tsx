@@ -59,6 +59,7 @@ const fallbackNavItems = [
 
 const adminItems = [
   { to: '/admin/account-browser', icon: ShieldAlert, label: 'Account Browser' },
+  { to: '/admin/apps', icon: LayoutGrid, label: 'Apps' },
   { to: '/admin/automations', icon: Zap, label: 'Automations' },
   { to: '/admin/custom-actions', icon: PlugZap, label: 'Custom Actions' },
   { to: '/admin/custom-fields', icon: SlidersHorizontal, label: 'Custom Fields' },
@@ -133,23 +134,29 @@ export function Sidebar() {
 
       <nav className="flex-1 space-y-1 overflow-y-auto p-3">
         {useAppNav ? (
-          appNavItems.map((item, i) => (
-            <NavLink
-              key={`${item.app_slug}-${item.view_slug || i}`}
-              to={item.view_slug ? `/v/${item.view_slug}` : item.url || '/'}
-              className={({ isActive }) =>
-                cn(
-                  'flex items-center gap-3 rounded-md px-3 py-2 text-sm font-medium transition-colors',
-                  isActive
-                    ? 'bg-primary/10 text-primary'
-                    : 'text-muted-foreground hover:bg-accent hover:text-accent-foreground',
-                )
-              }
-            >
-              <LayoutDashboard className="h-4 w-4" />
-              {item.label}
-            </NavLink>
-          ))
+          appNavItems.map((item, i) => {
+            const to =
+              item.route_type === 'view' && item.view_slug ? `/v/${item.view_slug}` :
+              (item.route_type === 'path' || item.route_type === 'admin') && item.url ? item.url :
+              item.url || '/'
+            return (
+              <NavLink
+                key={`${item.app_slug}-${item.view_slug || item.url || i}`}
+                to={to}
+                className={({ isActive }) =>
+                  cn(
+                    'flex items-center gap-3 rounded-md px-3 py-2 text-sm font-medium transition-colors',
+                    isActive
+                      ? 'bg-primary/10 text-primary'
+                      : 'text-muted-foreground hover:bg-accent hover:text-accent-foreground',
+                  )
+                }
+              >
+                <LayoutDashboard className="h-4 w-4" />
+                {item.label}
+              </NavLink>
+            )
+          })
         ) : (
           fallbackNavItems.map(({ key, to, icon: Icon, label }) => (
             <NavLink

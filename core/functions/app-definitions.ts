@@ -38,13 +38,18 @@ export default createHandler({
     }
 
     const limit = clampLimit(params)
-    const { data } = await db
+    const includeInactive = params.get('include_inactive') === 'true'
+
+    let query = db
       .from('app_definitions')
       .select('*')
       .eq('account_id', ctx.accountId)
-      .eq('is_active', true)
-      .order('name')
-      .limit(limit)
+
+    if (!includeInactive) {
+      query = query.eq('is_active', true)
+    }
+
+    const { data } = await query.order('name').limit(limit)
 
     return json(data || [])
   },
@@ -58,6 +63,42 @@ export default createHandler({
     if (roleCheck) return roleCheck
 
     const body = await parseBody<any>(req)
+
+    // Clone action: duplicate a pack-owned app as a tenant draft
+    if (body.action === 'clone' && body.source_id) {
+      const { data: source } = await db
+        .from('app_definitions')
+        .select('*')
+        .eq('id', body.source_id)
+        .eq('account_id', ctx.accountId)
+        .single()
+
+      if (!source) return error('Source app not found', 404)
+
+      const clonedSlug = `${source.slug}-custom`
+      const { data: cloned, error: cloneErr } = await db
+        .from('app_definitions')
+        .insert({
+          account_id: ctx.accountId,
+          slug: clonedSlug,
+          name: `${source.name} (Custom)`,
+          icon: source.icon,
+          description: source.description,
+          nav_items: source.nav_items || [],
+          default_view: source.default_view,
+          min_role: source.min_role || 'member',
+          integration_deps: source.integration_deps || [],
+          is_active: false,
+          ownership: 'tenant',
+        })
+        .select()
+        .single()
+
+      if (cloneErr) return error(cloneErr.message, 500)
+      await emitActivity(ctx, 'app_definition.cloned', `Cloned app "${source.name}" as "${cloned.name}"`, 'app', cloned.id)
+      return json(cloned, 201)
+    }
+
     if (!body.slug || !body.name) {
       return error('slug and name required')
     }
@@ -74,6 +115,8 @@ export default createHandler({
         default_view: body.default_view || null,
         min_role: body.min_role || 'member',
         integration_deps: body.integration_deps || [],
+        is_active: body.is_active ?? false,
+        ownership: 'tenant',
       })
       .select()
       .single()

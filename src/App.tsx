@@ -43,6 +43,8 @@ const ConfigPacksPage = lazy(() => import('@/pages/admin/ConfigPacks').then(m =>
 const AccountModulesPage = lazy(() => import('@/pages/admin/AccountModules').then(m => ({ default: m.AccountModulesPage })))
 const CustomActionTypesPage = lazy(() => import('@/pages/admin/CustomActionTypes').then(m => ({ default: m.CustomActionTypesPage })))
 const ViewDefinitionsPage = lazy(() => import('@/pages/admin/ViewDefinitions').then(m => ({ default: m.ViewDefinitionsPage })))
+const AppDefinitionsPage = lazy(() => import('@/pages/admin/AppDefinitions').then(m => ({ default: m.AppDefinitionsPage })))
+const AppBuilderPage = lazy(() => import('@/pages/admin/AppBuilder').then(m => ({ default: m.AppBuilderPage })))
 const AccountBrowserPage = lazy(() => import('@/pages/admin/AccountBrowser').then(m => ({ default: m.AccountBrowserPage })))
 
 // Public pages
@@ -139,6 +141,8 @@ export default function App() {
           <Route path="/admin/modules" element={<AccountModulesPage />} />
           <Route path="/admin/custom-actions" element={<CustomActionTypesPage />} />
           <Route path="/admin/views" element={<ViewDefinitionsPage />} />
+          <Route path="/admin/apps" element={<AppDefinitionsPage />} />
+          <Route path="/admin/apps/:appId/builder" element={<AppBuilderPage />} />
           <Route path="/admin/account-browser" element={<AccountBrowserPage />} />
           <Route path="/admin/system-health" element={<SystemHealthPage />} />
           <Route path="/v/:viewSlug" element={<ViewRendererPage />} />
