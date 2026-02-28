@@ -110,9 +110,8 @@ export default function App() {
           <Route path="/accounts/:accountId" element={<AccountDetailPage />} />
           <Route path="/persons" element={<PersonsPage />} />
           <Route path="/persons/:personId" element={<PersonDetailPage />} />
-          <Route path="/workflows" element={<WorkflowsPage />} />
-          <Route path="/workflows/:workflowId" element={<WorkflowDetailPage />} />
-          <Route path="/workflows/:workflowId/builder" element={<WorkflowBuilderPage />} />
+          <Route path="/workflows" element={<Navigate to="/admin/workflows" replace />} />
+          <Route path="/workflows/:workflowId" element={<Navigate to="/admin/workflows" replace />} />
           <Route path="/workflow-items/:itemId" element={<WorkflowItemDetailPage />} />
           {/* Redirects from old /tickets paths */}
           <Route path="/tickets" element={<Navigate to="/workflows" replace />} />
@@ -143,6 +142,9 @@ export default function App() {
           <Route path="/admin/views" element={<ViewDefinitionsPage />} />
           <Route path="/admin/apps" element={<AppDefinitionsPage />} />
           <Route path="/admin/apps/:appId/builder" element={<AppBuilderPage />} />
+          <Route path="/admin/workflows" element={<WorkflowsPage />} />
+          <Route path="/admin/workflows/:workflowId" element={<WorkflowDetailPage />} />
+          <Route path="/admin/workflows/:workflowId/builder" element={<WorkflowBuilderPage />} />
           <Route path="/admin/account-browser" element={<AccountBrowserPage />} />
           <Route path="/admin/system-health" element={<SystemHealthPage />} />
           <Route path="/v/:viewSlug" element={<ViewRendererPage />} />

@@ -151,7 +151,7 @@ export function WorkflowDetailPage() {
           })
         }
 
-        navigate(`/workflows/${wfId}`, { replace: true })
+        navigate(`/admin/workflows/${wfId}`, { replace: true })
       } else {
         // Update workflow definition
         await apiPatch('workflow-definitions', {
@@ -380,7 +380,7 @@ export function WorkflowDetailPage() {
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle className="text-lg">Workflow Items ({items.length})</CardTitle>
-            <Button variant="ghost" size="sm" onClick={() => navigate('/workflows')}>
+            <Button variant="ghost" size="sm" onClick={() => navigate('/admin/workflows')}>
               View Kanban
             </Button>
           </CardHeader>

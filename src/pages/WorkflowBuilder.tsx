@@ -272,7 +272,7 @@ export function WorkflowBuilderPage() {
     <div className="flex h-[calc(100vh-64px)] flex-col">
       {/* Header */}
       <div className="flex items-center gap-3 border-b px-4 py-2">
-        <Button variant="ghost" size="sm" onClick={() => navigate('/workflows')}>
+        <Button variant="ghost" size="sm" onClick={() => navigate('/admin/workflows')}>
           <ArrowLeft className="mr-1 h-4 w-4" /> Back
         </Button>
         <h1 className="text-lg font-semibold">{workflow?.name || 'Workflow'} Builder</h1>

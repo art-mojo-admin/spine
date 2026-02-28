@@ -6,6 +6,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { LayoutGrid } from 'lucide-react'
+import { DashboardRenderer } from '@/components/shared/DashboardRenderer'
 
 interface ViewDefinition {
   id: string
@@ -164,7 +165,12 @@ export function ViewRendererPage() {
     )
   }
 
-  // Dashboard / portal_page / detail / generic fallback
+  // Dashboard view
+  if (viewDef.view_type === 'dashboard' && viewDef.config?.widgets) {
+    return <DashboardRenderer name={viewDef.name} widgets={viewDef.config.widgets} />
+  }
+
+  // portal_page / detail / generic fallback
   return (
     <div className="space-y-4">
       <div>

@@ -123,7 +123,7 @@ export function WorkflowsPage() {
           <p className="mt-1 text-muted-foreground">Manage workflow definitions and items</p>
         </div>
         {!selectedDef && (
-          <Button onClick={() => navigate('/workflows/new')} size="sm">
+          <Button onClick={() => navigate('/admin/workflows/new')} size="sm">
             <Plus className="mr-2 h-4 w-4" /> New Workflow
           </Button>
         )}
@@ -146,10 +146,10 @@ export function WorkflowsPage() {
                     <p className="font-medium">{def.name}</p>
                     <p className="text-sm text-muted-foreground">{def.description || 'No description'}</p>
                   </div>
-                  <Button variant="ghost" size="sm" onClick={(e) => { e.stopPropagation(); navigate(`/workflows/${def.id}/builder`) }} title="Visual Builder">
+                  <Button variant="ghost" size="sm" onClick={(e) => { e.stopPropagation(); navigate(`/admin/workflows/${def.id}/builder`) }} title="Visual Builder">
                     <Workflow className="h-4 w-4" />
                   </Button>
-                  <Button variant="ghost" size="sm" onClick={(e) => { e.stopPropagation(); navigate(`/workflows/${def.id}`) }} title="Edit">
+                  <Button variant="ghost" size="sm" onClick={(e) => { e.stopPropagation(); navigate(`/admin/workflows/${def.id}`) }} title="Edit">
                     <Pencil className="h-4 w-4" />
                   </Button>
                   <Badge variant={def.status === 'active' ? 'default' : 'secondary'}>{def.status}</Badge>

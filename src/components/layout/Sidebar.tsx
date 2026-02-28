@@ -51,7 +51,6 @@ const fallbackNavItems = [
   { key: 'dashboard', to: '/', icon: LayoutDashboard, label: 'Dashboard', position: 0 },
   { key: 'accounts', to: '/accounts', icon: Building2, label: 'Accounts', position: 1 },
   { key: 'persons', to: '/persons', icon: Users, label: 'Persons', position: 2 },
-  { key: 'workflows', to: '/workflows', icon: GitBranch, label: 'Workflows', position: 3 },
   { key: 'documents', to: '/documents', icon: FileText, label: 'Documents', position: 4 },
   { key: 'activity', to: '/activity', icon: Activity, label: 'Activity', position: 7 },
   { key: 'search', to: '/search', icon: Search, label: 'Search', position: 8 },
@@ -74,6 +73,7 @@ const adminItems: { to: string; icon: any; label: string; countKey?: string }[] 
   { to: '/admin/theme', icon: Palette, label: 'Theme' },
   { to: '/admin/views', icon: LayoutGrid, label: 'Views', countKey: 'views' },
   { to: '/admin/webhooks', icon: Webhook, label: 'Webhooks', countKey: 'webhooks' },
+  { to: '/admin/workflows', icon: GitBranch, label: 'Workflows', countKey: 'workflows' },
 ]
 
 export function Sidebar() {
