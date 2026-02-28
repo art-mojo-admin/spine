@@ -12,12 +12,12 @@ export default createHandler({
 
     const { data } = await db
       .from('admin_counts')
-      .select('counter_key, count')
+      .select('counter_key, counter_value')
       .eq('account_id', ctx.accountId)
 
     const counts: Record<string, number> = {}
     for (const row of data || []) {
-      counts[row.counter_key] = row.count
+      counts[row.counter_key] = row.counter_value
     }
 
     return json(counts)

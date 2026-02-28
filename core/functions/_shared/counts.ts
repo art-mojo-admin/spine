@@ -9,18 +9,18 @@ export async function adjustCount(accountId: string, key: string, delta: number)
   // Upsert row then adjust
   const { data: existing } = await db
     .from('admin_counts')
-    .select('count')
+    .select('counter_value')
     .eq('account_id', accountId)
     .eq('counter_key', key)
     .maybeSingle()
 
-  const newCount = Math.max((existing?.count ?? 0) + delta, 0)
+  const newCount = Math.max((existing?.counter_value ?? 0) + delta, 0)
 
   await db.from('admin_counts').upsert(
     {
       account_id: accountId,
       counter_key: key,
-      count: newCount,
+      counter_value: newCount,
       updated_at: new Date().toISOString(),
     },
     { onConflict: 'account_id,counter_key' },
@@ -35,7 +35,7 @@ export async function setCount(accountId: string, key: string, value: number) {
     {
       account_id: accountId,
       counter_key: key,
-      count: Math.max(value, 0),
+      counter_value: Math.max(value, 0),
       updated_at: new Date().toISOString(),
     },
     { onConflict: 'account_id,counter_key' },
