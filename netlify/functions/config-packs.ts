@@ -142,6 +142,9 @@ async function cloneTemplateRow(table: string, template: any, accountId: string,
   const isTestData = template.is_test_data === true
   if ('is_active' in cloned) cloned.is_active = isTestData ? (template.is_active ?? false) : true
   if ('is_test_data' in cloned) cloned.is_test_data = isTestData
+  if ('ownership' in cloned) {
+    cloned.ownership = isTestData ? (template.ownership ?? 'pack') : 'tenant'
+  }
 
   for (const key of Object.keys(cloned)) {
     if (!key.endsWith('_id')) continue
