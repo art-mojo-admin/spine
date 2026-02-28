@@ -62,6 +62,47 @@ const CLONE_SEQUENCE: { table: typeof PACK_TABLES[number]; entityType: string }[
 
 function combineCounts(...datasets: Record<string, number>[]) {
   const result: Record<string, number> = {}
+
+async function uninstallPack(accountId: string, packId: string) {
+  const { mapByTemplate } = await fetchMappings(accountId, packId)
+  const clonedIds = Object.values(mapByTemplate)
+
+  if (clonedIds.length > 0) {
+    const deleteSequence = [...CLONE_SEQUENCE].reverse()
+    for (const { table } of deleteSequence) {
+      if (TABLES_WITH_ACCOUNT_ID.has(table)) {
+        await (db.from(table) as any)
+          .delete()
+          .eq('account_id', accountId)
+          .eq('pack_id', packId)
+      } else {
+        await (db.from(table) as any)
+          .delete()
+          .in('id', clonedIds)
+          .eq('pack_id', packId)
+      }
+    }
+  }
+
+  await db.from('pack_entity_mappings')
+    .delete()
+    .eq('account_id', accountId)
+    .eq('pack_id', packId)
+
+  await db.from('pack_activations').upsert({
+    account_id: accountId,
+    pack_id: packId,
+    config_active: false,
+    test_data_active: false,
+  }, { onConflict: 'account_id,pack_id' })
+
+  const otherActive = await anyPackHasTestDataActive(accountId, packId)
+  if (!otherActive) {
+    await setSharedTestDataActive(false, accountId)
+  }
+
+  await recalcAllCounts(accountId)
+}
   for (const data of datasets) {
     for (const [key, value] of Object.entries(data)) {
       result[key] = (result[key] || 0) + (value || 0)
@@ -287,10 +328,11 @@ async function setSharedTestDataActive(active: boolean, accountId?: string) {
     .eq('is_test_data', true)
 }
 
-async function anyPackHasTestDataActive(excludePackId?: string): Promise<boolean> {
+async function anyPackHasTestDataActive(accountId: string, excludePackId?: string): Promise<boolean> {
   let query = db
     .from('pack_activations')
     .select('id')
+    .eq('account_id', accountId)
     .eq('test_data_active', true)
     .limit(1)
 

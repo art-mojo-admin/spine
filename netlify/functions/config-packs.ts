@@ -240,6 +240,48 @@ async function setPackTestDataActive(accountId: string, packId: string, active: 
   return setClonedEntitiesActive(accountId, packId, active, true)
 }
 
+async function uninstallPack(accountId: string, packId: string) {
+  const { mapByTemplate } = await fetchMappings(accountId, packId)
+  const clonedIds = Object.values(mapByTemplate)
+
+  if (clonedIds.length > 0) {
+    const deleteSequence = [...CLONE_SEQUENCE].reverse()
+    for (const { table } of deleteSequence) {
+      if (TABLES_WITH_ACCOUNT_ID.has(table)) {
+        await (db.from(table) as any)
+          .delete()
+          .eq('account_id', accountId)
+          .eq('pack_id', packId)
+      } else {
+        await (db.from(table) as any)
+          .delete()
+          .in('id', clonedIds)
+          .eq('pack_id', packId)
+      }
+    }
+  }
+
+  await db.from('pack_entity_mappings')
+    .delete()
+    .eq('account_id', accountId)
+    .eq('pack_id', packId)
+
+  await db.from('pack_activations').upsert({
+    account_id: accountId,
+    pack_id: packId,
+    config_active: false,
+    test_data_active: false,
+  }, { onConflict: 'account_id,pack_id' })
+
+  const otherActive = await anyPackHasTestDataActive(accountId, packId)
+  if (!otherActive) {
+    await setSharedTestDataActive(false, accountId)
+  }
+
+  await recalcAllCounts(accountId)
+}
+
+// ── Shared test data helpers ──────────────────────────────────────────
 async function setSharedTestDataActive(active: boolean, accountId?: string) {
   for (const table of SHARED_TEST_TABLES) {
     if (table === 'memberships') continue // handled below
@@ -287,10 +329,11 @@ async function setSharedTestDataActive(active: boolean, accountId?: string) {
     .eq('is_test_data', true)
 }
 
-async function anyPackHasTestDataActive(excludePackId?: string): Promise<boolean> {
+async function anyPackHasTestDataActive(accountId: string, excludePackId?: string): Promise<boolean> {
   let query = db
     .from('pack_activations')
     .select('id')
+    .eq('account_id', accountId)
     .eq('test_data_active', true)
     .limit(1)
 
@@ -301,6 +344,7 @@ async function anyPackHasTestDataActive(excludePackId?: string): Promise<boolean
   const { data } = await query
   return (data?.length || 0) > 0
 }
+// ──────────────────────────────────────────────────────────────────────
 
 export default createHandler({
   async GET(req, ctx, params) {
@@ -469,50 +513,7 @@ export default createHandler({
       const { data: pack } = await db.from('config_packs').select('id, name').eq('id', packId).single()
       if (!pack) return error('Pack not found', 404)
 
-      // Get all cloned IDs for deletion
-      const { mapByTemplate } = await fetchMappings(accountId, packId)
-      const clonedIds = Object.values(mapByTemplate)
-
-      if (clonedIds.length > 0) {
-        // Delete in reverse dependency order (children first)
-        const deleteSequence = [...CLONE_SEQUENCE].reverse()
-        for (const { table } of deleteSequence) {
-          if (TABLES_WITH_ACCOUNT_ID.has(table)) {
-            await (db.from(table) as any)
-              .delete()
-              .eq('account_id', accountId)
-              .eq('pack_id', packId)
-          } else {
-            await (db.from(table) as any)
-              .delete()
-              .in('id', clonedIds)
-              .eq('pack_id', packId)
-          }
-        }
-      }
-
-      // Delete mappings
-      await db.from('pack_entity_mappings')
-        .delete()
-        .eq('account_id', accountId)
-        .eq('pack_id', packId)
-
-      // Update activation record
-      await db.from('pack_activations').upsert({
-        account_id: accountId,
-        pack_id: packId,
-        config_active: false,
-        test_data_active: false,
-      }, { onConflict: 'account_id,pack_id' })
-
-      // If no other packs have test data active, deactivate shared test data
-      const otherActive = await anyPackHasTestDataActive(packId)
-      if (!otherActive) {
-        await setSharedTestDataActive(false, accountId)
-      }
-
-      // Recalculate admin counts
-      await recalcAllCounts(accountId)
+      await uninstallPack(accountId, packId)
 
       await emitActivity(ctx, 'config_pack.uninstalled', `Uninstalled pack "${pack.name}"`, 'config_pack', packId)
       return json({ success: true, action: 'uninstalled' })
