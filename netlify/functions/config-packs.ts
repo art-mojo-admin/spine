@@ -505,6 +505,40 @@ export default createHandler({
       return json({ success: true, action: 'installed', include_test_data: includeTestData })
     }
 
+    if (action === 'install_test_data') {
+      if (!packId) return error('pack_id required')
+
+      const [{ data: pack }, { data: activation }] = await Promise.all([
+        db.from('config_packs').select('id, name').eq('id', packId).single(),
+        db.from('pack_activations').select('config_active, activated_at, activated_by').eq('account_id', accountId).eq('pack_id', packId).maybeSingle(),
+      ])
+
+      if (!pack) return error('Pack not found', 404)
+      if (!activation?.config_active) {
+        return error('Install the pack before adding test data', 400)
+      }
+      if (activation.test_data_active) {
+        return json({ success: true, action: 'test_data_installed', already_active: true })
+      }
+
+      await ensurePackTestDataCloned(packId, accountId)
+      await setPackTestDataActive(accountId, packId, true)
+      await setSharedTestDataActive(true, accountId)
+
+      await db.from('pack_activations').upsert({
+        account_id: accountId,
+        pack_id: packId,
+        config_active: true,
+        test_data_active: true,
+        activated_by: activation.activated_by ?? ctx.personId,
+        activated_at: activation.activated_at ?? new Date().toISOString(),
+      }, { onConflict: 'account_id,pack_id' })
+
+      await recalcAllCounts(accountId)
+      await emitActivity(ctx, 'config_pack.test_data_installed', `Installed test data for pack "${pack.name}"`, 'config_pack', packId)
+      return json({ success: true, action: 'test_data_installed' })
+    }
+
     // ── Uninstall Pack ────────────────────────────────────────────────
     // Deletes all cloned rows and mappings for this pack
     if (action === 'uninstall_pack') {
@@ -517,6 +551,38 @@ export default createHandler({
 
       await emitActivity(ctx, 'config_pack.uninstalled', `Uninstalled pack "${pack.name}"`, 'config_pack', packId)
       return json({ success: true, action: 'uninstalled' })
+    }
+
+    if (action === 'uninstall_test_data') {
+      if (!packId) return error('pack_id required')
+
+      const [{ data: pack }, { data: activation }] = await Promise.all([
+        db.from('config_packs').select('id, name').eq('id', packId).single(),
+        db.from('pack_activations').select('config_active').eq('account_id', accountId).eq('pack_id', packId).maybeSingle(),
+      ])
+
+      if (!pack) return error('Pack not found', 404)
+      if (!activation?.config_active) {
+        return error('Pack is not installed for this account', 400)
+      }
+
+      await setPackTestDataActive(accountId, packId, false)
+
+      await db.from('pack_activations').upsert({
+        account_id: accountId,
+        pack_id: packId,
+        config_active: true,
+        test_data_active: false,
+      }, { onConflict: 'account_id,pack_id' })
+
+      const otherActive = await anyPackHasTestDataActive(accountId, packId)
+      if (!otherActive) {
+        await setSharedTestDataActive(false, accountId)
+      }
+
+      await recalcAllCounts(accountId)
+      await emitActivity(ctx, 'config_pack.test_data_uninstalled', `Removed test data for pack "${pack.name}"`, 'config_pack', packId)
+      return json({ success: true, action: 'test_data_uninstalled' })
     }
 
     return error('Unknown action. Use install_pack or uninstall_pack')
