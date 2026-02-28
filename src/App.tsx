@@ -45,6 +45,7 @@ const CustomActionTypesPage = lazy(() => import('@/pages/admin/CustomActionTypes
 const ViewDefinitionsPage = lazy(() => import('@/pages/admin/ViewDefinitions').then(m => ({ default: m.ViewDefinitionsPage })))
 const AppDefinitionsPage = lazy(() => import('@/pages/admin/AppDefinitions').then(m => ({ default: m.AppDefinitionsPage })))
 const AppBuilderPage = lazy(() => import('@/pages/admin/AppBuilder').then(m => ({ default: m.AppBuilderPage })))
+const ReportsPage = lazy(() => import('@/pages/admin/Reports').then(m => ({ default: m.ReportsPage })))
 const AccountBrowserPage = lazy(() => import('@/pages/admin/AccountBrowser').then(m => ({ default: m.AccountBrowserPage })))
 
 // Public pages
@@ -145,6 +146,7 @@ export default function App() {
           <Route path="/admin/workflows" element={<WorkflowsPage />} />
           <Route path="/admin/workflows/:workflowId" element={<WorkflowDetailPage />} />
           <Route path="/admin/workflows/:workflowId/builder" element={<WorkflowBuilderPage />} />
+          <Route path="/admin/reports" element={<ReportsPage />} />
           <Route path="/admin/account-browser" element={<AccountBrowserPage />} />
           <Route path="/admin/system-health" element={<SystemHealthPage />} />
           <Route path="/v/:viewSlug" element={<ViewRendererPage />} />

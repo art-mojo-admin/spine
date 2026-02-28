@@ -29,6 +29,7 @@ import {
   ShieldAlert,
   HeartPulse,
   LayoutGrid,
+  BarChart3,
 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { signOut } from '@/lib/auth'
@@ -67,6 +68,7 @@ const adminItems: { to: string; icon: any; label: string; countKey?: string }[] 
   { to: '/admin/members', icon: UserPlus, label: 'Members', countKey: 'members' },
   { to: '/admin/modules', icon: Blocks, label: 'Modules', countKey: 'modules' },
   { to: '/admin/packs', icon: Package, label: 'Templates', countKey: 'templates' },
+  { to: '/admin/reports', icon: BarChart3, label: 'Reports' },
   { to: '/admin/roles', icon: Shield, label: 'Roles' },
   { to: '/admin/schedules', icon: Clock, label: 'Schedules', countKey: 'schedules' },
   { to: '/admin/settings', icon: Settings, label: 'Settings' },
