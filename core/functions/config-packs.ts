@@ -62,47 +62,6 @@ const CLONE_SEQUENCE: { table: typeof PACK_TABLES[number]; entityType: string }[
 
 function combineCounts(...datasets: Record<string, number>[]) {
   const result: Record<string, number> = {}
-
-async function uninstallPack(accountId: string, packId: string) {
-  const { mapByTemplate } = await fetchMappings(accountId, packId)
-  const clonedIds = Object.values(mapByTemplate)
-
-  if (clonedIds.length > 0) {
-    const deleteSequence = [...CLONE_SEQUENCE].reverse()
-    for (const { table } of deleteSequence) {
-      if (TABLES_WITH_ACCOUNT_ID.has(table)) {
-        await (db.from(table) as any)
-          .delete()
-          .eq('account_id', accountId)
-          .eq('pack_id', packId)
-      } else {
-        await (db.from(table) as any)
-          .delete()
-          .in('id', clonedIds)
-          .eq('pack_id', packId)
-      }
-    }
-  }
-
-  await db.from('pack_entity_mappings')
-    .delete()
-    .eq('account_id', accountId)
-    .eq('pack_id', packId)
-
-  await db.from('pack_activations').upsert({
-    account_id: accountId,
-    pack_id: packId,
-    config_active: false,
-    test_data_active: false,
-  }, { onConflict: 'account_id,pack_id' })
-
-  const otherActive = await anyPackHasTestDataActive(accountId, packId)
-  if (!otherActive) {
-    await setSharedTestDataActive(false, accountId)
-  }
-
-  await recalcAllCounts(accountId)
-}
   for (const data of datasets) {
     for (const [key, value] of Object.entries(data)) {
       result[key] = (result[key] || 0) + (value || 0)
@@ -309,6 +268,48 @@ async function setPackTestDataActive(accountId: string, packId: string, active: 
   return setClonedEntitiesActive(accountId, packId, active, true)
 }
 
+async function uninstallPack(accountId: string, packId: string) {
+  const { mapByTemplate } = await fetchMappings(accountId, packId)
+  const clonedIds = Object.values(mapByTemplate)
+
+  if (clonedIds.length > 0) {
+    const deleteSequence = [...CLONE_SEQUENCE].reverse()
+    for (const { table } of deleteSequence) {
+      if (TABLES_WITH_ACCOUNT_ID.has(table)) {
+        await (db.from(table) as any)
+          .delete()
+          .eq('account_id', accountId)
+          .eq('pack_id', packId)
+      } else {
+        await (db.from(table) as any)
+          .delete()
+          .in('id', clonedIds)
+          .eq('pack_id', packId)
+      }
+    }
+  }
+
+  await db.from('pack_entity_mappings')
+    .delete()
+    .eq('account_id', accountId)
+    .eq('pack_id', packId)
+
+  await db.from('pack_activations').upsert({
+    account_id: accountId,
+    pack_id: packId,
+    config_active: false,
+    test_data_active: false,
+  }, { onConflict: 'account_id,pack_id' })
+
+  const otherActive = await anyPackHasTestDataActive(accountId, packId)
+  if (!otherActive) {
+    await setSharedTestDataActive(false, accountId)
+  }
+
+  await recalcAllCounts(accountId)
+}
+
+// ── Shared test data helpers ──────────────────────────────────────────
 async function setSharedTestDataActive(active: boolean, accountId?: string) {
   for (const table of SHARED_TEST_TABLES) {
     if (table === 'memberships') continue // handled below
@@ -371,6 +372,7 @@ async function anyPackHasTestDataActive(accountId: string, excludePackId?: strin
   const { data } = await query
   return (data?.length || 0) > 0
 }
+// ──────────────────────────────────────────────────────────────────────
 
 export default createHandler({
   async GET(req, ctx, params) {
@@ -531,6 +533,40 @@ export default createHandler({
       return json({ success: true, action: 'installed', include_test_data: includeTestData })
     }
 
+    if (action === 'install_test_data') {
+      if (!packId) return error('pack_id required')
+
+      const [{ data: pack }, { data: activation }] = await Promise.all([
+        db.from('config_packs').select('id, name').eq('id', packId).single(),
+        db.from('pack_activations').select('config_active, activated_at, activated_by').eq('account_id', accountId).eq('pack_id', packId).maybeSingle(),
+      ])
+
+      if (!pack) return error('Pack not found', 404)
+      if (!activation?.config_active) {
+        return error('Install the pack before adding test data', 400)
+      }
+      if (activation.test_data_active) {
+        return json({ success: true, action: 'test_data_installed', already_active: true })
+      }
+
+      await ensurePackTestDataCloned(packId, accountId)
+      await setPackTestDataActive(accountId, packId, true)
+      await setSharedTestDataActive(true, accountId)
+
+      await db.from('pack_activations').upsert({
+        account_id: accountId,
+        pack_id: packId,
+        config_active: true,
+        test_data_active: true,
+        activated_by: activation.activated_by ?? ctx.personId,
+        activated_at: activation.activated_at ?? new Date().toISOString(),
+      }, { onConflict: 'account_id,pack_id' })
+
+      await recalcAllCounts(accountId)
+      await emitActivity(ctx, 'config_pack.test_data_installed', `Installed test data for pack "${pack.name}"`, 'config_pack', packId)
+      return json({ success: true, action: 'test_data_installed' })
+    }
+
     // ── Uninstall Pack ────────────────────────────────────────────────
     // Deletes all cloned rows and mappings for this pack
     if (action === 'uninstall_pack') {
@@ -539,53 +575,42 @@ export default createHandler({
       const { data: pack } = await db.from('config_packs').select('id, name').eq('id', packId).single()
       if (!pack) return error('Pack not found', 404)
 
-      // Get all cloned IDs for deletion
-      const { mapByTemplate } = await fetchMappings(accountId, packId)
-      const clonedIds = Object.values(mapByTemplate)
+      await uninstallPack(accountId, packId)
 
-      if (clonedIds.length > 0) {
-        // Delete in reverse dependency order (children first)
-        const deleteSequence = [...CLONE_SEQUENCE].reverse()
-        for (const { table } of deleteSequence) {
-          if (TABLES_WITH_ACCOUNT_ID.has(table)) {
-            await (db.from(table) as any)
-              .delete()
-              .eq('account_id', accountId)
-              .eq('pack_id', packId)
-          } else {
-            await (db.from(table) as any)
-              .delete()
-              .in('id', clonedIds)
-              .eq('pack_id', packId)
-          }
-        }
+      await emitActivity(ctx, 'config_pack.uninstalled', `Uninstalled pack "${pack.name}"`, 'config_pack', packId)
+      return json({ success: true, action: 'uninstalled' })
+    }
+
+    if (action === 'uninstall_test_data') {
+      if (!packId) return error('pack_id required')
+
+      const [{ data: pack }, { data: activation }] = await Promise.all([
+        db.from('config_packs').select('id, name').eq('id', packId).single(),
+        db.from('pack_activations').select('config_active').eq('account_id', accountId).eq('pack_id', packId).maybeSingle(),
+      ])
+
+      if (!pack) return error('Pack not found', 404)
+      if (!activation?.config_active) {
+        return error('Pack is not installed for this account', 400)
       }
 
-      // Delete mappings
-      await db.from('pack_entity_mappings')
-        .delete()
-        .eq('account_id', accountId)
-        .eq('pack_id', packId)
+      await setPackTestDataActive(accountId, packId, false)
 
-      // Update activation record
       await db.from('pack_activations').upsert({
         account_id: accountId,
         pack_id: packId,
-        config_active: false,
+        config_active: true,
         test_data_active: false,
       }, { onConflict: 'account_id,pack_id' })
 
-      // If no other packs have test data active, deactivate shared test data
-      const otherActive = await anyPackHasTestDataActive(packId)
+      const otherActive = await anyPackHasTestDataActive(accountId, packId)
       if (!otherActive) {
         await setSharedTestDataActive(false, accountId)
       }
 
-      // Recalculate admin counts
       await recalcAllCounts(accountId)
-
-      await emitActivity(ctx, 'config_pack.uninstalled', `Uninstalled pack "${pack.name}"`, 'config_pack', packId)
-      return json({ success: true, action: 'uninstalled' })
+      await emitActivity(ctx, 'config_pack.test_data_uninstalled', `Removed test data for pack "${pack.name}"`, 'config_pack', packId)
+      return json({ success: true, action: 'test_data_uninstalled' })
     }
 
     return error('Unknown action. Use install_pack or uninstall_pack')

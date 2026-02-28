@@ -22,6 +22,7 @@ interface ComputedNavItem {
   app_slug: string
   app_name: string
   app_icon?: string
+  app_position: number
   label: string
   icon?: string
   route_type: string
@@ -48,6 +49,7 @@ export default createHandler({
       .select('*')
       .eq('account_id', ctx.accountId)
       .eq('is_active', true)
+      .order('app_position', { ascending: true })
       .order('name')
 
     if (!apps || apps.length === 0) {
@@ -61,7 +63,7 @@ export default createHandler({
       const appMinRank = ROLE_RANK[app.min_role] ?? 1
       if (userRank < appMinRank) continue
 
-      visibleApps.push({ slug: app.slug, name: app.name, icon: app.icon })
+      visibleApps.push({ slug: app.slug, name: app.name, icon: app.icon, position: app.app_position ?? 0 })
 
       const items: NavItem[] = app.nav_items || []
       for (const item of items) {
@@ -72,6 +74,7 @@ export default createHandler({
           app_slug: app.slug,
           app_name: app.name,
           app_icon: app.icon,
+          app_position: app.app_position ?? 0,
           label: item.label,
           icon: item.icon,
           route_type: item.route_type,
@@ -82,8 +85,12 @@ export default createHandler({
       }
     }
 
-    // Sort by position
-    navItems.sort((a, b) => a.position - b.position)
+    // Sort by app_position first, then by item position within each app
+    navItems.sort((a, b) => {
+      if (a.app_position !== b.app_position) return a.app_position - b.app_position
+      if (a.app_name !== b.app_name) return a.app_name.localeCompare(b.app_name)
+      return a.position - b.position
+    })
 
     return json({ nav_items: navItems, apps: visibleApps })
   },
