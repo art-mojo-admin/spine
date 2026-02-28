@@ -138,8 +138,9 @@ async function cloneTemplateRow(table: string, template: any, accountId: string,
     cloned.account_id = accountId
   }
   if ('pack_id' in cloned) cloned.pack_id = packId
-  if ('is_active' in cloned) cloned.is_active = template.is_active ?? false
-  if ('is_test_data' in cloned) cloned.is_test_data = template.is_test_data ?? false
+  const isTestData = template.is_test_data === true
+  if ('is_active' in cloned) cloned.is_active = isTestData ? (template.is_active ?? false) : true
+  if ('is_test_data' in cloned) cloned.is_test_data = isTestData
 
   for (const key of Object.keys(cloned)) {
     if (!key.endsWith('_id')) continue
