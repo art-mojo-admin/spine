@@ -1,6 +1,7 @@
 import { createHandler, requireAuth, requireTenant, requireRole, json, error, parseBody } from './_shared/middleware'
 import { db } from './_shared/db'
 import { emitAudit, emitActivity, emitOutboxEvent } from './_shared/audit'
+import { adjustCount } from './_shared/counts'
 
 export default createHandler({
   async GET(req, ctx, params) {
@@ -72,6 +73,7 @@ export default createHandler({
     await emitActivity(ctx, 'automation.created', `Created automation "${data.name}"`, 'automation_rule', data.id)
     await emitOutboxEvent(ctx.accountId!, 'automation.created', 'automation_rule', data.id, data)
 
+    if (data.enabled !== false) await adjustCount(ctx.accountId!, 'automations', 1)
     return json(data, 201)
   },
 
@@ -118,6 +120,10 @@ export default createHandler({
     await emitActivity(ctx, 'automation.updated', `Updated automation "${data.name}"`, 'automation_rule', id)
     await emitOutboxEvent(ctx.accountId!, 'automation.updated', 'automation_rule', id, { before, after: data })
 
+    if (body.enabled !== undefined && before.enabled !== data.enabled) {
+      await adjustCount(ctx.accountId!, 'automations', data.enabled ? 1 : -1)
+    }
+
     return json(data)
   },
 
@@ -146,6 +152,7 @@ export default createHandler({
     await emitActivity(ctx, 'automation.deleted', `Deleted automation "${before.name}"`, 'automation_rule', id)
     await emitOutboxEvent(ctx.accountId!, 'automation.deleted', 'automation_rule', id, before)
 
+    if (before.enabled) await adjustCount(ctx.accountId!, 'automations', -1)
     return json({ success: true })
   },
 })

@@ -1,6 +1,7 @@
 import { createHandler, requireAuth, requireTenant, requireRole, requireMinRole, json, error, parseBody } from './_shared/middleware'
 import { db } from './_shared/db'
 import { emitAudit, emitActivity } from './_shared/audit'
+import { adjustCount } from './_shared/counts'
 
 export default createHandler({
   async GET(req, ctx) {
@@ -69,6 +70,7 @@ export default createHandler({
     await emitAudit(ctx, 'create', 'account_module', data.id, null, data)
     await emitActivity(ctx, 'module.installed', `Installed module "${body.label}"`, 'account_module', data.id)
 
+    if (data.enabled !== false) await adjustCount(ctx.accountId!, 'modules', 1)
     return json(data, 201)
   },
 
@@ -119,6 +121,9 @@ export default createHandler({
     await emitAudit(ctx, 'update', 'account_module', id, before, data)
     await emitActivity(ctx, 'module.updated', `Updated module "${data.label}"`, 'account_module', id)
 
+    if (body.enabled !== undefined && before.enabled !== data.enabled) {
+      await adjustCount(ctx.accountId!, 'modules', data.enabled ? 1 : -1)
+    }
     return json(data)
   },
 
@@ -154,6 +159,7 @@ export default createHandler({
     await emitAudit(ctx, 'delete', 'account_module', id, before, null)
     await emitActivity(ctx, 'module.removed', `Removed module "${before.label}"`, 'account_module', id)
 
+    if (before.enabled) await adjustCount(ctx.accountId!, 'modules', -1)
     return json({ success: true })
   },
 })

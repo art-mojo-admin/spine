@@ -1,6 +1,7 @@
 import { createHandler, requireAuth, requireTenant, requireRole, json, error, parseBody, clampLimit } from './_shared/middleware'
 import { db } from './_shared/db'
 import { emitActivity } from './_shared/audit'
+import { adjustCount } from './_shared/counts'
 
 export default createHandler({
   async GET(req, ctx, params) {
@@ -96,6 +97,7 @@ export default createHandler({
 
       if (cloneErr) return error(cloneErr.message, 500)
       await emitActivity(ctx, 'app_definition.cloned', `Cloned app "${source.name}" as "${cloned.name}"`, 'app', cloned.id)
+      // cloned apps start inactive, no count adjustment needed
       return json(cloned, 201)
     }
 
@@ -124,6 +126,7 @@ export default createHandler({
     if (dbErr) return error(dbErr.message, 500)
 
     await emitActivity(ctx, 'app_definition.created', `Created app "${data.name}"`, 'app', data.id)
+    if (data.is_active) await adjustCount(ctx.accountId!, 'apps', 1)
     return json(data, 201)
   },
 
@@ -138,7 +141,7 @@ export default createHandler({
     const id = params.get('id')
     if (!id) return error('id required')
 
-    const { data: existing } = await db.from('app_definitions').select('id').eq('id', id).eq('account_id', ctx.accountId).single()
+    const { data: existing } = await db.from('app_definitions').select('id, is_active').eq('id', id).eq('account_id', ctx.accountId).single()
     if (!existing) return error('Not found', 404)
 
     const body = await parseBody<any>(req)
@@ -165,6 +168,12 @@ export default createHandler({
       .single()
 
     if (dbErr) return error(dbErr.message, 500)
+
+    // Adjust count if is_active changed
+    if (body.is_active !== undefined && existing.is_active !== data.is_active) {
+      await adjustCount(ctx.accountId!, 'apps', data.is_active ? 1 : -1)
+    }
+
     return json(data)
   },
 
@@ -179,6 +188,9 @@ export default createHandler({
     const id = params.get('id')
     if (!id) return error('id required')
 
+    // Check if it was active before deleting
+    const { data: before } = await db.from('app_definitions').select('is_active').eq('id', id).eq('account_id', ctx.accountId).single()
+
     const { error: dbErr } = await db
       .from('app_definitions')
       .delete()
@@ -186,6 +198,7 @@ export default createHandler({
       .eq('account_id', ctx.accountId)
 
     if (dbErr) return error(dbErr.message, 500)
+    if (before?.is_active) await adjustCount(ctx.accountId!, 'apps', -1)
     return json({ success: true })
   },
 })

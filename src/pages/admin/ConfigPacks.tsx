@@ -3,8 +3,7 @@ import { apiGet, apiPost } from '@/lib/api'
 import { useAuth } from '@/hooks/useAuth'
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
-import { Switch } from '@/components/ui/switch'
-import { Package, Briefcase, Headphones, Users, GraduationCap, Bug, LayoutGrid, ChevronDown, ChevronUp, Download } from 'lucide-react'
+import { Package, Briefcase, Headphones, Users, GraduationCap, Bug, LayoutGrid, ChevronDown, ChevronUp, Download, Check, Trash2, Loader2 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 
 interface ConfigPack {
@@ -45,9 +44,11 @@ export function ConfigPacksPage() {
   const { currentAccountId } = useAuth()
   const [packs, setPacks] = useState<ConfigPack[]>([])
   const [loading, setLoading] = useState(true)
-  const [toggling, setToggling] = useState<string | null>(null)
+  const [working, setWorking] = useState<string | null>(null)
   const [expanded, setExpanded] = useState<Set<string>>(new Set())
   const [errorMessage, setErrorMessage] = useState<string | null>(null)
+  const [includeTestData, setIncludeTestData] = useState<Set<string>>(new Set())
+  const [confirmUninstall, setConfirmUninstall] = useState<string | null>(null)
 
   async function loadPacks() {
     try {
@@ -66,38 +67,47 @@ export function ConfigPacksPage() {
     loadPacks()
   }, [currentAccountId])
 
-  async function handleToggleConfig(packId: string, active: boolean) {
-    setToggling(packId)
+  async function handleInstall(packId: string) {
+    setWorking(packId)
     setErrorMessage(null)
     try {
       await apiPost('config-packs', {
-        action: 'toggle_config',
+        action: 'install_pack',
         pack_id: packId,
-        active,
+        include_test_data: includeTestData.has(packId),
       })
       await loadPacks()
     } catch (err: any) {
-      setErrorMessage(err?.message || 'Toggle failed')
+      setErrorMessage(err?.message || 'Install failed')
     } finally {
-      setToggling(null)
+      setWorking(null)
     }
   }
 
-  async function handleToggleTestData(packId: string, active: boolean) {
-    setToggling(packId)
+  async function handleUninstall(packId: string) {
+    setWorking(packId)
     setErrorMessage(null)
+    setConfirmUninstall(null)
     try {
       await apiPost('config-packs', {
-        action: 'toggle_test_data',
+        action: 'uninstall_pack',
         pack_id: packId,
-        active,
       })
       await loadPacks()
     } catch (err: any) {
-      setErrorMessage(err?.message || 'Toggle failed')
+      setErrorMessage(err?.message || 'Uninstall failed')
     } finally {
-      setToggling(null)
+      setWorking(null)
     }
+  }
+
+  function toggleTestDataOption(packId: string) {
+    setIncludeTestData((prev) => {
+      const next = new Set(prev)
+      if (next.has(packId)) next.delete(packId)
+      else next.add(packId)
+      return next
+    })
   }
 
   function toggleExpanded(packId: string) {
@@ -118,7 +128,7 @@ export function ConfigPacksPage() {
       <div>
         <h1 className="text-3xl font-bold tracking-tight">Template Packs</h1>
         <p className="mt-1 text-muted-foreground">
-          Pre-built configurations for common use cases. Toggle templates on to add workflows, fields, link types, and documentation to your workspace.
+          Install pre-built configurations to add workflows, fields, views, and apps to your workspace. Everything installed becomes yours to customize.
         </p>
       </div>
 
@@ -138,14 +148,15 @@ export function ConfigPacksPage() {
       ) : (
         <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
           {packs.map((pack) => {
-            const isToggling = toggling === pack.id
+            const isWorking = working === pack.id
+            const isInstalled = pack.config_active
             const isExpanded = expanded.has(pack.id)
             const features = pack.pack_data?.features || []
             const icon = pack.icon ? ICON_MAP[pack.icon] : <Package className="h-5 w-5" />
             const categoryColor = pack.category ? CATEGORY_COLORS[pack.category] || 'bg-gray-100 text-gray-700' : null
 
             return (
-              <Card key={pack.id} className={pack.config_active ? 'ring-1 ring-primary/20' : ''}>
+              <Card key={pack.id} className={isInstalled ? 'ring-1 ring-primary/20' : ''}>
                 <CardHeader className="pb-3">
                   <div className="flex items-start justify-between">
                     <div className="flex items-center gap-2">
@@ -153,6 +164,11 @@ export function ConfigPacksPage() {
                       <CardTitle className="text-lg">{pack.name}</CardTitle>
                     </div>
                     <div className="flex items-center gap-1.5">
+                      {isInstalled && (
+                        <Badge variant="default" className="text-[10px]">
+                          <Check className="mr-0.5 h-2.5 w-2.5" /> Installed
+                        </Badge>
+                      )}
                       {pack.is_system && (
                         <Badge variant="secondary" className="text-[10px]">Built-in</Badge>
                       )}
@@ -191,37 +207,80 @@ export function ConfigPacksPage() {
                     </div>
                   )}
 
-                  {/* Toggle: Template Config */}
-                  <div className="flex items-center justify-between">
-                    <div>
-                      <p className="text-sm font-medium">Template Config</p>
-                      <p className="text-[11px] text-muted-foreground">Workflows, fields, link types, docs</p>
+                  {/* Install / Uninstall Actions */}
+                  {!isInstalled ? (
+                    <div className="space-y-3 pt-1 border-t">
+                      <label className="flex items-center gap-2 cursor-pointer">
+                        <input
+                          type="checkbox"
+                          checked={includeTestData.has(pack.id)}
+                          onChange={() => toggleTestDataOption(pack.id)}
+                          className="rounded border-border"
+                        />
+                        <span className="text-xs text-muted-foreground">Include test data (sample items, people)</span>
+                      </label>
+                      <Button
+                        size="sm"
+                        className="w-full"
+                        onClick={() => handleInstall(pack.id)}
+                        disabled={isWorking}
+                      >
+                        {isWorking ? (
+                          <><Loader2 className="mr-1 h-3 w-3 animate-spin" /> Installing...</>
+                        ) : (
+                          <><Package className="mr-1 h-3 w-3" /> Install Pack</>
+                        )}
+                      </Button>
                     </div>
-                    <Switch
-                      checked={pack.config_active}
-                      onCheckedChange={(checked) => handleToggleConfig(pack.id, checked)}
-                      disabled={isToggling}
-                    />
-                  </div>
+                  ) : (
+                    <div className="space-y-3 pt-1 border-t">
+                      {pack.activated_at && (
+                        <p className="text-[10px] text-muted-foreground">
+                          Installed {new Date(pack.activated_at).toLocaleDateString()}
+                          {pack.test_data_active && ' · includes test data'}
+                        </p>
+                      )}
 
-                  {/* Toggle: Test Data */}
-                  <div className="flex items-center justify-between">
-                    <div>
-                      <p className={`text-sm font-medium ${!pack.config_active ? 'text-muted-foreground' : ''}`}>Test Data</p>
-                      <p className="text-[11px] text-muted-foreground">Sample items, people, accounts</p>
+                      {confirmUninstall === pack.id ? (
+                        <div className="space-y-2">
+                          <p className="text-xs text-destructive font-medium">
+                            This will remove all cloned workflows, views, fields, and data from this pack.
+                          </p>
+                          <div className="flex gap-2">
+                            <Button
+                              size="sm"
+                              variant="destructive"
+                              className="flex-1"
+                              onClick={() => handleUninstall(pack.id)}
+                              disabled={isWorking}
+                            >
+                              {isWorking ? (
+                                <><Loader2 className="mr-1 h-3 w-3 animate-spin" /> Removing...</>
+                              ) : (
+                                'Confirm Uninstall'
+                              )}
+                            </Button>
+                            <Button
+                              size="sm"
+                              variant="ghost"
+                              onClick={() => setConfirmUninstall(null)}
+                            >
+                              Cancel
+                            </Button>
+                          </div>
+                        </div>
+                      ) : (
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          className="w-full text-destructive hover:text-destructive"
+                          onClick={() => setConfirmUninstall(pack.id)}
+                          disabled={isWorking}
+                        >
+                          <Trash2 className="mr-1 h-3 w-3" /> Uninstall
+                        </Button>
+                      )}
                     </div>
-                    <Switch
-                      checked={pack.test_data_active}
-                      onCheckedChange={(checked) => handleToggleTestData(pack.id, checked)}
-                      disabled={isToggling || !pack.config_active}
-                    />
-                  </div>
-
-                  {/* Activation info */}
-                  {pack.activated_at && (
-                    <p className="text-[10px] text-muted-foreground">
-                      Activated {new Date(pack.activated_at).toLocaleDateString()}
-                    </p>
                   )}
 
                   {/* Export button */}

@@ -1,6 +1,7 @@
 import { createHandler, requireAuth, requireTenant, requireRole, json, error, parseBody } from './_shared/middleware'
 import { db } from './_shared/db'
 import { emitAudit, emitActivity, emitOutboxEvent } from './_shared/audit'
+import { adjustCount } from './_shared/counts'
 
 export default createHandler({
   async GET(req, ctx, params) {
@@ -45,6 +46,9 @@ export default createHandler({
     await emitActivity(ctx, 'membership.created', `Added member to account`, 'membership', membership.id)
     await emitOutboxEvent(ctx.accountId!, 'membership.created', 'membership', membership.id, membership)
 
+    if (membership.status === 'active' && !membership.is_test_data) {
+      await adjustCount(ctx.accountId!, 'members', 1)
+    }
     return json(membership, 201)
   },
 
@@ -80,6 +84,13 @@ export default createHandler({
     await emitActivity(ctx, 'membership.updated', `Updated membership role`, 'membership', id)
     await emitOutboxEvent(ctx.accountId!, 'membership.updated', 'membership', id, { before, after: membership })
 
+    if (body.status !== undefined && !before.is_test_data) {
+      const wasActive = before.status === 'active'
+      const nowActive = membership.status === 'active'
+      if (wasActive !== nowActive) {
+        await adjustCount(ctx.accountId!, 'members', nowActive ? 1 : -1)
+      }
+    }
     return json(membership)
   },
 
@@ -103,6 +114,9 @@ export default createHandler({
     await emitActivity(ctx, 'membership.deleted', `Removed member from account`, 'membership', id)
     await emitOutboxEvent(ctx.accountId!, 'membership.deleted', 'membership', id, before)
 
+    if (before.status === 'active' && !before.is_test_data) {
+      await adjustCount(ctx.accountId!, 'members', -1)
+    }
     return json({ success: true })
   },
 })

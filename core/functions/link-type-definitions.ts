@@ -1,6 +1,7 @@
 import { createHandler, requireAuth, requireTenant, requireRole, json, error, parseBody } from './_shared/middleware'
 import { db } from './_shared/db'
 import { emitAudit, emitActivity } from './_shared/audit'
+import { adjustCount } from './_shared/counts'
 
 function slugify(name: string): string {
   return name
@@ -90,6 +91,7 @@ export default createHandler({
     await emitAudit(ctx, 'create', 'link_type_definition', data.id, null, data)
     await emitActivity(ctx, 'link_type.created', `Created link type "${data.name}"`, 'link_type_definition', data.id)
 
+    await adjustCount(ctx.accountId!, 'link_types', 1)
     return json(data, 201)
   },
 
@@ -159,6 +161,7 @@ export default createHandler({
     await emitAudit(ctx, 'delete', 'link_type_definition', id, before, null)
     await emitActivity(ctx, 'link_type.deleted', `Deleted link type "${before.name}"`, 'link_type_definition', id)
 
+    if (before.is_active !== false) await adjustCount(ctx.accountId!, 'link_types', -1)
     return json({ success: true })
   },
 })

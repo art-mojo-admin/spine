@@ -1,6 +1,7 @@
 import { createHandler, requireAuth, requireTenant, requireRole, json, error, parseBody } from './_shared/middleware'
 import { db } from './_shared/db'
 import { emitAudit, emitActivity } from './_shared/audit'
+import { adjustCount } from './_shared/counts'
 import { nextCronDate } from './_shared/cron'
 
 export default createHandler({
@@ -96,6 +97,7 @@ export default createHandler({
     await emitAudit(ctx, 'create', 'scheduled_trigger', data.id, null, data)
     await emitActivity(ctx, 'scheduled_trigger.created', `Created trigger "${data.name}"`, 'scheduled_trigger', data.id)
 
+    if (data.enabled !== false) await adjustCount(ctx.accountId!, 'schedules', 1)
     return json(data, 201)
   },
 
@@ -152,6 +154,9 @@ export default createHandler({
     await emitAudit(ctx, 'update', 'scheduled_trigger', id, before, data)
     await emitActivity(ctx, 'scheduled_trigger.updated', `Updated trigger "${data.name}"`, 'scheduled_trigger', id)
 
+    if (body.enabled !== undefined && before.enabled !== data.enabled) {
+      await adjustCount(ctx.accountId!, 'schedules', data.enabled ? 1 : -1)
+    }
     return json(data)
   },
 
@@ -179,6 +184,7 @@ export default createHandler({
     await emitAudit(ctx, 'delete', 'scheduled_trigger', id, before, null)
     await emitActivity(ctx, 'scheduled_trigger.deleted', `Deleted trigger "${before.name}"`, 'scheduled_trigger', id)
 
+    if (before.enabled) await adjustCount(ctx.accountId!, 'schedules', -1)
     return json({ success: true })
   },
 })

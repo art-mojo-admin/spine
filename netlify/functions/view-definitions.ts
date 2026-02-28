@@ -1,6 +1,7 @@
 import { createHandler, requireAuth, requireTenant, requireRole, requireMinRole, json, error, parseBody, clampLimit } from './_shared/middleware'
 import { db } from './_shared/db'
 import { emitActivity } from './_shared/audit'
+import { adjustCount } from './_shared/counts'
 
 export default createHandler({
   async GET(req, ctx, params) {
@@ -86,6 +87,7 @@ export default createHandler({
     if (dbErr) return error(dbErr.message, 500)
 
     await emitActivity(ctx, 'view_definition.created', `Created view "${data.name}"`, 'view', data.id)
+    await adjustCount(ctx.accountId!, 'views', 1)
     return json(data, 201)
   },
 
@@ -147,6 +149,8 @@ export default createHandler({
       .eq('account_id', ctx.accountId)
 
     if (dbErr) return error(dbErr.message, 500)
+    // View was active by default (is_active defaults true)
+    await adjustCount(ctx.accountId!, 'views', -1)
     return json({ success: true })
   },
 })

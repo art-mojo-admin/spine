@@ -57,23 +57,23 @@ const fallbackNavItems = [
   { key: 'search', to: '/search', icon: Search, label: 'Search', position: 8 },
 ]
 
-const adminItems = [
+const adminItems: { to: string; icon: any; label: string; countKey?: string }[] = [
   { to: '/admin/account-browser', icon: ShieldAlert, label: 'Account Browser' },
-  { to: '/admin/apps', icon: LayoutGrid, label: 'Apps' },
-  { to: '/admin/automations', icon: Zap, label: 'Automations' },
-  { to: '/admin/custom-actions', icon: PlugZap, label: 'Custom Actions' },
-  { to: '/admin/custom-fields', icon: SlidersHorizontal, label: 'Custom Fields' },
-  { to: '/admin/inbound-webhooks', icon: ArrowDownToLine, label: 'Inbound Hooks' },
-  { to: '/admin/link-types', icon: Link2, label: 'Link Types' },
-  { to: '/admin/members', icon: UserPlus, label: 'Members' },
-  { to: '/admin/modules', icon: Blocks, label: 'Modules' },
-  { to: '/admin/packs', icon: Package, label: 'Templates' },
+  { to: '/admin/apps', icon: LayoutGrid, label: 'Apps', countKey: 'apps' },
+  { to: '/admin/automations', icon: Zap, label: 'Automations', countKey: 'automations' },
+  { to: '/admin/custom-actions', icon: PlugZap, label: 'Custom Actions', countKey: 'custom_actions' },
+  { to: '/admin/custom-fields', icon: SlidersHorizontal, label: 'Custom Fields', countKey: 'custom_fields' },
+  { to: '/admin/inbound-webhooks', icon: ArrowDownToLine, label: 'Inbound Hooks', countKey: 'inbound_hooks' },
+  { to: '/admin/link-types', icon: Link2, label: 'Link Types', countKey: 'link_types' },
+  { to: '/admin/members', icon: UserPlus, label: 'Members', countKey: 'members' },
+  { to: '/admin/modules', icon: Blocks, label: 'Modules', countKey: 'modules' },
+  { to: '/admin/packs', icon: Package, label: 'Templates', countKey: 'templates' },
   { to: '/admin/roles', icon: Shield, label: 'Roles' },
-  { to: '/admin/schedules', icon: Clock, label: 'Schedules' },
+  { to: '/admin/schedules', icon: Clock, label: 'Schedules', countKey: 'schedules' },
   { to: '/admin/settings', icon: Settings, label: 'Settings' },
   { to: '/admin/theme', icon: Palette, label: 'Theme' },
-  { to: '/admin/views', icon: LayoutGrid, label: 'Views' },
-  { to: '/admin/webhooks', icon: Webhook, label: 'Webhooks' },
+  { to: '/admin/views', icon: LayoutGrid, label: 'Views', countKey: 'views' },
+  { to: '/admin/webhooks', icon: Webhook, label: 'Webhooks', countKey: 'webhooks' },
 ]
 
 export function Sidebar() {
@@ -86,6 +86,7 @@ export function Sidebar() {
 
   const [appNavItems, setAppNavItems] = useState<AppNavItem[]>([])
   const [navLoaded, setNavLoaded] = useState(false)
+  const [adminCounts, setAdminCounts] = useState<Record<string, number>>({})
 
   useEffect(() => {
     if (!currentAccountId) return
@@ -96,6 +97,13 @@ export function Sidebar() {
       })
       .catch(() => setNavLoaded(true))
   }, [currentAccountId])
+
+  useEffect(() => {
+    if (!currentAccountId || !isAdmin) return
+    apiGet<Record<string, number>>('admin-counts')
+      .then((counts) => setAdminCounts(counts || {}))
+      .catch(() => {})
+  }, [currentAccountId, isAdmin])
 
   // Use app-driven nav if apps are published, otherwise fall back to defaults
   const useAppNav = navLoaded && appNavItems.length > 0
@@ -185,23 +193,31 @@ export function Sidebar() {
                 Admin
               </p>
             </div>
-            {adminItems.map(({ to, icon: Icon, label }) => (
-              <NavLink
-                key={to}
-                to={to}
-                className={({ isActive }) =>
-                  cn(
-                    'flex items-center gap-3 rounded-md px-3 py-2 text-sm font-medium transition-colors',
-                    isActive
-                      ? 'bg-primary/10 text-primary'
-                      : 'text-muted-foreground hover:bg-accent hover:text-accent-foreground',
-                  )
-                }
-              >
-                <Icon className="h-4 w-4" />
-                {label}
-              </NavLink>
-            ))}
+            {adminItems.map(({ to, icon: Icon, label, countKey }) => {
+              const count = countKey ? adminCounts[countKey] : undefined
+              return (
+                <NavLink
+                  key={to}
+                  to={to}
+                  className={({ isActive }) =>
+                    cn(
+                      'flex items-center gap-3 rounded-md px-3 py-2 text-sm font-medium transition-colors',
+                      isActive
+                        ? 'bg-primary/10 text-primary'
+                        : 'text-muted-foreground hover:bg-accent hover:text-accent-foreground',
+                    )
+                  }
+                >
+                  <Icon className="h-4 w-4" />
+                  <span className="flex-1">{label}</span>
+                  {count != null && count > 0 && (
+                    <span className="ml-auto rounded-full bg-muted px-1.5 py-0.5 text-[10px] font-medium text-muted-foreground">
+                      {count}
+                    </span>
+                  )}
+                </NavLink>
+              )
+            })}
           </>
         )}
 

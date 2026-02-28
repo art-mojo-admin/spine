@@ -3,6 +3,7 @@ import { randomUUID } from 'crypto'
 import { createHandler, requireAuth, requireTenant, requireRole, json, error, parseBody } from './_shared/middleware'
 import { db } from './_shared/db'
 import { emitActivity } from './_shared/audit'
+import { recalcAllCounts } from './_shared/counts'
 
 // Tables that have pack_id and is_active columns for toggling
 const PACK_TABLES = [
@@ -411,120 +412,112 @@ export default createHandler({
     const packId = body.pack_id
     const accountId = ctx.accountId!
 
-    // ── Toggle Config ─────────────────────────────────────────────────
-    if (action === 'toggle_config') {
+    // ── Install Pack ──────────────────────────────────────────────────
+    // Clones all config (and optionally test data) as tenant-owned, active rows
+    if (action === 'install_pack') {
       if (!packId) return error('pack_id required')
-      const active = body.active === true
 
       const { data: pack } = await db.from('config_packs').select('id, name').eq('id', packId).single()
       if (!pack) return error('Pack not found', 404)
 
-      if (active) {
-        await ensurePackConfigCloned(packId, accountId)
-
-        const counts = await setPackConfigActive(accountId, packId, true)
-
-        const { data: activation } = await db
-          .from('pack_activations')
-          .select('test_data_active')
-          .eq('account_id', accountId)
-          .eq('pack_id', packId)
-          .maybeSingle()
-
-        if (!activation?.test_data_active) {
-          await setPackTestDataActive(accountId, packId, false)
-        }
-
-        await db.from('pack_activations').upsert({
-          account_id: accountId,
-          pack_id: packId,
-          config_active: true,
-          test_data_active: activation?.test_data_active ?? false,
-          activated_by: ctx.personId,
-          activated_at: new Date().toISOString(),
-        }, { onConflict: 'account_id,pack_id' })
-
-        await emitActivity(ctx, 'config_pack.config_enabled', `Enabled template config "${pack.name}"`, 'config_pack', packId)
-        return json({ success: true, action: 'config_enabled', counts })
-      } else {
-        const configCounts = await setPackConfigActive(accountId, packId, false)
-        const testCounts = await setPackTestDataActive(accountId, packId, false)
-        const counts = combineCounts(configCounts, testCounts)
-
-        await db.from('pack_activations').upsert({
-          account_id: accountId,
-          pack_id: packId,
-          config_active: false,
-          test_data_active: false,
-        }, { onConflict: 'account_id,pack_id' })
-
-        // If no other packs have test data active, deactivate shared test data
-        const otherActive = await anyPackHasTestDataActive(packId)
-        if (!otherActive) {
-          await setSharedTestDataActive(false, accountId)
-        }
-
-        await emitActivity(ctx, 'config_pack.config_disabled', `Disabled template config "${pack.name}"`, 'config_pack', packId)
-        return json({ success: true, action: 'config_disabled', counts })
-      }
-    }
-
-    // ── Toggle Test Data ──────────────────────────────────────────────
-    if (action === 'toggle_test_data') {
-      if (!packId) return error('pack_id required')
-      const active = body.active === true
-
-      const { data: pack } = await db.from('config_packs').select('id, name').eq('id', packId).single()
-      if (!pack) return error('Pack not found', 404)
-
-      // Check config is active first
-      const { data: activation } = await db
+      // Check if already installed
+      const { data: existing } = await db
         .from('pack_activations')
         .select('config_active')
         .eq('account_id', accountId)
         .eq('pack_id', packId)
         .maybeSingle()
 
-      if (active && !activation?.config_active) {
-        return error('Template config must be enabled before enabling test data')
+      if (existing?.config_active) {
+        return error('Pack is already installed. Uninstall first to reinstall.', 409)
       }
 
-      if (active) {
-        await ensurePackTestDataCloned(packId, accountId)
+      // Clone config rows (workflows, fields, views, apps, etc.)
+      await cloneTemplatesForPack(packId, accountId, false)
+      await setClonedEntitiesActive(accountId, packId, true, false)
 
-        const counts = await setPackTestDataActive(accountId, packId, true)
-
-        // Activate shared test data (persons, accounts)
+      // Optionally clone test data
+      const includeTestData = body.include_test_data === true
+      if (includeTestData) {
+        await cloneTemplatesForPack(packId, accountId, true)
+        await setClonedEntitiesActive(accountId, packId, true, true)
         await setSharedTestDataActive(true, accountId)
-
-        await db.from('pack_activations').upsert({
-          account_id: accountId,
-          pack_id: packId,
-          test_data_active: true,
-        }, { onConflict: 'account_id,pack_id' })
-
-        await emitActivity(ctx, 'config_pack.test_data_enabled', `Enabled test data for "${pack.name}"`, 'config_pack', packId)
-        return json({ success: true, action: 'test_data_enabled', counts })
-      } else {
-        const counts = await setPackTestDataActive(accountId, packId, false)
-
-        await db.from('pack_activations').upsert({
-          account_id: accountId,
-          pack_id: packId,
-          test_data_active: false,
-        }, { onConflict: 'account_id,pack_id' })
-
-        // If no other packs have test data active, deactivate shared test data
-        const otherActive = await anyPackHasTestDataActive(packId)
-        if (!otherActive) {
-          await setSharedTestDataActive(false, accountId)
-        }
-
-        await emitActivity(ctx, 'config_pack.test_data_disabled', `Disabled test data for "${pack.name}"`, 'config_pack', packId)
-        return json({ success: true, action: 'test_data_disabled', counts })
       }
+
+      // Record activation
+      await db.from('pack_activations').upsert({
+        account_id: accountId,
+        pack_id: packId,
+        config_active: true,
+        test_data_active: includeTestData,
+        activated_by: ctx.personId,
+        activated_at: new Date().toISOString(),
+      }, { onConflict: 'account_id,pack_id' })
+
+      // Recalculate admin counts
+      await recalcAllCounts(accountId)
+
+      await emitActivity(ctx, 'config_pack.installed', `Installed pack "${pack.name}"${includeTestData ? ' with test data' : ''}`, 'config_pack', packId)
+      return json({ success: true, action: 'installed', include_test_data: includeTestData })
     }
 
-    return error('Unknown action. Use toggle_config or toggle_test_data')
+    // ── Uninstall Pack ────────────────────────────────────────────────
+    // Deletes all cloned rows and mappings for this pack
+    if (action === 'uninstall_pack') {
+      if (!packId) return error('pack_id required')
+
+      const { data: pack } = await db.from('config_packs').select('id, name').eq('id', packId).single()
+      if (!pack) return error('Pack not found', 404)
+
+      // Get all cloned IDs for deletion
+      const { mapByTemplate } = await fetchMappings(accountId, packId)
+      const clonedIds = Object.values(mapByTemplate)
+
+      if (clonedIds.length > 0) {
+        // Delete in reverse dependency order (children first)
+        const deleteSequence = [...CLONE_SEQUENCE].reverse()
+        for (const { table } of deleteSequence) {
+          if (TABLES_WITH_ACCOUNT_ID.has(table)) {
+            await (db.from(table) as any)
+              .delete()
+              .eq('account_id', accountId)
+              .eq('pack_id', packId)
+          } else {
+            await (db.from(table) as any)
+              .delete()
+              .in('id', clonedIds)
+              .eq('pack_id', packId)
+          }
+        }
+      }
+
+      // Delete mappings
+      await db.from('pack_entity_mappings')
+        .delete()
+        .eq('account_id', accountId)
+        .eq('pack_id', packId)
+
+      // Update activation record
+      await db.from('pack_activations').upsert({
+        account_id: accountId,
+        pack_id: packId,
+        config_active: false,
+        test_data_active: false,
+      }, { onConflict: 'account_id,pack_id' })
+
+      // If no other packs have test data active, deactivate shared test data
+      const otherActive = await anyPackHasTestDataActive(packId)
+      if (!otherActive) {
+        await setSharedTestDataActive(false, accountId)
+      }
+
+      // Recalculate admin counts
+      await recalcAllCounts(accountId)
+
+      await emitActivity(ctx, 'config_pack.uninstalled', `Uninstalled pack "${pack.name}"`, 'config_pack', packId)
+      return json({ success: true, action: 'uninstalled' })
+    }
+
+    return error('Unknown action. Use install_pack or uninstall_pack')
   },
 })

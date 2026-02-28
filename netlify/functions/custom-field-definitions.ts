@@ -1,6 +1,7 @@
 import { createHandler, requireAuth, requireTenant, requireRole, json, error, parseBody } from './_shared/middleware'
 import { db } from './_shared/db'
 import { emitAudit, emitActivity } from './_shared/audit'
+import { adjustCount } from './_shared/counts'
 
 function slugify(name: string): string {
   return name
@@ -100,6 +101,7 @@ export default createHandler({
     await emitAudit(ctx, 'create', 'custom_field_definition', data.id, null, data)
     await emitActivity(ctx, 'custom_field.created', `Created custom field "${data.name}" for ${data.entity_type}`, 'custom_field_definition', data.id)
 
+    if (data.enabled !== false) await adjustCount(ctx.accountId!, 'custom_fields', 1)
     return json(data, 201)
   },
 
@@ -144,6 +146,9 @@ export default createHandler({
 
     if (dbErr) return error(dbErr.message, 500)
 
+    if (body.enabled !== undefined && before.enabled !== data.enabled) {
+      await adjustCount(ctx.accountId!, 'custom_fields', data.enabled ? 1 : -1)
+    }
     await emitAudit(ctx, 'update', 'custom_field_definition', id, before, data)
     return json(data)
   },
@@ -172,6 +177,7 @@ export default createHandler({
     await emitAudit(ctx, 'delete', 'custom_field_definition', id, before, null)
     await emitActivity(ctx, 'custom_field.deleted', `Deleted custom field "${before.name}"`, 'custom_field_definition', id)
 
+    if (before.enabled !== false) await adjustCount(ctx.accountId!, 'custom_fields', -1)
     return json({ success: true })
   },
 })
