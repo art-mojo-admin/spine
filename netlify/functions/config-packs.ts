@@ -155,12 +155,37 @@ async function cloneTemplateRow(table: string, template: any, accountId: string,
     }
   }
 
+  // Remap template IDs inside JSON/JSONB fields
+  const jsonFields = ['target_filter', 'config', 'nav_items', 'action_config', 'conditions', 'metadata']
+  for (const field of jsonFields) {
+    if (cloned[field] != null) {
+      cloned[field] = remapJsonIds(cloned[field], entityMap)
+    }
+  }
+
   delete cloned.created_at
   delete cloned.updated_at
 
   await (db.from(table) as any).insert(cloned)
 
   return newId
+}
+
+function remapJsonIds(value: any, entityMap: Record<string, string>): any {
+  if (typeof value === 'string') {
+    return entityMap[value] || value
+  }
+  if (Array.isArray(value)) {
+    return value.map((v) => remapJsonIds(v, entityMap))
+  }
+  if (value && typeof value === 'object') {
+    const result: Record<string, any> = {}
+    for (const [k, v] of Object.entries(value)) {
+      result[k] = remapJsonIds(v, entityMap)
+    }
+    return result
+  }
+  return value
 }
 
 async function cloneTemplatesForPack(packId: string, accountId: string, isTestData: boolean) {

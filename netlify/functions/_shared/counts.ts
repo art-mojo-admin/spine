@@ -96,6 +96,10 @@ export async function recalcAllCounts(accountId: string) {
       key: 'templates',
       query: db.from('pack_activations').select('id').eq('account_id', accountId).eq('config_active', true),
     },
+    {
+      key: 'workflows',
+      query: db.from('workflow_definitions').select('id').eq('account_id', accountId).eq('is_active', true),
+    },
   ]
 
   const results = await Promise.all(queries.map((q) => q.query))
