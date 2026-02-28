@@ -22,7 +22,7 @@ export function PortalDashboardPage() {
         const [linksRes, itemsRes] = await Promise.all([
           apiGet<any[]>('entity-links', {
             entity_type: 'person',
-            entity_id: profile!.person_id,
+            entity_id: profile!.person_id || '',
             direction: 'source',
           }),
           apiGet<any[]>('workflow-items', { item_type: 'ticket' }),

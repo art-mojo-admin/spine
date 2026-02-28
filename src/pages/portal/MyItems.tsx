@@ -21,7 +21,7 @@ export function MyItemsPage() {
       try {
         const links = await apiGet<any[]>('entity-links', {
           entity_type: 'person',
-          entity_id: profile!.person_id,
+          entity_id: profile!.person_id || '',
           direction: 'source',
         })
 
