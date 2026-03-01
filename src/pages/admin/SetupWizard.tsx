@@ -47,6 +47,8 @@ const archetypes = [
 
 type ArchetypeKey = typeof archetypes[number]['key']
 
+const modernPackSlugs = new Set(['support-csm', 'sales', 'operations', 'marketing'])
+
 export function SetupWizardPage() {
   const navigate = useNavigate()
   const { settings, loading, error, save, canConfigure } = useTenantSettings()
@@ -60,7 +62,10 @@ export function SetupWizardPage() {
   useEffect(() => {
     apiGet<PackSummary[]>('config-packs')
       .then((data) => {
-        setPacks((data || []).map((p) => ({ id: p.id, slug: p.slug, name: p.name, description: p.description, category: p.category })))
+        const filtered = (data || [])
+          .filter((p) => modernPackSlugs.has(p.slug))
+          .map((p) => ({ id: p.id, slug: p.slug, name: p.name, description: p.description, category: p.category }))
+        setPacks(filtered)
       })
       .catch(() => setPacks([]))
   }, [])
@@ -97,11 +102,6 @@ export function SetupWizardPage() {
 
   function handleSelectArchetype(key: ArchetypeKey) {
     setSelected(key)
-    const archetype = archetypes.find((candidate) => candidate.key === key)
-    if (!archetype) return
-    if (!packsDirty && (!settings || !settings.installed_packs?.length)) {
-      setSelectedPacks(new Set(archetype.recommendedPacks))
-    }
   }
 
   function togglePack(slug: string) {
@@ -287,27 +287,6 @@ export function SetupWizardPage() {
                   </li>
                 )
               })}
-            </ul>
-          )}
-        </CardContent>
-      </Card>
-
-      <Card>
-        <CardHeader>
-          <CardTitle>Packs snapshot</CardTitle>
-          <CardDescription>Review available packs. Install them after saving configuration.</CardDescription>
-        </CardHeader>
-        <CardContent>
-          {packs.length === 0 ? (
-            <p className="text-sm text-muted-foreground">Loading packs...</p>
-          ) : (
-            <ul className="grid gap-3 md:grid-cols-2">
-              {packs.map((pack) => (
-                <li key={pack.id} className="rounded-md border p-3 text-sm">
-                  <p className="font-medium">{pack.name}</p>
-                  {pack.description && <p className="text-xs text-muted-foreground">{pack.description}</p>}
-                </li>
-              ))}
             </ul>
           )}
         </CardContent>
