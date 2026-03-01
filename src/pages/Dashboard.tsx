@@ -73,7 +73,7 @@ function ConfiguredDashboard({ dashboard }: { dashboard: DashboardDef }) {
 }
 
 function FallbackDashboard() {
-  const { profile, currentAccountId } = useAuth()
+  const { profile, currentAccountId, currentAccountNodeId } = useAuth()
   const [activity, setActivity] = useState<any[]>([])
   const [counts, setCounts] = useState({ accounts: 0, persons: 0, workflows: 0, documents: 0 })
   const [loading, setLoading] = useState(true)
@@ -98,7 +98,7 @@ function FallbackDashboard() {
       })
       .catch(() => {})
       .finally(() => setLoading(false))
-  }, [currentAccountId])
+  }, [currentAccountId, currentAccountNodeId])
 
   return (
     <div className="space-y-8">
@@ -181,7 +181,7 @@ function FallbackDashboard() {
 }
 
 export function DashboardPage() {
-  const { currentAccountId } = useAuth()
+  const { currentAccountId, currentAccountNodeId } = useAuth()
   const [dashboard, setDashboard] = useState<DashboardDef | null>(null)
   const [checked, setChecked] = useState(false)
 
@@ -191,7 +191,7 @@ export function DashboardPage() {
       .then((data) => setDashboard(data && data.widgets?.length ? data : null))
       .catch(() => setDashboard(null))
       .finally(() => setChecked(true))
-  }, [currentAccountId])
+  }, [currentAccountId, currentAccountNodeId])
 
   if (!checked) {
     return (

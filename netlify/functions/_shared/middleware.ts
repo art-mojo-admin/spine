@@ -6,6 +6,7 @@ export interface RequestContext {
   requestId: string
   personId: string | null
   accountId: string | null
+  accountNodeId: string | null
   accountRole: string | null
   systemRole: string | null
   authUid: string | null
@@ -37,7 +38,7 @@ const ALLOWED_ORIGIN = process.env.SITE_URL || process.env.URL || '*'
 
 const CORS_HEADERS: Record<string, string> = {
   'Access-Control-Allow-Origin': ALLOWED_ORIGIN,
-  'Access-Control-Allow-Headers': 'Content-Type, Authorization, X-Request-Id, X-Account-Id, X-Impersonate-Session-Id',
+  'Access-Control-Allow-Headers': 'Content-Type, Authorization, X-Request-Id, X-Account-Id, X-Account-Node-Id, X-Impersonate-Session-Id',
   'Access-Control-Allow-Methods': 'GET, POST, PATCH, DELETE, OPTIONS',
   'Content-Type': 'application/json',
 }
@@ -157,6 +158,36 @@ async function resolveTenant(
   return { accountId: null, accountRole: null }
 }
 
+async function resolveAccountNode(
+  req: Request,
+  accountId: string | null,
+): Promise<string | null> {
+  if (!accountId) return null
+
+  const headerNodeId = req.headers.get('x-account-node-id')
+  const url = new URL(req.url)
+  const paramNodeId = url.searchParams.get('account_node_id')
+  const nodeId = headerNodeId || paramNodeId
+
+  if (!nodeId) {
+    return accountId
+  }
+
+  const { data: path } = await db
+    .from('account_paths')
+    .select('ancestor_id')
+    .eq('ancestor_id', accountId)
+    .eq('descendant_id', nodeId)
+    .limit(1)
+    .single()
+
+  if (path) {
+    return nodeId
+  }
+
+  return accountId
+}
+
 interface ImpersonationResult {
   sessionId: string
   targetPersonId: string
@@ -238,6 +269,7 @@ export function createHandler(routes: RouteMap) {
           requestId,
           personId: impersonation.targetPersonId,
           accountId: impersonation.targetAccountId,
+          accountNodeId: impersonation.targetAccountId,
           accountRole: impersonation.targetAccountRole,
           systemRole: null,
           authUid: auth.authUid ?? null,
@@ -247,10 +279,12 @@ export function createHandler(routes: RouteMap) {
         }
       } else {
         const tenant = await resolveTenant(req, auth.personId ?? null, auth.systemRole ?? null)
+        const accountNodeId = await resolveAccountNode(req, tenant.accountId)
         ctx = {
           requestId,
           personId: auth.personId ?? null,
           accountId: tenant.accountId,
+          accountNodeId,
           accountRole: tenant.accountRole,
           systemRole: auth.systemRole ?? null,
           authUid: auth.authUid ?? null,

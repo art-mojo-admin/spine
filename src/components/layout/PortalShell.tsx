@@ -4,6 +4,7 @@ import { APP_NAME } from '@/lib/config'
 import { Button } from '@/components/ui/button'
 import { signOut } from '@/lib/auth'
 import { cn } from '@/lib/utils'
+import { AccountNodePanel } from '@/components/layout/AccountNodePanel'
 import {
   LayoutDashboard,
   KanbanSquare,
@@ -21,7 +22,14 @@ const portalNavItems = [
 ]
 
 export function PortalShell() {
-  const { profile, memberships, currentAccountId, setCurrentAccountId } = useAuth()
+  const {
+    profile,
+    memberships,
+    currentAccountId,
+    currentAccountNodeId,
+    setCurrentAccountId,
+    setCurrentAccountNodeId,
+  } = useAuth()
   const currentAccount = memberships.find(m => m.account_id === currentAccountId)?.account
   const showTenantSwitcher = memberships.length > 1
 
@@ -58,6 +66,11 @@ export function PortalShell() {
             <p className="text-sm font-medium">{currentAccount.display_name}</p>
           </div>
         )}
+
+        <div className="border-b px-4 py-3">
+          <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Account scope</p>
+          <AccountNodePanel className="mt-2" />
+        </div>
 
         <nav className="flex-1 space-y-1 overflow-y-auto p-3">
           {portalNavItems.map(({ to, icon: Icon, label }) => (

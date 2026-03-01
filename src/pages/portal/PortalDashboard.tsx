@@ -9,7 +9,7 @@ import { KanbanSquare, Inbox, Link2, PlusCircle } from 'lucide-react'
 
 export function PortalDashboardPage() {
   const navigate = useNavigate()
-  const { profile, currentAccountId } = useAuth()
+  const { profile, currentAccountId, currentAccountNodeId } = useAuth()
   const [linkedItems, setLinkedItems] = useState<any[]>([])
   const [myTickets, setMyTickets] = useState<any[]>([])
   const [loading, setLoading] = useState(true)
@@ -52,7 +52,7 @@ export function PortalDashboardPage() {
     }
 
     load()
-  }, [currentAccountId, profile?.person_id])
+  }, [currentAccountId, currentAccountNodeId, profile?.person_id])
 
   if (loading) {
     return <p className="text-sm text-muted-foreground">Loading...</p>

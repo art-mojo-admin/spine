@@ -6,7 +6,7 @@ import { Badge } from '@/components/ui/badge'
 import { Input } from '@/components/ui/input'
 
 export function ActivityPage() {
-  const { currentAccountId } = useAuth()
+  const { currentAccountId, currentAccountNodeId } = useAuth()
   const [events, setEvents] = useState<any[]>([])
   const [filter, setFilter] = useState('')
   const [loading, setLoading] = useState(true)
@@ -17,7 +17,7 @@ export function ActivityPage() {
       .then(setEvents)
       .catch(() => {})
       .finally(() => setLoading(false))
-  }, [currentAccountId])
+  }, [currentAccountId, currentAccountNodeId])
 
   const filtered = filter
     ? events.filter((e: any) => e.event_type.includes(filter) || e.summary.toLowerCase().includes(filter.toLowerCase()))

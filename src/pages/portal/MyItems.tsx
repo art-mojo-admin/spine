@@ -8,7 +8,7 @@ import { KanbanSquare } from 'lucide-react'
 
 export function MyItemsPage() {
   const navigate = useNavigate()
-  const { profile, currentAccountId } = useAuth()
+  const { profile, currentAccountId, currentAccountNodeId } = useAuth()
   const [items, setItems] = useState<any[]>([])
   const [resolvedItems, setResolvedItems] = useState<any[]>([])
   const [loading, setLoading] = useState(true)
@@ -53,7 +53,7 @@ export function MyItemsPage() {
     }
 
     load()
-  }, [currentAccountId, profile?.person_id])
+  }, [currentAccountId, currentAccountNodeId, profile?.person_id])
 
   return (
     <div className="space-y-6">

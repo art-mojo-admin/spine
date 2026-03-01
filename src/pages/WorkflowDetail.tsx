@@ -27,7 +27,7 @@ interface StageDraft {
 export function WorkflowDetailPage() {
   const { workflowId } = useParams<{ workflowId: string }>()
   const navigate = useNavigate()
-  const { currentAccountId } = useAuth()
+  const { currentAccountId, currentAccountNodeId } = useAuth()
   const isNew = workflowId === 'new'
 
   const [workflow, setWorkflow] = useState<any>(null)
@@ -43,18 +43,22 @@ export function WorkflowDetailPage() {
   const [status, setStatus] = useState('active')
   const [stageDrafts, setStageDrafts] = useState<StageDraft[]>([])
 
+  const scopeKey = currentAccountNodeId || currentAccountId || 'root'
+
   useEffect(() => {
     if (isNew || !workflowId || !currentAccountId) return
+    const requestScope = scopeKey
 
     setLoading(true)
     setErrorMessage(null)
 
-    async function load() {
+    async function load(expectedScope: string) {
       try {
         const [wfRes, itemsRes] = await Promise.all([
           apiGet<any>('workflow-definitions', { id: workflowId! }),
           apiGet<any[]>('workflow-items', { workflow_definition_id: workflowId! }),
         ])
+        if (expectedScope !== scopeKey) return
         setWorkflow(wfRes)
         setItems(itemsRes || [])
         setName(wfRes.name || '')
@@ -78,8 +82,8 @@ export function WorkflowDetailPage() {
       }
     }
 
-    load()
-  }, [workflowId, currentAccountId, isNew])
+    load(requestScope)
+  }, [workflowId, currentAccountId, scopeKey, isNew])
 
   function resetDraft() {
     if (workflow) {

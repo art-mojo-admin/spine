@@ -32,7 +32,7 @@ const PERSON_STATUSES = [
 export function PersonDetailPage() {
   const { personId } = useParams<{ personId: string }>()
   const navigate = useNavigate()
-  const { currentAccountId } = useAuth()
+  const { currentAccountId, currentAccountNodeId } = useAuth()
   const isNew = personId === 'new'
 
   const [person, setPerson] = useState<any>(null)
@@ -54,6 +54,7 @@ export function PersonDetailPage() {
   useEffect(() => {
     if (isNew || !personId || !currentAccountId) return
     const pid = personId
+    let cancelled = false
 
     setLoading(true)
     setErrorMessage(null)
@@ -68,8 +69,9 @@ export function PersonDetailPage() {
             apiGet<any[]>('memberships'),
             apiGet<any[]>('accounts'),
           ])
-        setAccounts(accountsRes || [])
+        if (cancelled) return
 
+        setAccounts(accountsRes || [])
         setPerson(personRes)
         setFullName(personRes.full_name || '')
         setEmail(personRes.email || '')
@@ -93,15 +95,20 @@ export function PersonDetailPage() {
         )
         setMemberships(personMemberships)
       } catch (err: any) {
+        if (cancelled) return
         console.error('Failed to load person detail', err)
         setErrorMessage(err?.message || 'Failed to load person data')
       } finally {
+        if (cancelled) return
         setLoading(false)
       }
     }
 
     loadData()
-  }, [personId, currentAccountId, isNew])
+    return () => {
+      cancelled = true
+    }
+  }, [personId, currentAccountId, currentAccountNodeId, isNew])
 
   function resetDraft() {
     if (person) {

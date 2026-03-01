@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { apiGet, apiPost, apiPatch } from '@/lib/api'
 import { useAuth } from '@/hooks/useAuth'
@@ -10,7 +10,7 @@ import { Plus, GitBranch, Settings2, ArrowRight, Pencil, Workflow } from 'lucide
 
 export function WorkflowsPage() {
   const navigate = useNavigate()
-  const { currentAccountId } = useAuth()
+  const { currentAccountId, currentAccountNodeId } = useAuth()
   const [definitions, setDefinitions] = useState<any[]>([])
   const [items, setItems] = useState<any[]>([])
   const [stages, setStages] = useState<any[]>([])
@@ -41,21 +41,26 @@ export function WorkflowsPage() {
       .then(setDefinitions)
       .catch(() => {})
       .finally(() => setLoading(false))
-  }, [currentAccountId])
+  }, [currentAccountId, currentAccountNodeId])
 
-  async function loadWorkflow(defId: string) {
+  const loadWorkflow = useCallback(async (defId: string) => {
     const [itemsData, stagesData] = await Promise.all([
       apiGet<any[]>('workflow-items', { workflow_definition_id: defId }),
       apiGet<any[]>('stage-definitions', { workflow_definition_id: defId }),
     ])
     setItems(itemsData)
     setStages(stagesData)
-  }
+  }, [currentAccountNodeId])
 
   async function selectDef(def: any) {
     setSelectedDef(def)
     await loadWorkflow(def.id)
   }
+
+  useEffect(() => {
+    if (!selectedDef) return
+    loadWorkflow(selectedDef.id)
+  }, [selectedDef?.id, loadWorkflow])
 
   async function createDef() {
     if (!newName.trim()) return

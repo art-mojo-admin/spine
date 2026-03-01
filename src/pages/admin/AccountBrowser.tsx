@@ -10,6 +10,7 @@ interface Account {
   account_type: string
   status: string
   slug: string | null
+  parent_account_id?: string | null
 }
 
 interface Member {
@@ -29,11 +30,14 @@ export function AccountBrowserPage() {
   const { startImpersonation, active: isImpersonating } = useImpersonation()
   const [accounts, setAccounts] = useState<Account[]>([])
   const [selectedAccount, setSelectedAccount] = useState<Account | null>(null)
+  const [breadcrumbs, setBreadcrumbs] = useState<Account[]>([])
   const [members, setMembers] = useState<Member[]>([])
+  const [childAccounts, setChildAccounts] = useState<Account[]>([])
   const [search, setSearch] = useState('')
   const [reason, setReason] = useState('')
   const [loading, setLoading] = useState(true)
   const [membersLoading, setMembersLoading] = useState(false)
+  const [childrenLoading, setChildrenLoading] = useState(false)
   const [actingAs, setActingAs] = useState<string | null>(null)
 
   const isAdmin = profile?.system_role === 'system_admin' || profile?.system_role === 'system_operator'
@@ -46,7 +50,6 @@ export function AccountBrowserPage() {
   }, [])
 
   const loadMembers = useCallback(async (account: Account) => {
-    setSelectedAccount(account)
     setMembersLoading(true)
     try {
       const data = await apiGet<Member[]>('memberships', { account_id: account.id })
@@ -57,6 +60,24 @@ export function AccountBrowserPage() {
       setMembersLoading(false)
     }
   }, [])
+
+  const loadChildAccounts = useCallback(async (account: Account) => {
+    setChildrenLoading(true)
+    try {
+      const data = await apiGet<Account[]>('accounts', { parent_id: account.id })
+      setChildAccounts(data)
+    } catch {
+      setChildAccounts([])
+    } finally {
+      setChildrenLoading(false)
+    }
+  }, [])
+
+  const openAccount = useCallback(async (account: Account, trail: Account[] = []) => {
+    setSelectedAccount(account)
+    setBreadcrumbs(trail)
+    await Promise.all([loadMembers(account), loadChildAccounts(account)])
+  }, [loadMembers, loadChildAccounts])
 
   const handleActAs = useCallback(async (member: Member) => {
     if (!selectedAccount || actingAs) return
@@ -137,10 +158,20 @@ export function AccountBrowserPage() {
         /* ── Members view ── */
         <div className="space-y-4">
           <button
-            onClick={() => { setSelectedAccount(null); setMembers([]) }}
+            onClick={() => {
+              if (breadcrumbs.length > 0) {
+                const newTrail = breadcrumbs.slice(0, -1)
+                const parent = breadcrumbs[breadcrumbs.length - 1]
+                openAccount(parent, newTrail)
+              } else {
+                setSelectedAccount(null)
+                setMembers([])
+                setChildAccounts([])
+              }
+            }}
             className="flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground"
           >
-            <ArrowLeft className="h-4 w-4" /> Back to accounts
+            <ArrowLeft className="h-4 w-4" /> {breadcrumbs.length > 0 ? 'Back to parent' : 'Back to accounts'}
           </button>
 
           <div className="rounded-lg border bg-card p-4">
@@ -153,45 +184,89 @@ export function AccountBrowserPage() {
                 </p>
               </div>
             </div>
+
+            {breadcrumbs.length > 0 && (
+              <div className="mt-3 flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
+                {breadcrumbs.map((crumb, idx) => (
+                  <button
+                    key={crumb.id}
+                    onClick={() => openAccount(crumb, breadcrumbs.slice(0, idx))}
+                    className="underline-offset-2 hover:underline"
+                  >
+                    {crumb.display_name}
+                  </button>
+                ))}
+                <span>/ {selectedAccount.display_name}</span>
+              </div>
+            )}
           </div>
 
-          <h3 className="text-sm font-semibold text-muted-foreground uppercase tracking-wider">
-            Members ({members.length})
-          </h3>
+          <div className="flex flex-col gap-4 lg:flex-row">
+            <div className="flex-1 space-y-3">
+              <h3 className="text-sm font-semibold text-muted-foreground uppercase tracking-wider">Members ({members.length})</h3>
 
-          {membersLoading ? (
-            <div className="text-sm text-muted-foreground py-4 text-center">Loading members...</div>
-          ) : members.length === 0 ? (
-            <div className="text-sm text-muted-foreground py-4 text-center">No members found</div>
-          ) : (
-            <div className="space-y-2">
-              {members.map(m => (
-                <div
-                  key={m.id}
-                  className="flex items-center justify-between rounded-lg border bg-card p-3 transition-colors hover:bg-accent/50"
-                >
-                  <div className="flex items-center gap-3">
-                    {roleIcon(m.account_role)}
-                    <div>
-                      <div className="text-sm font-medium">{m.persons?.full_name ?? 'Unknown'}</div>
-                      <div className="text-xs text-muted-foreground">{m.persons?.email}</div>
+              {membersLoading ? (
+                <div className="text-sm text-muted-foreground py-4 text-center">Loading members...</div>
+              ) : members.length === 0 ? (
+                <div className="text-sm text-muted-foreground py-4 text-center">No members found</div>
+              ) : (
+                <div className="space-y-2">
+                  {members.map(m => (
+                    <div
+                      key={m.id}
+                      className="flex items-center justify-between rounded-lg border bg-card p-3 transition-colors hover:bg-accent/50"
+                    >
+                      <div className="flex items-center gap-3">
+                        {roleIcon(m.account_role)}
+                        <div>
+                          <div className="text-sm font-medium">{m.persons?.full_name ?? 'Unknown'}</div>
+                          <div className="text-xs text-muted-foreground">{m.persons?.email}</div>
+                        </div>
+                        <span className={`rounded-full px-2 py-0.5 text-xs font-medium ${roleBadgeColor(m.account_role)}`}>
+                          {m.account_role}
+                        </span>
+                      </div>
+                      <button
+                        onClick={() => handleActAs(m)}
+                        disabled={actingAs === m.person_id}
+                        className="flex items-center gap-1.5 rounded-md bg-primary px-3 py-1.5 text-xs font-medium text-primary-foreground transition-colors hover:bg-primary/90 disabled:opacity-50"
+                      >
+                        <Play className="h-3 w-3" />
+                        {actingAs === m.person_id ? 'Starting...' : 'Act As'}
+                      </button>
                     </div>
-                    <span className={`rounded-full px-2 py-0.5 text-xs font-medium ${roleBadgeColor(m.account_role)}`}>
-                      {m.account_role}
-                    </span>
-                  </div>
-                  <button
-                    onClick={() => handleActAs(m)}
-                    disabled={actingAs === m.person_id}
-                    className="flex items-center gap-1.5 rounded-md bg-primary px-3 py-1.5 text-xs font-medium text-primary-foreground transition-colors hover:bg-primary/90 disabled:opacity-50"
-                  >
-                    <Play className="h-3 w-3" />
-                    {actingAs === m.person_id ? 'Starting...' : 'Act As'}
-                  </button>
+                  ))}
                 </div>
-              ))}
+              )}
             </div>
-          )}
+
+            <div className="flex-1 space-y-3">
+              <h3 className="text-sm font-semibold text-muted-foreground uppercase tracking-wider">Child Accounts ({childAccounts.length})</h3>
+              {childrenLoading ? (
+                <div className="text-sm text-muted-foreground py-4 text-center">Loading child accounts...</div>
+              ) : childAccounts.length === 0 ? (
+                <div className="text-sm text-muted-foreground py-4 text-center">No child accounts</div>
+              ) : (
+                <div className="space-y-2">
+                  {childAccounts.map(child => (
+                    <button
+                      key={child.id}
+                      onClick={() => openAccount(child, [...breadcrumbs, selectedAccount])}
+                      className="flex w-full items-center justify-between rounded-lg border bg-card p-3 text-left transition-colors hover:bg-accent/50"
+                    >
+                      <div>
+                        <div className="text-sm font-medium">{child.display_name}</div>
+                        <div className="text-xs text-muted-foreground">
+                          {child.slug || 'no slug'} &middot; {child.account_type}
+                        </div>
+                      </div>
+                      <ChevronRight className="h-4 w-4 text-muted-foreground" />
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
+          </div>
         </div>
       ) : (
         /* ── Accounts list ── */
@@ -216,7 +291,7 @@ export function AccountBrowserPage() {
               {filteredAccounts.map(account => (
                 <button
                   key={account.id}
-                  onClick={() => loadMembers(account)}
+                  onClick={() => openAccount(account)}
                   className="flex w-full items-center justify-between rounded-lg border bg-card p-4 text-left transition-colors hover:bg-accent/50"
                 >
                   <div className="flex items-center gap-3">

@@ -23,8 +23,17 @@ export default createHandler({
     const { data: memberships } = await db
       .from('memberships')
       .select(`
-        id, account_id, account_role, status,
-        accounts:account_id (id, display_name, account_type, status, settings)
+        id, account_id, account_role, status, scope,
+        accounts:account_id (
+          id,
+          display_name,
+          account_type,
+          status,
+          settings,
+          parent_account_id,
+          slug,
+          metadata
+        )
       `)
       .eq('person_id', ctx.personId)
       .eq('status', 'active')
@@ -37,6 +46,7 @@ export default createHandler({
         account_id: m.account_id,
         account_role: m.account_role,
         status: m.status,
+        scope: m.scope,
         account: m.accounts,
       })),
     })

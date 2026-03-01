@@ -35,6 +35,7 @@ import { Button } from '@/components/ui/button'
 import { signOut } from '@/lib/auth'
 import { cn } from '@/lib/utils'
 import { useImpersonation } from '@/hooks/useImpersonation'
+import { AccountNodePanel } from '@/components/layout/AccountNodePanel'
 
 interface AppNavItem {
   app_slug: string
@@ -141,6 +142,11 @@ export function Sidebar() {
           <p className="text-sm font-medium">{currentAccount.display_name}</p>
         </div>
       )}
+
+      <div className="border-b px-4 py-3">
+        <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Account scope</p>
+        <AccountNodePanel className="mt-2" />
+      </div>
 
       <nav className="flex-1 space-y-1 overflow-y-auto p-3">
         {useAppNav && (

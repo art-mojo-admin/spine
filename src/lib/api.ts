@@ -1,6 +1,6 @@
 import { getAccessToken } from './auth'
 import { generateRequestId } from './utils'
-import { getActiveAccountId } from './accountContext'
+import { getActiveAccountId, getActiveAccountNodeId } from './accountContext'
 import { getImpersonationSessionId } from './impersonationContext'
 
 const API_BASE = '/.netlify/functions'
@@ -33,6 +33,10 @@ export async function api<T = unknown>(endpoint: string, options: ApiOptions = {
   const activeAccountId = getActiveAccountId()
   if (activeAccountId) {
     headers['X-Account-Id'] = activeAccountId
+  }
+  const activeAccountNodeId = getActiveAccountNodeId()
+  if (activeAccountNodeId) {
+    headers['X-Account-Node-Id'] = activeAccountNodeId
   }
   const impersonationSessionId = getImpersonationSessionId()
   if (impersonationSessionId) {

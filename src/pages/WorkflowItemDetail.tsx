@@ -25,7 +25,7 @@ export function WorkflowItemDetailPage() {
   const { itemId } = useParams<{ itemId: string }>()
   const [searchParams] = useSearchParams()
   const navigate = useNavigate()
-  const { currentAccountId } = useAuth()
+  const { currentAccountId, currentAccountNodeId } = useAuth()
   const isNew = itemId === 'new'
 
   const [item, setItem] = useState<any>(null)
@@ -57,76 +57,120 @@ export function WorkflowItemDetailPage() {
   useEffect(() => {
     if (!currentAccountId) return
 
+    let cancelled = false
+
     async function load() {
+      if (!isNew) {
+        setLoading(true)
+      }
+      setErrorMessage(null)
+
       try {
         const [wfRes, pplRes] = await Promise.all([
           apiGet<any[]>('workflow-definitions'),
           apiGet<any[]>('persons'),
         ])
+        if (cancelled) return
         setWorkflows(wfRes || [])
         setPeople(pplRes || [])
 
         if (isNew) {
           const preselect = searchParams.get('workflow')
           if (preselect) setWorkflowDefId(preselect)
+          setParentItem(null)
+          setChildItems([])
+          return
         }
 
-        if (!isNew && itemId) {
-          setLoading(true)
-          const itemRes = await apiGet<any>('workflow-items', { id: itemId })
-          setItem(itemRes)
-          setTitle(itemRes.title || '')
-          setDescription(itemRes.description || '')
-          setWorkflowDefId(itemRes.workflow_definition_id || '')
-          setStageDefId(itemRes.stage_definition_id || '')
-          setOwnerPersonId(itemRes.owner_person_id || '')
-          setPriority(itemRes.priority || 'medium')
-          setDueDate(itemRes.due_date ? itemRes.due_date.split('T')[0] : '')
-          setWorkflowType(itemRes.workflow_type || 'deal')
-          setMetadata(itemRes.metadata || {})
+        if (!itemId) return
 
-          if (itemRes.workflow_definition_id) {
-            const [stageRes, transRes] = await Promise.all([
-              apiGet<any[]>('stage-definitions', { workflow_definition_id: itemRes.workflow_definition_id }),
-              apiGet<any[]>('transition-definitions', { workflow_definition_id: itemRes.workflow_definition_id }),
-            ])
+        const itemRes = await apiGet<any>('workflow-items', { id: itemId })
+        if (cancelled) return
+        setItem(itemRes)
+        setTitle(itemRes.title || '')
+        setDescription(itemRes.description || '')
+        setWorkflowDefId(itemRes.workflow_definition_id || '')
+        setStageDefId(itemRes.stage_definition_id || '')
+        setOwnerPersonId(itemRes.owner_person_id || '')
+        setPriority(itemRes.priority || 'medium')
+        setDueDate(itemRes.due_date ? itemRes.due_date.split('T')[0] : '')
+        setWorkflowType(itemRes.workflow_type || 'deal')
+        setMetadata(itemRes.metadata || {})
+
+        if (itemRes.workflow_definition_id) {
+          const [stageRes, transRes] = await Promise.all([
+            apiGet<any[]>('stage-definitions', { workflow_definition_id: itemRes.workflow_definition_id }),
+            apiGet<any[]>('transition-definitions', { workflow_definition_id: itemRes.workflow_definition_id }),
+          ])
+          if (!cancelled) {
             setStages(stageRes || [])
             setTransitions(transRes || [])
           }
+        } else if (!cancelled) {
+          setStages([])
+          setTransitions([])
+        }
 
-          // Load parent item if exists
-          if (itemRes.parent_item_id) {
-            apiGet<any>('workflow-items', { id: itemRes.parent_item_id })
-              .then(setParentItem)
-              .catch(() => {})
-          } else {
-            setParentItem(null)
+        let parent: any = null
+        if (itemRes.parent_item_id) {
+          try {
+            parent = await apiGet<any>('workflow-items', { id: itemRes.parent_item_id })
+          } catch {
+            parent = null
           }
+        }
+        if (!cancelled) {
+          setParentItem(parent)
+        }
 
-          // Load child items
-          apiGet<any[]>('workflow-items', { parent_id: itemRes.id })
-            .then(setChildItems)
-            .catch(() => setChildItems([]))
+        let children: any[] = []
+        try {
+          children = (await apiGet<any[]>('workflow-items', { parent_id: itemRes.id })) || []
+        } catch {
+          children = []
+        }
+        if (!cancelled) {
+          setChildItems(children)
         }
       } catch (err: any) {
+        if (cancelled) return
         setErrorMessage(err?.message || 'Failed to load')
       } finally {
+        if (cancelled) return
         setLoading(false)
       }
     }
 
     load()
-  }, [currentAccountId, itemId, isNew])
+    return () => {
+      cancelled = true
+    }
+  }, [currentAccountId, currentAccountNodeId, itemId, isNew, searchParams])
 
   useEffect(() => {
     if (!workflowDefId || !currentAccountId) {
       setStages([])
       return
     }
-    apiGet<any[]>('stage-definitions', { workflow_definition_id: workflowDefId })
-      .then((res) => setStages(res || []))
-      .catch(() => setStages([]))
-  }, [workflowDefId, currentAccountId])
+
+    let cancelled = false
+
+    async function fetchStages() {
+      try {
+        const res = await apiGet<any[]>('stage-definitions', { workflow_definition_id: workflowDefId })
+        if (cancelled) return
+        setStages(res || [])
+      } catch {
+        if (cancelled) return
+        setStages([])
+      }
+    }
+
+    fetchStages()
+    return () => {
+      cancelled = true
+    }
+  }, [workflowDefId, currentAccountId, currentAccountNodeId])
 
   function resetDraft() {
     if (item) {

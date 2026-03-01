@@ -1,7 +1,12 @@
 import { createContext, useContext, useEffect, useState, useCallback, type ReactNode } from 'react'
 import { supabase } from '@/lib/auth'
 import { apiGet, apiPost } from '@/lib/api'
-import { getActiveAccountId, setActiveAccountId } from '@/lib/accountContext'
+import {
+  getActiveAccountId,
+  setActiveAccountId,
+  getActiveAccountNodeId,
+  setActiveAccountNodeId,
+} from '@/lib/accountContext'
 import type { Session, User } from '@supabase/supabase-js'
 
 interface Profile {
@@ -31,9 +36,11 @@ interface AuthState {
   profile: Profile | null
   memberships: Membership[]
   currentAccountId: string | null
+  currentAccountNodeId: string | null
   currentRole: string | null
   loading: boolean
-  setCurrentAccountId: (id: string) => void
+  setCurrentAccountId: (id: string | null) => void
+  setCurrentAccountNodeId: (id: string | null) => void
   refresh: () => Promise<void>
 }
 
@@ -45,9 +52,18 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [profile, setProfile] = useState<Profile | null>(null)
   const [memberships, setMemberships] = useState<Membership[]>([])
   const [currentAccountId, setCurrentAccountIdState] = useState<string | null>(getActiveAccountId())
+  const [currentAccountNodeId, setCurrentAccountNodeIdState] = useState<string | null>(getActiveAccountNodeId())
   const [loading, setLoading] = useState(true)
 
   const currentRole = memberships.find(m => m.account_id === currentAccountId)?.account_role ?? null
+
+  const applyAccountContext = useCallback((accountId: string | null, nodeId?: string | null) => {
+    setCurrentAccountIdState(accountId)
+    setActiveAccountId(accountId)
+    const resolvedNode = accountId ? (nodeId ?? accountId) : null
+    setCurrentAccountNodeIdState(resolvedNode)
+    setActiveAccountNodeId(resolvedNode)
+  }, [])
 
   const loadProfile = useCallback(async () => {
     try {
@@ -55,23 +71,21 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       setProfile({ ...data.profile, person_id: data.profile.person_id || data.person?.id })
       setMemberships(data.memberships)
       if (data.memberships.length === 0) {
-        setCurrentAccountIdState(null)
-        setActiveAccountId(null)
+        applyAccountContext(null, null)
         return
       }
 
       const stored = getActiveAccountId()
+      const storedNode = getActiveAccountNodeId()
       const availableIds = data.memberships.map((m) => m.account_id)
       if (stored && availableIds.includes(stored)) {
-        setCurrentAccountIdState(stored)
-        setActiveAccountId(stored)
+        applyAccountContext(stored, storedNode)
         return
       }
 
       if (!currentAccountId) {
         const fallback = data.memberships[0].account_id
-        setCurrentAccountIdState(fallback)
-        setActiveAccountId(fallback)
+        applyAccountContext(fallback)
       }
     } catch (err: any) {
       if (err?.status === 401) {
@@ -82,14 +96,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           setMemberships(data.memberships)
           if (data.memberships.length > 0) {
             const stored = getActiveAccountId()
+            const storedNode = getActiveAccountNodeId()
             const availableIds = data.memberships.map((m) => m.account_id)
             if (stored && availableIds.includes(stored)) {
-              setCurrentAccountIdState(stored)
-              setActiveAccountId(stored)
+              applyAccountContext(stored, storedNode)
             } else {
               const fallback = data.memberships[0].account_id
-              setCurrentAccountIdState(fallback)
-              setActiveAccountId(fallback)
+              applyAccountContext(fallback)
             }
           }
         } catch {
@@ -98,9 +111,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       }
       setProfile(null)
       setMemberships([])
-      setActiveAccountId(null)
+      applyAccountContext(null, null)
     }
-  }, [currentAccountId])
+  }, [applyAccountContext, currentAccountId])
 
   const refresh = useCallback(async () => {
     await loadProfile()
@@ -121,24 +134,27 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       else {
         setProfile(null)
         setMemberships([])
-        setCurrentAccountIdState(null)
-        setActiveAccountId(null)
+        applyAccountContext(null, null)
       }
     })
 
     return () => subscription.unsubscribe()
-  }, [loadProfile])
+  }, [applyAccountContext, loadProfile])
 
   const setCurrentAccountId = useCallback((id: string | null) => {
-    setCurrentAccountIdState(id)
-    setActiveAccountId(id)
+    applyAccountContext(id)
+  }, [applyAccountContext])
+
+  const setCurrentAccountNodeId = useCallback((id: string | null) => {
+    setCurrentAccountNodeIdState(id)
+    setActiveAccountNodeId(id)
   }, [])
 
   return (
     <AuthContext.Provider value={{
       session, user, profile, memberships,
-      currentAccountId, currentRole, loading,
-      setCurrentAccountId, refresh,
+      currentAccountId, currentAccountNodeId, currentRole, loading,
+      setCurrentAccountId, setCurrentAccountNodeId, refresh,
     }}>
       {children}
     </AuthContext.Provider>
