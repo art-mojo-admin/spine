@@ -47,6 +47,7 @@ const AppDefinitionsPage = lazy(() => import('@/pages/admin/AppDefinitions').the
 const AppBuilderPage = lazy(() => import('@/pages/admin/AppBuilder').then(m => ({ default: m.AppBuilderPage })))
 const ReportsPage = lazy(() => import('@/pages/admin/Reports').then(m => ({ default: m.ReportsPage })))
 const AccountBrowserPage = lazy(() => import('@/pages/admin/AccountBrowser').then(m => ({ default: m.AccountBrowserPage })))
+const SetupWizardPage = lazy(() => import('@/pages/admin/SetupWizard').then(m => ({ default: m.SetupWizardPage })))
 
 // Public pages
 const PublicHomePage = lazy(() => import('@/pages/public/PublicHome').then(m => ({ default: m.PublicHomePage })))
@@ -147,6 +148,7 @@ export default function App() {
           <Route path="/admin/workflows/:workflowId" element={<WorkflowDetailPage />} />
           <Route path="/admin/workflows/:workflowId/builder" element={<WorkflowBuilderPage />} />
           <Route path="/admin/reports" element={<ReportsPage />} />
+          <Route path="/admin/setup" element={<SetupWizardPage />} />
           <Route path="/admin/account-browser" element={<AccountBrowserPage />} />
           <Route path="/admin/system-health" element={<SystemHealthPage />} />
           <Route path="/v/:viewSlug" element={<ViewRendererPage />} />
