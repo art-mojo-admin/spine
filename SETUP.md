@@ -173,66 +173,25 @@ Each tenant/account can configure its own theme via **Admin → Theme**. The the
 
 ## Multi-Instance Setup (Shared Supabase Project)
 
-If you need to run **multiple Spine instances** on the same Supabase project (e.g. separate tenants, staging vs production, or white-label deployments), use the namespaced installer:
+### Advanced (Deprecated): Namespaced Installs
 
-### 1. Run the Namespaced Installer
+The modern Spine runtime expects everything in the default `public` schema. Running side-by-side instances inside the same Supabase project (e.g. `spine_v1`, `spine_v2`) is no longer recommended because it doubles every migration, introduces confusion about which schema is active, and breaks defaults like `/me` lookups.
 
-Open `supabase/install-namespaced.sql` and change `spine_v1` to your desired schema name on the **two lines** at the top of the file:
+If you *still* need this pattern (white-label proof-of-concept, etc.), the legacy workflow lives in `supabase/install-namespaced.sql`. Update the `CREATE SCHEMA` + `SET search_path` lines to your schema name, run the installer manually, and set `DB_SCHEMA` / `VITE_DB_SCHEMA` env vars to match. Expect to maintain that schema yourself—future migrations only target `public`.
 
-```sql
-CREATE SCHEMA IF NOT EXISTS spine_v1;
-SET search_path TO spine_v1, extensions;
-```
+#### Removing an old schema (e.g. `spine_v1`)
+1. Confirm all live data you care about already exists in `public.*` tables (accounts, persons, config packs, etc.). Migrate/copy anything missing.
+2. Clear any `DB_SCHEMA` / `VITE_DB_SCHEMA` overrides from local `.env`, Netlify, and CI so the app reconnects to `public`.
+3. Verify the UI works end-to-end using the default schema (login, /admin pages, installs).
+4. Drop the legacy schema in Supabase:
 
-Then paste the entire file into the Supabase SQL Editor and click **Run**. Repeat with a different schema name (e.g. `spine_v2`) for each additional instance.
+   ```sql
+   drop schema if exists spine_v1 cascade;
+   ```
 
-After the installer succeeds, run the helper migration to make sure the RPC and security-definer helpers exist inside every schema:
+5. Remove the schema name from **Supabase → Settings → API → Exposed schemas** if it was listed there.
 
-```sql
--- Run in the Supabase SQL editor
-\i supabase/migrations/033_schema_helper_functions.sql
-```
-
-> **Shortcut:** you can also copy the contents of `033_schema_helper_functions.sql` into the SQL editor and run it manually.
-### 2. Expose the Schema via PostgREST
-
-In the Supabase dashboard, go to **Settings → API → Exposed schemas** and add your schema name (e.g. `spine_v1`). This allows the Supabase client to query tables in that schema.
-
-### 3. Refresh Schema Grants
-
-Make sure the built-in roles have the right permissions in your new schema by running the grant block from `scripts/schema-grants.sql` or reusing the SQL we executed in the prior project:
-
-```sql
-GRANT USAGE ON SCHEMA spine_v1 TO anon, authenticated, service_role;
-GRANT USAGE, SELECT ON ALL SEQUENCES IN SCHEMA spine_v1 TO anon, authenticated, service_role;
-GRANT SELECT, INSERT, UPDATE, DELETE ON ALL TABLES IN SCHEMA spine_v1 TO anon, authenticated, service_role;
-ALTER DEFAULT PRIVILEGES IN SCHEMA spine_v1 GRANT SELECT, INSERT, UPDATE, DELETE ON TABLES TO anon, authenticated, service_role;
-GRANT EXECUTE ON ALL FUNCTIONS IN SCHEMA spine_v1 TO anon, authenticated, service_role;
-```
-
-Repeat for each schema you install (swap `spine_v1` for your schema name).
-
-### 4. Set Environment Variables
-
-For each deployed instance, set the schema env vars:
-
-```bash
-# Frontend (Vite)
-VITE_DB_SCHEMA=spine_v1
-
-# Backend (Netlify Functions)
-DB_SCHEMA=spine_v1
-```
-
-Omit these variables (or leave them unset) if you installed into the default `public` schema.
-
-### How It Works
-
-- Each instance gets its own PostgreSQL schema (e.g. `spine_v1.accounts`, `spine_v2.accounts`)
-- Schemas are fully isolated — data, functions, RLS policies, and triggers are all schema-scoped
-- Auth users (`auth.users`) are shared across all instances (Supabase manages auth at the project level)
-- The `supabase-js` client's `db: { schema }` option routes all queries to the correct schema
-- The script is idempotent and safe to re-run
+Once the extras are gone, every user/environment consistently targets `public` and we avoid the “ghost schema” rabbit holes entirely.
 
 ---
 
