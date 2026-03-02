@@ -20,11 +20,21 @@ export default createHandler({
       .eq('person_id', ctx.personId)
       .single()
 
+    // NOTE: mirror v2 schema — legacy scope/parent columns were dropped
     const { data: memberships } = await db
       .from('memberships')
       .select(`
         id, account_id, account_role, status,
-        accounts:account_id (id, display_name, account_type, status, settings)
+        accounts:account_id (
+          id,
+          display_name,
+          account_type,
+          status,
+          settings,
+          parent_account_id,
+          slug,
+          metadata
+        )
       `)
       .eq('person_id', ctx.personId)
       .eq('status', 'active')

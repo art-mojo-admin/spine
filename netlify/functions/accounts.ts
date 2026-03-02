@@ -8,6 +8,7 @@ export default createHandler({
     if (authCheck) return authCheck
 
     const id = params.get('id')
+    const parentId = params.get('parent_id')
 
     if (id) {
       const tenantCheck = requireTenant(ctx)
@@ -25,6 +26,32 @@ export default createHandler({
 
       if (dbErr || !account) return error('Account not found', 404)
       return json(account)
+    }
+
+    if (parentId) {
+      const tenantCheck = requireTenant(ctx)
+      if (tenantCheck) return tenantCheck
+
+      if (!ctx.systemRole) {
+        const { data: allowed } = await db
+          .from('account_paths')
+          .select('ancestor_id')
+          .eq('ancestor_id', ctx.accountId)
+          .eq('descendant_id', parentId)
+          .single()
+
+        if (!allowed && parentId !== ctx.accountId) {
+          return error('Access denied', 403)
+        }
+      }
+
+      const { data: children } = await db
+        .from('accounts')
+        .select('*')
+        .eq('parent_account_id', parentId)
+        .order('created_at', { ascending: false })
+
+      return json(children || [])
     }
 
     if (ctx.systemRole && ['system_admin', 'system_operator'].includes(ctx.systemRole)) {

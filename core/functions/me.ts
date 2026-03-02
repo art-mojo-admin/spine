@@ -20,6 +20,7 @@ export default createHandler({
       .eq('person_id', ctx.personId)
       .single()
 
+    // NOTE: account selection only includes v2 columns (scope/parent_account_id were removed)
     const { data: memberships } = await db
       .from('memberships')
       .select(`
@@ -30,7 +31,6 @@ export default createHandler({
           account_type,
           status,
           settings,
-          parent_account_id,
           slug,
           metadata
         )
