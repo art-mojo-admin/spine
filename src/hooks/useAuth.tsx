@@ -83,10 +83,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         return
       }
 
-      if (!currentAccountId) {
-        const fallback = data.memberships[0].account_id
-        applyAccountContext(fallback)
-      }
+      const fallback = data.memberships[0].account_id
+      applyAccountContext(fallback)
     } catch (err: any) {
       if (err?.status === 401) {
         try {
