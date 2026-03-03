@@ -34,7 +34,7 @@ interface AccountRecord {
 export function AccountDetailPage() {
   const { accountId } = useParams<{ accountId: string }>()
   const navigate = useNavigate()
-  const { currentAccountId, setCurrentAccountId, memberships } = useAuth()
+  const { currentAccountId, setCurrentAccountId, memberships, profile } = useAuth()
   const isNew = accountId === 'new'
 
   const [account, setAccount] = useState<AccountRecord | null>(null)
@@ -52,13 +52,15 @@ export function AccountDetailPage() {
   const [accountStatus, setAccountStatus] = useState('active')
   const [metadata, setMetadata] = useState<Record<string, any>>({})
 
+  const hasMembership = memberships.some(m => m.account_id === accountId)
+  const isSystemLevel = profile?.system_role === 'system_admin' || profile?.system_role === 'system_operator'
+
   useEffect(() => {
     if (isNew || !accountId) return
-    const hasMembership = memberships.some(m => m.account_id === accountId)
-    if (hasMembership && currentAccountId !== accountId) {
+    if ((hasMembership || isSystemLevel) && currentAccountId !== accountId) {
       setCurrentAccountId(accountId)
     }
-  }, [accountId, currentAccountId, memberships, setCurrentAccountId, isNew])
+  }, [accountId, currentAccountId, hasMembership, isSystemLevel, setCurrentAccountId, isNew])
 
   useEffect(() => {
     if (isNew || !accountId || currentAccountId !== accountId) return
