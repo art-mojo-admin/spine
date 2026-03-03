@@ -5,6 +5,17 @@ import { Shell } from '@/components/layout/Shell'
 import { PortalShell } from '@/components/layout/PortalShell'
 import { ImpersonationProvider } from '@/hooks/useImpersonation'
 import { ImpersonationBanner } from '@/components/layout/ImpersonationBanner'
+import { getCustomRoutes } from '@/lib/customRoutes'
+
+const runtimeCustomRoutes = getCustomRoutes().map(route => ({
+  ...route,
+  Component: lazy(route.loader),
+  layout: route.layout ?? 'shell',
+}))
+
+const shellCustomRoutes = runtimeCustomRoutes.filter(route => route.layout === 'shell')
+const portalCustomRoutes = runtimeCustomRoutes.filter(route => route.layout === 'portal')
+const publicCustomRoutes = runtimeCustomRoutes.filter(route => route.layout === 'public')
 
 // Lazy-loaded pages — each becomes its own chunk
 const LoginPage = lazy(() => import('@/pages/Login').then(m => ({ default: m.LoginPage })))
@@ -101,11 +112,17 @@ export default function App() {
           <Route path="/p/:accountSlug" element={<PublicHomePage />} />
           <Route path="/p/:accountSlug/:workflowId" element={<PublicListingPage />} />
           <Route path="/p/:accountSlug/:workflowId/:itemId" element={<PublicItemDetailPage />} />
+          {publicCustomRoutes.map(({ path, Component }) => (
+            <Route key={path} path={path} element={<Component />} />
+          ))}
           <Route element={<ProtectedRoutes />}>
           {/* Portal routes */}
           <Route path="/my-items" element={<MyItemsPage />} />
           <Route path="/browse" element={<PortalBrowsePage />} />
           <Route path="/profile" element={<PortalProfilePage />} />
+          {portalCustomRoutes.map(({ path, Component }) => (
+            <Route key={path} path={path} element={<Component />} />
+          ))}
           {/* Standard routes */}
           <Route path="/" element={<DashboardPage />} />
           <Route path="/accounts" element={<AccountsPage />} />
@@ -126,6 +143,9 @@ export default function App() {
           <Route path="/courses" element={<CoursesPage />} />
           <Route path="/courses/:courseId" element={<CourseDetailPage />} />
           <Route path="/courses/:courseId/lessons/:lessonId" element={<LessonViewerPage />} />
+          {shellCustomRoutes.map(({ path, Component }) => (
+            <Route key={path} path={path} element={<Component />} />
+          ))}
           <Route path="/activity" element={<ActivityPage />} />
           <Route path="/search" element={<SearchPage />} />
           <Route path="/admin/theme" element={<ThemeEditorPage />} />

@@ -19,9 +19,10 @@
     "resolveJsonModule": true,
     "baseUrl": ".",
     "paths": {
-      "@/*": ["./src/*"]
+      "@/*": ["./src/*"],
+      "@custom/*": ["./custom/src/*"]
     }
   },
-  "include": ["src"],
+  "include": ["src", "custom/src"],
   "references": [{ "path": "./tsconfig.node.json" }]
 }

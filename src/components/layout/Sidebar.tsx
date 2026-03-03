@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { NavLink } from 'react-router-dom'
 import { useAuth } from '@/hooks/useAuth'
 import { APP_NAME } from '@/lib/config'
@@ -36,6 +36,45 @@ import { signOut } from '@/lib/auth'
 import { cn } from '@/lib/utils'
 import { useImpersonation } from '@/hooks/useImpersonation'
 import { AccountNodePanel } from '@/components/layout/AccountNodePanel'
+import { getCustomNavSections } from '@/lib/customRoutes'
+
+const ROLE_RANK: Record<string, number> = {
+  portal: 0,
+  member: 1,
+  operator: 2,
+  admin: 3,
+  system_admin: 4,
+  system_operator: 4,
+}
+
+const ICON_MAP: Record<string, React.ComponentType<{ className?: string }>> = {
+  LayoutDashboard,
+  Building2,
+  Users,
+  GitBranch,
+  FileText,
+  Activity,
+  Palette,
+  Webhook,
+  Settings,
+  Shield,
+  UserPlus,
+  Zap,
+  ArrowDownToLine,
+  SlidersHorizontal,
+  Clock,
+  Link2,
+  Package,
+  Search,
+  LogOut,
+  ChevronDown,
+  Blocks,
+  PlugZap,
+  ShieldAlert,
+  HeartPulse,
+  LayoutGrid,
+  BarChart3,
+}
 
 interface AppNavItem {
   app_slug: string
@@ -79,6 +118,8 @@ const adminItems: { to: string; icon: any; label: string; countKey?: string }[] 
   { to: '/admin/workflows', icon: GitBranch, label: 'Workflows', countKey: 'workflows' },
 ]
 
+const manifestNavSections = getCustomNavSections()
+
 export function Sidebar() {
   const { profile, memberships, currentAccountId, setCurrentAccountId, currentRole } = useAuth()
   const { active: isImpersonating } = useImpersonation()
@@ -110,6 +151,60 @@ export function Sidebar() {
 
   // Use app-driven nav if apps are published, otherwise fall back to defaults
   const useAppNav = navLoaded && appNavItems.length > 0
+
+  const userRank = ROLE_RANK[currentRole ?? profile?.system_role ?? 'member'] ?? 1
+
+  const { primarySections, adminSections } = useMemo(() => {
+    const filtered = manifestNavSections
+      .map(section => ({
+        ...section,
+        scope: section.scope ?? 'primary',
+        items: section.items.filter(item => {
+          const itemRank = ROLE_RANK[item.minRole ?? 'member'] ?? 1
+          return userRank >= itemRank
+        }),
+      }))
+      .filter(section => section.items.length > 0)
+
+    const sortSections = (sections: typeof filtered) =>
+      sections.slice().sort((a, b) => (a.position ?? 0) - (b.position ?? 0))
+
+    return {
+      primarySections: sortSections(filtered.filter(section => section.scope === 'primary')),
+      adminSections: sortSections(filtered.filter(section => section.scope === 'admin')),
+    }
+  }, [userRank])
+
+  const renderCustomSections = (sections: typeof primarySections) =>
+    sections.map(section => (
+      <div key={section.key}>
+        <div className="pb-1 pt-3">
+          <p className="px-3 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground/60">
+            {section.title}
+          </p>
+        </div>
+        {section.items.map(item => {
+          const Icon = (item.icon && ICON_MAP[item.icon]) || LayoutDashboard
+          return (
+            <NavLink
+              key={`${section.key}-${item.key}`}
+              to={item.to}
+              className={({ isActive }) =>
+                cn(
+                  'flex items-center gap-3 rounded-md px-3 py-2 text-sm font-medium transition-colors',
+                  isActive
+                    ? 'bg-primary/10 text-primary'
+                    : 'text-muted-foreground hover:bg-accent hover:text-accent-foreground',
+                )
+              }
+            >
+              <Icon className="h-4 w-4" />
+              {item.label}
+            </NavLink>
+          )
+        })}
+      </div>
+    ))
 
   return (
     <aside className="flex h-full w-64 flex-col border-r bg-card">
@@ -213,14 +308,36 @@ export function Sidebar() {
                 </div>
               ))
             })()}
+
+            {renderCustomSections(primarySections)}
           </>
         )}
 
         {/* When no apps are installed, show nothing in user nav */}
         {navLoaded && !useAppNav && (
-          <p className="px-3 py-6 text-xs text-muted-foreground text-center">
-            Install a template pack to get started.
-          </p>
+          <>
+            {fallbackNavItems
+              .sort((a, b) => a.position - b.position)
+              .map(({ key, to, icon: Icon, label }) => (
+                <NavLink
+                  key={key}
+                  to={to}
+                  className={({ isActive }) =>
+                    cn(
+                      'flex items-center gap-3 rounded-md px-3 py-2 text-sm font-medium transition-colors',
+                      isActive
+                        ? 'bg-primary/10 text-primary'
+                        : 'text-muted-foreground hover:bg-accent hover:text-accent-foreground',
+                    )
+                  }
+                >
+                  <Icon className="h-4 w-4" />
+                  {label}
+                </NavLink>
+              ))}
+
+            {renderCustomSections(primarySections)}
+          </>
         )}
 
         {isAdmin && (
@@ -246,15 +363,15 @@ export function Sidebar() {
                   }
                 >
                   <Icon className="h-4 w-4" />
-                  <span className="flex-1">{label}</span>
-                  {count != null && count > 0 && (
-                    <span className="ml-auto rounded-full bg-muted px-1.5 py-0.5 text-[10px] font-medium text-muted-foreground">
-                      {count}
-                    </span>
+                  {label}
+                  {typeof count === 'number' && (
+                    <span className="ml-auto text-xs text-muted-foreground">{count}</span>
                   )}
                 </NavLink>
               )
             })}
+
+            {renderCustomSections(adminSections)}
           </>
         )}
 
