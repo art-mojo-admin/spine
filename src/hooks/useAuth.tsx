@@ -68,18 +68,22 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const loadProfile = useCallback(async () => {
     try {
       const data = await apiGet<{ person: { id: string }; profile: Profile; memberships: Membership[] }>('me')
-      setProfile({ ...data.profile, person_id: data.profile.person_id || data.person?.id })
+      const nextProfile: Profile = { ...data.profile, person_id: data.profile.person_id || data.person?.id }
+      setProfile(nextProfile)
       setMemberships(data.memberships)
-      if (data.memberships.length === 0) {
-        applyAccountContext(null, null)
-        return
-      }
 
       const stored = getActiveAccountId()
       const storedNode = getActiveAccountNodeId()
       const availableIds = data.memberships.map((m) => m.account_id)
-      if (stored && availableIds.includes(stored)) {
+      const isSystemLevel = ['system_admin', 'system_operator'].includes(nextProfile.system_role || '')
+
+      if (stored && (availableIds.includes(stored) || isSystemLevel)) {
         applyAccountContext(stored, storedNode)
+        return
+      }
+
+      if (data.memberships.length === 0) {
+        applyAccountContext(null, null)
         return
       }
 
