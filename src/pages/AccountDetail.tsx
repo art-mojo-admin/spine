@@ -34,7 +34,7 @@ interface AccountRecord {
 export function AccountDetailPage() {
   const { accountId } = useParams<{ accountId: string }>()
   const navigate = useNavigate()
-  const { currentAccountId, setCurrentAccountId } = useAuth()
+  const { currentAccountId, setCurrentAccountId, memberships } = useAuth()
   const isNew = accountId === 'new'
 
   const [account, setAccount] = useState<AccountRecord | null>(null)
@@ -54,10 +54,11 @@ export function AccountDetailPage() {
 
   useEffect(() => {
     if (isNew || !accountId) return
-    if (accountId && currentAccountId !== accountId) {
+    const hasMembership = memberships.some(m => m.account_id === accountId)
+    if (hasMembership && currentAccountId !== accountId) {
       setCurrentAccountId(accountId)
     }
-  }, [accountId, currentAccountId, setCurrentAccountId, isNew])
+  }, [accountId, currentAccountId, memberships, setCurrentAccountId, isNew])
 
   useEffect(() => {
     if (isNew || !accountId || currentAccountId !== accountId) return
