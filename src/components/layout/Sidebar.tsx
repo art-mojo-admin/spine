@@ -37,6 +37,7 @@ import { cn } from '@/lib/utils'
 import { useImpersonation } from '@/hooks/useImpersonation'
 import { AccountNodePanel } from '@/components/layout/AccountNodePanel'
 import { getCustomNavSections } from '@/lib/customRoutes'
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
 
 const ROLE_RANK: Record<string, number> = {
   portal: 0,
@@ -238,11 +239,6 @@ export function Sidebar() {
         </div>
       )}
 
-      <div className="border-b px-4 py-3">
-        <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Account scope</p>
-        <AccountNodePanel className="mt-2" />
-      </div>
-
       <nav className="flex-1 space-y-1 overflow-y-auto p-3">
         {useAppNav && (
           <>
@@ -415,19 +411,38 @@ export function Sidebar() {
       </nav>
 
       <div className="border-t p-3">
-        <div className="mb-2 px-3">
-          <p className="text-sm font-medium">{profile?.display_name}</p>
-          <p className="text-xs text-muted-foreground">{currentRole}</p>
-        </div>
-        <Button
-          variant="ghost"
-          size="sm"
-          className="w-full justify-start gap-2"
-          onClick={() => signOut()}
-        >
-          <LogOut className="h-4 w-4" />
-          Sign out
-        </Button>
+        <Popover>
+          <PopoverTrigger asChild>
+            <Button
+              variant="ghost"
+              size="sm"
+              className="w-full justify-between px-3 py-2"
+            >
+              <div className="flex flex-col text-left">
+                <span className="text-sm font-medium">{profile?.display_name}</span>
+                <span className="text-xs text-muted-foreground">{currentRole}</span>
+              </div>
+              <div className="flex flex-col items-center gap-1 text-muted-foreground">
+                <span className="h-1 w-1 rounded-full bg-current" />
+                <span className="h-1 w-1 rounded-full bg-current" />
+                <span className="h-1 w-1 rounded-full bg-current" />
+              </div>
+            </Button>
+          </PopoverTrigger>
+          <PopoverContent align="end" className="w-64 p-0">
+            <div className="border-b px-4 py-3">
+              <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Account scope</p>
+              <AccountNodePanel className="mt-2" />
+            </div>
+            <button
+              onClick={() => signOut()}
+              className="flex w-full items-center gap-2 px-4 py-3 text-sm text-destructive hover:bg-muted"
+            >
+              <LogOut className="h-4 w-4" />
+              Sign out
+            </button>
+          </PopoverContent>
+        </Popover>
       </div>
     </aside>
   )
