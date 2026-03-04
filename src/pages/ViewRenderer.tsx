@@ -5,7 +5,7 @@ import { useAuth } from '@/hooks/useAuth'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
-import { LayoutGrid } from 'lucide-react'
+import { LayoutGrid, Plus } from 'lucide-react'
 import { DashboardRenderer } from '@/components/shared/DashboardRenderer'
 
 interface ViewDefinition {
@@ -91,9 +91,16 @@ export function ViewRendererPage() {
 
     return (
       <div className="space-y-4">
-        <div>
-          <h1 className="text-3xl font-bold tracking-tight">{viewDef.name}</h1>
-          <p className="mt-1 text-muted-foreground">Board view</p>
+        <div className="flex items-center justify-between">
+          <div>
+            <h1 className="text-3xl font-bold tracking-tight">{viewDef.name}</h1>
+            <p className="mt-1 text-muted-foreground">Board view</p>
+          </div>
+          {viewDef.target_filter?.workflow_definition_id && (
+            <Button size="sm" onClick={() => navigate(`/workflow-items/new?workflow=${viewDef.target_filter.workflow_definition_id}`)}>
+              <Plus className="mr-2 h-4 w-4" /> Add Item
+            </Button>
+          )}
         </div>
         <div className="flex gap-4 overflow-x-auto pb-4">
           {Array.from(stageGroups.entries()).map(([stageName, stageItems]) => (
@@ -128,9 +135,16 @@ export function ViewRendererPage() {
   if (viewDef.view_type === 'list' || (viewDef.target_type === 'item' && items.length > 0)) {
     return (
       <div className="space-y-4">
-        <div>
-          <h1 className="text-3xl font-bold tracking-tight">{viewDef.name}</h1>
-          <p className="mt-1 text-muted-foreground">{items.length} item{items.length !== 1 ? 's' : ''}</p>
+        <div className="flex items-center justify-between">
+          <div>
+            <h1 className="text-3xl font-bold tracking-tight">{viewDef.name}</h1>
+            <p className="mt-1 text-muted-foreground">{items.length} item{items.length !== 1 ? 's' : ''}</p>
+          </div>
+          {viewDef.target_filter?.workflow_definition_id && (
+            <Button size="sm" onClick={() => navigate(`/workflow-items/new?workflow=${viewDef.target_filter.workflow_definition_id}`)}>
+              <Plus className="mr-2 h-4 w-4" /> Add Item
+            </Button>
+          )}
         </div>
         <div className="space-y-2">
           {items.length === 0 ? (

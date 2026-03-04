@@ -19,7 +19,6 @@ export default createHandler({
         .select('*, stage_definitions(id, name, position, is_terminal), workflow_definitions(id, name)')
         .eq('id', id)
         .eq('account_id', ctx.accountId)
-        .eq('account_node_id', ctx.accountNodeId)
         .single()
 
       if (!data) return error('Not found', 404)
@@ -34,7 +33,6 @@ export default createHandler({
       .from('items')
       .select('*, stage_definitions(id, name, position, is_terminal), workflow_definitions(id, name)')
       .eq('account_id', ctx.accountId)
-      .eq('account_node_id', ctx.accountNodeId)
       .order('created_at', { ascending: false })
 
     if (!includeInactive) query = query.eq('is_active', true)
@@ -74,7 +72,6 @@ export default createHandler({
       .from('items')
       .insert({
         account_id: ctx.accountId,
-        account_node_id: ctx.accountNodeId,
         item_type: body.item_type || 'task',
         workflow_definition_id: body.workflow_definition_id,
         stage_definition_id: stageId,
@@ -115,7 +112,6 @@ export default createHandler({
       .select('*')
       .eq('id', id)
       .eq('account_id', ctx.accountId)
-      .eq('account_node_id', ctx.accountNodeId)
       .single()
     if (!before) return error('Not found', 404)
 
