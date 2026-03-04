@@ -361,6 +361,20 @@ export function WorkflowItemDetailPage() {
             <EditableField label="Description" value={description} editing={editing} onChange={setDescription} type="textarea" placeholder="Describe this item..." />
           </div>
 
+          {['article', 'course', 'lesson'].includes(workflowType) && (
+            <div className="mt-4">
+              <EditableField
+                label="Content (Markdown)"
+                value={metadata?.body || ''}
+                editing={editing}
+                onChange={(val) => setMetadata({ ...metadata, body: val })}
+                type="richtext"
+                placeholder="Write your content here..."
+                mono={true}
+              />
+            </div>
+          )}
+
           {!isNew && !editing && (
             <div className="mt-4 grid gap-4 sm:grid-cols-2 text-sm">
               <div>
@@ -396,24 +410,6 @@ export function WorkflowItemDetailPage() {
           editing={editing}
           onChange={setMetadata}
         />
-      )}
-
-      {/* Markdown Body (for articles, lessons, courses) */}
-      {!isNew && !editing && metadata?.body && (
-        <Card>
-          <CardHeader className="pb-2">
-            <CardTitle className="flex items-center gap-2 text-base">
-              <FileText className="h-4 w-4" />
-              Content
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div
-              className="prose prose-sm dark:prose-invert max-w-none"
-              dangerouslySetInnerHTML={{ __html: marked.parse(metadata.body) as string }}
-            />
-          </CardContent>
-        </Card>
       )}
 
       {/* Parent Breadcrumb */}

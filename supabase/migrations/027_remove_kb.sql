@@ -202,11 +202,10 @@ SELECT
   'person',
   e.person_id,
   'item',
-  e.course_id,
+  e.course_item_id,
   'enrolled',
   jsonb_build_object(
-    'enrolled_at', e.enrolled_at,
-    'completed_at', e.completed_at,
+    'progress', e.progress,
     'status', e.status
   ) || COALESCE(e.metadata, '{}'::jsonb),
   e.is_active,
@@ -220,7 +219,7 @@ WHERE NOT EXISTS (
     AND el.source_type = 'person'
     AND el.source_id = e.person_id
     AND el.target_type = 'item'
-    AND el.target_id = e.course_id
+    AND el.target_id = e.course_item_id
     AND el.link_type = 'enrolled'
 );
 
@@ -233,25 +232,26 @@ INSERT INTO entity_links (
 )
 SELECT
   gen_random_uuid(),
-  lc.account_id,
+  e.account_id,
   'person',
-  lc.person_id,
+  e.person_id,
   'item',
-  lc.article_id,
+  lc.lesson_item_id,
   'completed',
-  jsonb_build_object('completed_at', lc.completed_at) || COALESCE(lc.metadata, '{}'::jsonb),
+  jsonb_build_object('completed_at', lc.completed_at, 'score', lc.score) || COALESCE(lc.metadata, '{}'::jsonb),
   lc.is_active,
   lc.is_test_data,
   lc.pack_id,
   lc.ownership
 FROM lesson_completions lc
+JOIN enrollments e ON e.id = lc.enrollment_id
 WHERE NOT EXISTS (
   SELECT 1 FROM entity_links el
-  WHERE el.account_id = lc.account_id
+  WHERE el.account_id = e.account_id
     AND el.source_type = 'person'
-    AND el.source_id = lc.person_id
+    AND el.source_id = e.person_id
     AND el.target_type = 'item'
-    AND el.target_id = lc.article_id
+    AND el.target_id = lc.lesson_item_id
     AND el.link_type = 'completed'
 );
 
@@ -319,9 +319,10 @@ ALTER TABLE knowledge_base_articles DROP CONSTRAINT IF EXISTS fk_kb_articles_pac
 ALTER TABLE enrollments DROP CONSTRAINT IF EXISTS fk_enrollments_pack;
 
 -- Drop the tables (child tables first)
-DROP TABLE IF EXISTS lesson_completions CASCADE;
-DROP TABLE IF EXISTS enrollments CASCADE;
-DROP TABLE IF EXISTS knowledge_base_articles CASCADE;
+-- Instead of dropping, rename legacy tables for safety
+ALTER TABLE knowledge_base_articles RENAME TO legacy_knowledge_base_articles;
+ALTER TABLE enrollments RENAME TO legacy_enrollments;
+ALTER TABLE lesson_completions RENAME TO legacy_lesson_completions;
 
 -- ══════════════════════════════════════════════════════════════════════
 -- DONE. knowledge_base_articles, enrollments, and lesson_completions
