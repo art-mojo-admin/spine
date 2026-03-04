@@ -27,7 +27,7 @@ interface Member {
 
 export function AccountBrowserPage() {
   const { profile } = useAuth()
-  const { startImpersonation, active: isImpersonating } = useImpersonation()
+  const { startImpersonation, stopImpersonation, active: isImpersonating } = useImpersonation()
   const [accounts, setAccounts] = useState<Account[]>([])
   const [selectedAccount, setSelectedAccount] = useState<Account | null>(null)
   const [breadcrumbs, setBreadcrumbs] = useState<Account[]>([])
@@ -113,22 +113,29 @@ export function AccountBrowserPage() {
     }
   }
 
+  if (isImpersonating) {
+    return (
+      <div className="py-12 text-center text-muted-foreground">
+        <UserCog className="mx-auto mb-3 h-10 w-10 text-amber-500" />
+        <p className="text-lg font-medium">Currently Impersonating</p>
+        <p className="mb-4 text-sm">Exit the current impersonation session to browse accounts.</p>
+        <button
+          type="button"
+          onClick={stopImpersonation}
+          className="inline-flex items-center justify-center rounded-md bg-amber-500 px-3 py-1.5 text-sm font-medium text-amber-950 shadow-sm transition hover:bg-amber-400"
+        >
+          Exit Impersonation
+        </button>
+      </div>
+    )
+  }
+
   if (!isAdmin) {
     return (
       <div className="py-12 text-center text-muted-foreground">
         <ShieldCheck className="mx-auto mb-3 h-10 w-10" />
         <p className="text-lg font-medium">System Admin Access Required</p>
         <p className="text-sm">Only system admins can browse accounts and impersonate users.</p>
-      </div>
-    )
-  }
-
-  if (isImpersonating) {
-    return (
-      <div className="py-12 text-center text-muted-foreground">
-        <UserCog className="mx-auto mb-3 h-10 w-10 text-amber-500" />
-        <p className="text-lg font-medium">Currently Impersonating</p>
-        <p className="text-sm">Exit the current impersonation session to browse accounts.</p>
       </div>
     )
   }
