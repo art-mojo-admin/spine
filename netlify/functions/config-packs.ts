@@ -20,10 +20,8 @@ const PACK_TABLES = [
   'custom_action_types',
   'view_definitions',
   'app_definitions',
-  'knowledge_base_articles',
   'threads',
   'messages',
-  'enrollments',
 ] as const
 
 // Shared test data tables (no pack_id — shared across packs)
@@ -35,7 +33,7 @@ const TABLES_WITH_ACCOUNT_ID = new Set([
   'workflow_definitions', 'items', 'automation_rules',
   'custom_field_definitions', 'link_type_definitions', 'entity_links',
   'account_modules', 'custom_action_types', 'view_definitions', 'app_definitions',
-  'knowledge_base_articles', 'threads', 'enrollments',
+  'threads',
 ])
 // Tables WITHOUT account_id — children linked via parent FK
 // stage_definitions, transition_definitions, workflow_actions, messages
@@ -52,12 +50,10 @@ const CLONE_SEQUENCE: { table: typeof PACK_TABLES[number]; entityType: string }[
   { table: 'app_definitions', entityType: 'app_definition' },
   { table: 'account_modules', entityType: 'account_module' },
   { table: 'custom_action_types', entityType: 'custom_action_type' },
-  { table: 'knowledge_base_articles', entityType: 'knowledge_base_article' },
   { table: 'threads', entityType: 'thread' },
   { table: 'messages', entityType: 'message' },
   { table: 'items', entityType: 'item' },
   { table: 'entity_links', entityType: 'entity_link' },
-  { table: 'enrollments', entityType: 'enrollment' },
 ]
 
 function combineCounts(...datasets: Record<string, number>[]) {
@@ -387,7 +383,7 @@ export default createHandler({
       const { data: pack } = await db.from('config_packs').select('*').eq('id', id).single()
       if (!pack) return error('Not found', 404)
 
-      const [workflows, stages, transitions, fields, linkTypes, automations, views, apps, docs] = await Promise.all([
+      const [workflows, stages, transitions, fields, linkTypes, automations, views, apps] = await Promise.all([
         db.from('workflow_definitions').select('*').eq('pack_id', id).eq('is_test_data', false),
         db.from('stage_definitions').select('*').eq('pack_id', id).eq('is_test_data', false),
         db.from('transition_definitions').select('*').eq('pack_id', id).eq('is_test_data', false),
@@ -396,7 +392,6 @@ export default createHandler({
         db.from('automation_rules').select('*').eq('pack_id', id).eq('is_test_data', false),
         db.from('view_definitions').select('*').eq('pack_id', id).eq('is_test_data', false),
         db.from('app_definitions').select('*').eq('pack_id', id).eq('is_test_data', false),
-        db.from('knowledge_base_articles').select('*').eq('pack_id', id).eq('is_test_data', false),
       ])
 
       const [testItems, testLinks, testThreads] = await Promise.all([
@@ -421,7 +416,6 @@ export default createHandler({
           automations: automations.data || [],
           views: views.data || [],
           apps: apps.data || [],
-          documents: docs.data || [],
         },
         test_data: {
           items: testItems.data || [],

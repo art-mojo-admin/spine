@@ -39,18 +39,20 @@ export default createHandler({
             .order('updated_at', { ascending: false })
             .limit(10),
           db
-            .from('knowledge_base_articles')
-            .select('id, title, parent_article_id, updated_at')
+            .from('items')
+            .select('id, title, metadata, updated_at')
             .eq('account_id', ctx.accountId)
+            .eq('item_type', 'lesson')
             .eq('is_active', true)
-            .not('parent_article_id', 'is', null)
             .order('updated_at', { ascending: false })
             .limit(6),
           db
-            .from('lesson_completions')
-            .select('article_id, completed_at')
+            .from('entity_links')
+            .select('target_id, metadata')
             .eq('account_id', ctx.accountId)
-            .eq('person_id', ctx.personId),
+            .eq('source_type', 'person')
+            .eq('source_id', ctx.personId)
+            .eq('link_type', 'completed'),
           db
             .from('items')
             .select('id, title, metadata, created_at')
@@ -84,7 +86,7 @@ export default createHandler({
         const start = evt.metadata?.start_at || evt.metadata?.startAt || evt.metadata?.start || evt.created_at
         return new Date(start) >= now
       }).length
-      const lessonCompletionSet = new Set(completions.map((c) => c.article_id))
+      const lessonCompletionSet = new Set(completions.map((c: any) => c.target_id))
 
       const persona = {
         id: person?.id ?? ctx.personId,

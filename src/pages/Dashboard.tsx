@@ -75,7 +75,7 @@ function ConfiguredDashboard({ dashboard }: { dashboard: DashboardDef }) {
 function FallbackDashboard() {
   const { profile, currentAccountId, currentAccountNodeId } = useAuth()
   const [activity, setActivity] = useState<any[]>([])
-  const [counts, setCounts] = useState({ accounts: 0, persons: 0, workflows: 0, documents: 0 })
+  const [counts, setCounts] = useState({ accounts: 0, persons: 0, workflows: 0, items: 0 })
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
@@ -85,15 +85,15 @@ function FallbackDashboard() {
       apiGet<any[]>('accounts'),
       apiGet<any[]>('persons'),
       apiGet<any[]>('workflow-definitions'),
-      apiGet<any[]>('kb-articles'),
+      apiGet<any[]>('workflow-items'),
     ])
-      .then(([actData, acctData, pplData, wfData, kbData]) => {
+      .then(([actData, acctData, pplData, wfData, itemData]) => {
         setActivity(actData)
         setCounts({
           accounts: acctData.length,
           persons: pplData.length,
           workflows: wfData.length,
-          documents: kbData.length,
+          items: itemData.length,
         })
       })
       .catch(() => {})
@@ -139,11 +139,11 @@ function FallbackDashboard() {
         </Card>
         <Card>
           <CardHeader className="flex flex-row items-center justify-between pb-2">
-            <CardTitle className="text-sm font-medium">Documents</CardTitle>
+            <CardTitle className="text-sm font-medium">Items</CardTitle>
             <FileText className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <p className="text-2xl font-bold">{counts.documents}</p>
+            <p className="text-2xl font-bold">{counts.items}</p>
           </CardContent>
         </Card>
       </div>

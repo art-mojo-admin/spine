@@ -28,12 +28,7 @@ const WorkflowsPage = lazy(() => import('@/pages/Workflows').then(m => ({ defaul
 const WorkflowDetailPage = lazy(() => import('@/pages/WorkflowDetail').then(m => ({ default: m.WorkflowDetailPage })))
 const WorkflowBuilderPage = lazy(() => import('@/pages/WorkflowBuilder').then(m => ({ default: m.WorkflowBuilderPage })))
 const WorkflowItemDetailPage = lazy(() => import('@/pages/WorkflowItemDetail').then(m => ({ default: m.WorkflowItemDetailPage })))
-const DocumentsPage = lazy(() => import('@/pages/KnowledgeBase').then(m => ({ default: m.DocumentsPage })))
-const DocumentDetailPage = lazy(() => import('@/pages/KBArticleDetail').then(m => ({ default: m.DocumentDetailPage })))
 const ActivityPage = lazy(() => import('@/pages/Activity').then(m => ({ default: m.ActivityPage })))
-const CoursesPage = lazy(() => import('@/pages/Courses').then(m => ({ default: m.CoursesPage })))
-const CourseDetailPage = lazy(() => import('@/pages/CourseDetail').then(m => ({ default: m.CourseDetailPage })))
-const LessonViewerPage = lazy(() => import('@/pages/LessonViewer').then(m => ({ default: m.LessonViewerPage })))
 const SearchPage = lazy(() => import('@/pages/Search').then(m => ({ default: m.SearchPage })))
 const ExtensionPage = lazy(() => import('@/pages/ExtensionPage').then(m => ({ default: m.ExtensionPage })))
 const ViewRendererPage = lazy(() => import('@/pages/ViewRenderer').then(m => ({ default: m.ViewRendererPage })))
@@ -135,14 +130,14 @@ export default function App() {
           {/* Redirects from old /tickets paths */}
           <Route path="/tickets" element={<Navigate to="/workflows" replace />} />
           <Route path="/tickets/:ticketId" element={<Navigate to="/workflows" replace />} />
-          <Route path="/documents" element={<DocumentsPage />} />
-          <Route path="/documents/:articleId" element={<DocumentDetailPage />} />
-          {/* Redirects from old /kb paths */}
-          <Route path="/kb" element={<Navigate to="/documents" replace />} />
-          <Route path="/kb/:articleId" element={<Navigate to="/documents" replace />} />
-          <Route path="/courses" element={<CoursesPage />} />
-          <Route path="/courses/:courseId" element={<CourseDetailPage />} />
-          <Route path="/courses/:courseId/lessons/:lessonId" element={<LessonViewerPage />} />
+          {/* Documents/KB/Courses now use items + views */}
+          <Route path="/documents" element={<Navigate to="/v/documents" replace />} />
+          <Route path="/documents/:articleId" element={<Navigate to="/workflow-items/:articleId" replace />} />
+          <Route path="/kb" element={<Navigate to="/v/documents" replace />} />
+          <Route path="/kb/:articleId" element={<Navigate to="/v/documents" replace />} />
+          <Route path="/courses" element={<Navigate to="/v/courses" replace />} />
+          <Route path="/courses/:courseId" element={<Navigate to="/v/courses" replace />} />
+          <Route path="/courses/:courseId/lessons/:lessonId" element={<Navigate to="/v/courses" replace />} />
           {shellCustomRoutes.map(({ path, Component }) => (
             <Route key={path} path={path} element={<Component />} />
           ))}

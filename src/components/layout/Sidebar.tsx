@@ -93,7 +93,6 @@ const fallbackNavItems = [
   { key: 'dashboard', to: '/', icon: LayoutDashboard, label: 'Dashboard', position: 0 },
   { key: 'accounts', to: '/accounts', icon: Building2, label: 'Accounts', position: 1 },
   { key: 'persons', to: '/persons', icon: Users, label: 'Persons', position: 2 },
-  { key: 'documents', to: '/documents', icon: FileText, label: 'Documents', position: 4 },
   { key: 'activity', to: '/activity', icon: Activity, label: 'Activity', position: 7 },
   { key: 'search', to: '/search', icon: Search, label: 'Search', position: 8 },
 ]

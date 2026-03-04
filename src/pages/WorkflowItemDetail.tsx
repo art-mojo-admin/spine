@@ -11,8 +11,9 @@ import { EntityAttachmentsPanel } from '@/components/shared/EntityAttachmentsPan
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
-import { ArrowLeft, Pencil, Save, X, KanbanSquare, ArrowRight, MessageSquare, GitFork } from 'lucide-react'
+import { ArrowLeft, Pencil, Save, X, KanbanSquare, ArrowRight, MessageSquare, GitFork, FileText } from 'lucide-react'
 import { Textarea } from '@/components/ui/textarea'
+import { marked } from 'marked'
 
 const PRIORITIES = [
   { value: 'low', label: 'Low' },
@@ -395,6 +396,24 @@ export function WorkflowItemDetailPage() {
           editing={editing}
           onChange={setMetadata}
         />
+      )}
+
+      {/* Markdown Body (for articles, lessons, courses) */}
+      {!isNew && !editing && metadata?.body && (
+        <Card>
+          <CardHeader className="pb-2">
+            <CardTitle className="flex items-center gap-2 text-base">
+              <FileText className="h-4 w-4" />
+              Content
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div
+              className="prose prose-sm dark:prose-invert max-w-none"
+              dangerouslySetInnerHTML={{ __html: marked.parse(metadata.body) as string }}
+            />
+          </CardContent>
+        </Card>
       )}
 
       {/* Parent Breadcrumb */}
