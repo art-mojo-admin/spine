@@ -39,13 +39,15 @@ export function ViewRendererPage() {
         const vd = await apiGet<ViewDefinition>('view-definitions', { slug: viewSlug! })
         setViewDef(vd)
 
-        if (vd.target_type === 'item' || vd.view_type === 'list' || vd.view_type === 'board') {
+        if (vd.target_type === 'item' || vd.target_type === 'document' || vd.view_type === 'list' || vd.view_type === 'board') {
           const params: Record<string, string> = {}
           if (vd.target_filter?.workflow_definition_id) {
             params.workflow_definition_id = vd.target_filter.workflow_definition_id
           }
           if (vd.target_filter?.item_type) {
             params.item_type = vd.target_filter.item_type
+          } else if (vd.target_type === 'document') {
+            params.item_type = 'article,course,lesson'
           }
           const data = await apiGet<any[]>('workflow-items', params)
           setItems(data || [])
@@ -96,8 +98,14 @@ export function ViewRendererPage() {
             <h1 className="text-3xl font-bold tracking-tight">{viewDef.name}</h1>
             <p className="mt-1 text-muted-foreground">Board view</p>
           </div>
-          {viewDef.target_filter?.workflow_definition_id && (
-            <Button size="sm" onClick={() => navigate(`/workflow-items/new?workflow=${viewDef.target_filter.workflow_definition_id}`)}>
+          {(viewDef.target_type === 'item' || viewDef.target_type === 'document') && (
+            <Button size="sm" onClick={() => {
+              const params = new URLSearchParams()
+              if (viewDef.target_filter?.workflow_definition_id) params.set('workflow', viewDef.target_filter.workflow_definition_id)
+              if (viewDef.target_filter?.item_type) params.set('type', viewDef.target_filter.item_type)
+              else if (viewDef.target_type === 'document') params.set('type', 'article') // Default type for documents
+              navigate(`/workflow-items/new?${params.toString()}`)
+            }}>
               <Plus className="mr-2 h-4 w-4" /> Add Item
             </Button>
           )}
@@ -140,8 +148,14 @@ export function ViewRendererPage() {
             <h1 className="text-3xl font-bold tracking-tight">{viewDef.name}</h1>
             <p className="mt-1 text-muted-foreground">{items.length} item{items.length !== 1 ? 's' : ''}</p>
           </div>
-          {viewDef.target_filter?.workflow_definition_id && (
-            <Button size="sm" onClick={() => navigate(`/workflow-items/new?workflow=${viewDef.target_filter.workflow_definition_id}`)}>
+          {(viewDef.target_type === 'item' || viewDef.target_type === 'document') && (
+            <Button size="sm" onClick={() => {
+              const params = new URLSearchParams()
+              if (viewDef.target_filter?.workflow_definition_id) params.set('workflow', viewDef.target_filter.workflow_definition_id)
+              if (viewDef.target_filter?.item_type) params.set('type', viewDef.target_filter.item_type)
+              else if (viewDef.target_type === 'document') params.set('type', 'article') // Default type for documents
+              navigate(`/workflow-items/new?${params.toString()}`)
+            }}>
               <Plus className="mr-2 h-4 w-4" /> Add Item
             </Button>
           )}

@@ -76,8 +76,10 @@ export function WorkflowItemDetailPage() {
         setPeople(pplRes || [])
 
         if (isNew) {
-          const preselect = searchParams.get('workflow')
-          if (preselect) setWorkflowDefId(preselect)
+          const preselectWorkflow = searchParams.get('workflow')
+          const preselectType = searchParams.get('type')
+          if (preselectWorkflow) setWorkflowDefId(preselectWorkflow)
+          if (preselectType) setWorkflowType(preselectType)
           setParentItem(null)
           setChildItems([])
           return

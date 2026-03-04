@@ -37,7 +37,13 @@ export default createHandler({
 
     if (!includeInactive) query = query.eq('is_active', true)
     if (workflowId) query = query.eq('workflow_definition_id', workflowId)
-    if (itemType) query = query.eq('item_type', itemType)
+    if (itemType) {
+      if (itemType.includes(',')) {
+        query = query.in('item_type', itemType.split(',').map(s => s.trim()))
+      } else {
+        query = query.eq('item_type', itemType)
+      }
+    }
     if (parentId === 'null') query = query.is('parent_item_id', null)
     else if (parentId) query = query.eq('parent_item_id', parentId)
 
