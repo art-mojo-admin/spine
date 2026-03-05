@@ -3,6 +3,7 @@ import remarkGfm from 'remark-gfm'
 import rehypeSlug from 'rehype-slug'
 import rehypeAutolinkHeadings from 'rehype-autolink-headings'
 import rehypeRaw from 'rehype-raw'
+import rehypeSanitize, { defaultSchema } from 'rehype-sanitize'
 import mermaid from 'mermaid'
 import { useEffect, useRef } from 'react'
 
@@ -63,6 +64,14 @@ export function MarkdownRenderer({ content, className = '' }: MarkdownRendererPr
         remarkPlugins={[remarkGfm]}
         rehypePlugins={[
           rehypeRaw, // Allows rendering HTML like iframes
+          [rehypeSanitize, {
+            ...defaultSchema,
+            tagNames: [...(defaultSchema.tagNames || []), 'iframe'],
+            attributes: {
+              ...defaultSchema.attributes,
+              iframe: ['src', 'width', 'height', 'allow', 'allowfullscreen', 'frameborder', 'title'],
+            }
+          }],
           rehypeSlug, // Adds IDs to headings
           [rehypeAutolinkHeadings, { behavior: 'wrap' }] // Adds links to headings
         ]}
