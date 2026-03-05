@@ -44,6 +44,7 @@ export function CustomFieldDefinitionsPage() {
   const [defaultValue, setDefaultValue] = useState('')
   const [section, setSection] = useState('')
   const [position, setPosition] = useState(0)
+  const [workflowTypes, setWorkflowTypes] = useState<string>('')
 
   useEffect(() => { if (currentAccountId) loadFields() }, [currentAccountId, tab])
 
@@ -58,7 +59,7 @@ export function CustomFieldDefinitionsPage() {
 
   function resetForm() {
     setName(''); setFieldKey(''); setFieldType('text'); setOptions('')
-    setRequired(false); setDefaultValue(''); setSection(''); setPosition(0)
+    setRequired(false); setDefaultValue(''); setSection(''); setPosition(0); setWorkflowTypes('')
     setShowForm(false); setEditingField(null)
   }
 
@@ -76,6 +77,7 @@ export function CustomFieldDefinitionsPage() {
     setDefaultValue(f.default_value || '')
     setSection(f.section || '')
     setPosition(f.position || 0)
+    setWorkflowTypes((f.workflow_types || []).join(', '))
     setShowForm(true)
   }
 
@@ -98,6 +100,7 @@ export function CustomFieldDefinitionsPage() {
       default_value: defaultValue || null,
       section: section || null,
       position,
+      workflow_types: workflowTypes ? workflowTypes.split(',').map(s => s.trim()).filter(Boolean) : null,
     }
 
     if (editingField) {
@@ -190,9 +193,16 @@ export function CustomFieldDefinitionsPage() {
               </div>
               <div className="space-y-1">
                 <label className="text-sm font-medium">Position</label>
-                <Input type="number" value={position} onChange={e => setPosition(Number(e.target.value))} />
+                <Input type="number" value={position} onChange={(e) => setPosition(Number(e.target.value))} />
               </div>
             </div>
+
+            {tab === 'item' && (
+              <div className="space-y-1">
+                <label className="text-sm font-medium">Workflow Types <span className="text-xs font-normal text-muted-foreground">(comma-separated, optional)</span></label>
+                <Input value={workflowTypes} onChange={(e) => setWorkflowTypes(e.target.value)} placeholder="e.g. article, course, deal" />
+              </div>
+            )}
 
             {(fieldType === 'select' || fieldType === 'multi_select') && (
               <div className="space-y-1">
@@ -243,7 +253,10 @@ export function CustomFieldDefinitionsPage() {
                   <div className="flex items-center gap-2 mt-0.5">
                     <Badge variant="secondary" className="text-[10px]">{f.field_type}</Badge>
                     {f.required && <Badge variant="destructive" className="text-[10px]">required</Badge>}
-                    {f.section && <span className="text-[10px] text-muted-foreground">{f.section}</span>}
+                    <span className="text-[10px] text-muted-foreground">Pos: {f.position}</span>
+                    {f.workflow_types?.length > 0 && (
+                      <Badge variant="outline" className="text-[10px]">Types: {f.workflow_types.join(', ')}</Badge>
+                    )}
                     {(f.field_type === 'select' || f.field_type === 'multi_select') && f.options?.length > 0 && (
                       <span className="text-[10px] text-muted-foreground">
                         {f.options.length} option{f.options.length !== 1 ? 's' : ''}

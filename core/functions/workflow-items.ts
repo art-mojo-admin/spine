@@ -16,7 +16,7 @@ export default createHandler({
     if (id) {
       const { data } = await db
         .from('items')
-        .select('*, stage_definitions(id, name, position, is_terminal), workflow_definitions(id, name)')
+        .select('*, stage_definitions(id, name, position, is_terminal), workflow_definitions(id, name, custom_field_keys)')
         .eq('id', id)
         .eq('account_id', ctx.accountId)
         .single()
@@ -31,7 +31,7 @@ export default createHandler({
     const itemType = params.get('item_type')
     let query = db
       .from('items')
-      .select('*, stage_definitions(id, name, position, is_terminal), workflow_definitions(id, name)')
+      .select('*, stage_definitions(id, name, position, is_terminal), workflow_definitions(id, name, custom_field_keys)')
       .eq('account_id', ctx.accountId)
       .order('created_at', { ascending: false })
 

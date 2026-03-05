@@ -15,6 +15,7 @@ export interface CustomFieldDef {
   section: string | null
   position: number
   enabled: boolean
+  workflow_types: string[] | null
 }
 
 interface FieldPath {
@@ -54,7 +55,7 @@ const CORE_FIELDS: Record<string, FieldPath[]> = {
 const cache = new Map<string, { fields: CustomFieldDef[]; ts: number }>()
 const CACHE_TTL = 60_000
 
-export function useCustomFields(entityType?: string) {
+export function useCustomFields(entityType?: string, workflowType?: string, allowedKeys?: string[]) {
   const { currentAccountId } = useAuth()
   const [fields, setFields] = useState<CustomFieldDef[]>([])
   const [loading, setLoading] = useState(false)
@@ -65,13 +66,15 @@ export function useCustomFields(entityType?: string) {
     return () => { mountedRef.current = false }
   }, [])
 
+  const allowedKeysStr = allowedKeys ? allowedKeys.join(',') : ''
+  const cacheKey = `${currentAccountId}:${entityType}:${workflowType || ''}:${allowedKeysStr}`
+
   useEffect(() => {
     if (!currentAccountId || !entityType) {
       setFields([])
       return
     }
 
-    const cacheKey = `${currentAccountId}:${entityType}`
     const cached = cache.get(cacheKey)
     if (cached && Date.now() - cached.ts < CACHE_TTL) {
       setFields(cached.fields)
@@ -79,7 +82,11 @@ export function useCustomFields(entityType?: string) {
     }
 
     setLoading(true)
-    apiGet<CustomFieldDef[]>('custom-field-definitions', { entity_type: entityType })
+    const params: any = { entity_type: entityType }
+    if (workflowType) params.workflow_type = workflowType
+    if (allowedKeysStr) params.allowed_keys = allowedKeysStr
+
+    apiGet<CustomFieldDef[]>('custom-field-definitions', params)
       .then((data) => {
         const enabled = data.filter((f) => f.enabled)
         cache.set(cacheKey, { fields: enabled, ts: Date.now() })
@@ -91,7 +98,7 @@ export function useCustomFields(entityType?: string) {
       .finally(() => {
         if (mountedRef.current) setLoading(false)
       })
-  }, [currentAccountId, entityType])
+  }, [currentAccountId, entityType, cacheKey, workflowType, allowedKeysStr])
 
   const fieldPaths: FieldPath[] = [
     ...(CORE_FIELDS[entityType || ''] || []),
@@ -104,7 +111,7 @@ export function useCustomFields(entityType?: string) {
 
   function invalidate() {
     if (currentAccountId && entityType) {
-      cache.delete(`${currentAccountId}:${entityType}`)
+      cache.delete(cacheKey)
     }
   }
 

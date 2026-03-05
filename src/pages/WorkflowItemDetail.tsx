@@ -421,6 +421,8 @@ export function WorkflowItemDetailPage() {
       {!isNew && (
         <CustomFieldsRenderer
           entityType="item"
+          workflowType={workflowType}
+          allowedKeys={item?.workflow_definitions?.custom_field_keys || undefined}
           metadata={metadata}
           editing={editing}
           onChange={setMetadata}

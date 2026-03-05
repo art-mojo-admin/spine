@@ -31,6 +31,11 @@ export default createHandler({
     }
 
     const includeInactive = params.get('include_inactive') === 'true' && ctx.accountRole === 'admin'
+    const entityType = params.get('entity_type')
+    const workflowType = params.get('workflow_type')
+    const allowedKeysParam = params.get('allowed_keys')
+    const allowedKeys = allowedKeysParam ? allowedKeysParam.split(',').map(s => s.trim()) : null
+
     let query = db
       .from('custom_field_definitions')
       .select('*')
@@ -41,12 +46,22 @@ export default createHandler({
 
     if (!includeInactive) query = query.eq('is_active', true)
 
-    const entityType = params.get('entity_type')
     if (entityType) {
       query = query.eq('entity_type', entityType)
     }
 
-    const { data } = await query
+    if (workflowType) {
+      // Return fields that are global (workflow_types is null/empty) OR include the requested workflowType
+      query = query.or(`workflow_types.is.null,workflow_types.cs.{${workflowType}}`)
+    }
+
+    if (allowedKeys) {
+      // In Supabase/PostgREST we can use in filter
+      query = query.in('field_key', allowedKeys)
+    }
+
+    const { data, error: dbErr } = await query
+    if (dbErr) return error(dbErr.message, 500)
     return json(data || [])
   },
 
@@ -89,9 +104,10 @@ export default createHandler({
         required: body.required || false,
         default_value: body.default_value || null,
         section: body.section || null,
-        position: body.position ?? 0,
+        position: body.position || 0,
         enabled: body.enabled !== false,
         is_public: body.is_public || false,
+        workflow_types: body.workflow_types || null,
       })
       .select()
       .single()
@@ -136,6 +152,7 @@ export default createHandler({
     if (body.position !== undefined) updates.position = body.position
     if (body.enabled !== undefined) updates.enabled = body.enabled
     if (body.is_public !== undefined) updates.is_public = body.is_public
+    if (body.workflow_types !== undefined) updates.workflow_types = body.workflow_types
 
     const { data, error: dbErr } = await db
       .from('custom_field_definitions')

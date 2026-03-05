@@ -41,6 +41,7 @@ export function WorkflowDetailPage() {
   const [name, setName] = useState('')
   const [description, setDescription] = useState('')
   const [status, setStatus] = useState('active')
+  const [customFieldKeys, setCustomFieldKeys] = useState('')
   const [stageDrafts, setStageDrafts] = useState<StageDraft[]>([])
 
   const scopeKey = currentAccountNodeId || currentAccountId || 'root'
@@ -64,6 +65,7 @@ export function WorkflowDetailPage() {
         setName(wfRes.name || '')
         setDescription(wfRes.description || '')
         setStatus(wfRes.status || 'active')
+        setCustomFieldKeys((wfRes.custom_field_keys || []).join(', '))
 
         const stages = (wfRes.stage_definitions || [])
           .sort((a: any, b: any) => a.position - b.position)
@@ -90,6 +92,7 @@ export function WorkflowDetailPage() {
       setName(workflow.name || '')
       setDescription(workflow.description || '')
       setStatus(workflow.status || 'active')
+      setCustomFieldKeys((workflow.custom_field_keys || []).join(', '))
       const stages = (workflow.stage_definitions || [])
         .sort((a: any, b: any) => a.position - b.position)
         .map((s: any) => ({
@@ -135,10 +138,12 @@ export function WorkflowDetailPage() {
     setErrorMessage(null)
     try {
       let wfId = workflowId
+      const parsedCustomFieldKeys = customFieldKeys.split(',').map(s => s.trim()).filter(Boolean)
       if (isNew) {
         const created = await apiPost<any>('workflow-definitions', {
           name,
           description: description || undefined,
+          custom_field_keys: parsedCustomFieldKeys.length > 0 ? parsedCustomFieldKeys : null,
         })
         wfId = created.id
 
@@ -162,6 +167,7 @@ export function WorkflowDetailPage() {
           name,
           description: description || undefined,
           status,
+          custom_field_keys: parsedCustomFieldKeys.length > 0 ? parsedCustomFieldKeys : null,
         }, { id: wfId! })
 
         // Process stage changes
@@ -197,6 +203,7 @@ export function WorkflowDetailPage() {
         setName(wfRes.name || '')
         setDescription(wfRes.description || '')
         setStatus(wfRes.status || 'active')
+        setCustomFieldKeys((wfRes.custom_field_keys || []).join(', '))
         const stages = (wfRes.stage_definitions || [])
           .sort((a: any, b: any) => a.position - b.position)
           .map((s: any) => ({
@@ -286,6 +293,12 @@ export function WorkflowDetailPage() {
           <div className="mt-4">
             <EditableField label="Description" value={description} editing={editing} onChange={setDescription} type="textarea" placeholder="Describe this workflow..." />
           </div>
+          {editing && (
+            <div className="mt-4">
+              <EditableField label="Custom Field Keys" value={customFieldKeys} editing={editing} onChange={setCustomFieldKeys} placeholder="e.g. priority, product_area (comma separated)" />
+              <p className="text-xs text-muted-foreground mt-1">If left blank, all custom fields matching this workflow's item type will be shown.</p>
+            </div>
+          )}
           {!isNew && !editing && (
             <div className="mt-4 grid gap-4 sm:grid-cols-2 text-sm">
               <div>

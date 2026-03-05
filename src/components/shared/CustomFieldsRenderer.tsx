@@ -6,26 +6,39 @@ import { SlidersHorizontal } from 'lucide-react'
 
 interface CustomFieldsRendererProps {
   entityType: string
+  workflowType?: string
+  allowedKeys?: string[]
   metadata: Record<string, any>
   editing: boolean
   onChange: (metadata: Record<string, any>) => void
 }
 
-export function CustomFieldsRenderer({ entityType, metadata, editing, onChange }: CustomFieldsRendererProps) {
-  const { fields, loading } = useCustomFields(entityType)
+export function CustomFieldsRenderer({ entityType, workflowType, allowedKeys, metadata, editing, onChange }: CustomFieldsRendererProps) {
+  const { fields, loading } = useCustomFields(entityType, workflowType, allowedKeys)
 
   if (loading || fields.length === 0) return null
 
-  function setValue(key: string, value: any) {
-    onChange({ ...metadata, [key]: value })
+  // If not editing, hide empty fields. If all fields in all sections are empty, hide the whole component.
+  let hasAnyVisibleValue = false
+  const sections = new Map<string, CustomFieldDef[]>()
+  
+  for (const f of fields) {
+    const val = metadata[f.field_key]
+    const hasValue = val !== undefined && val !== null && val !== '' && (f.field_type !== 'multi_select' || (Array.isArray(val) && val.length > 0))
+    
+    if (editing || hasValue) {
+      if (hasValue) hasAnyVisibleValue = true
+      
+      const sec = f.section || ''
+      if (!sections.has(sec)) sections.set(sec, [])
+      sections.get(sec)!.push(f)
+    }
   }
 
-  // Group by section
-  const sections = new Map<string, CustomFieldDef[]>()
-  for (const f of fields) {
-    const sec = f.section || ''
-    if (!sections.has(sec)) sections.set(sec, [])
-    sections.get(sec)!.push(f)
+  if (!editing && !hasAnyVisibleValue) return null
+
+  function setValue(key: string, value: any) {
+    onChange({ ...metadata, [key]: value })
   }
 
   return (
