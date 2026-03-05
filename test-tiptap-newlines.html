@@ -1,0 +1,27 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <script type="module">
+    import { Editor } from 'https://esm.sh/@tiptap/core@3.0.0';
+    import StarterKit from 'https://esm.sh/@tiptap/starter-kit@3.0.0';
+    import { Markdown } from 'https://esm.sh/tiptap-markdown@0.9.0';
+
+    const editor = new Editor({
+      element: document.querySelector('#editor'),
+      extensions: [StarterKit, Markdown],
+      content: '',
+    });
+    
+    // Test setContent with Markdown containing \n
+    editor.commands.setContent('Line 1\n\nLine 2\n\n## Heading');
+    
+    setTimeout(() => {
+      document.querySelector('#output').textContent = editor.getHTML();
+    }, 500);
+  </script>
+</head>
+<body>
+  <div id="editor"></div>
+  <pre id="output"></pre>
+</body>
+</html>
