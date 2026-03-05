@@ -11,8 +11,10 @@ import { EntityAttachmentsPanel } from '@/components/shared/EntityAttachmentsPan
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
-import { ArrowLeft, Pencil, Save, X, KanbanSquare, ArrowRight, MessageSquare, GitFork, FileText } from 'lucide-react'
+import { ArrowLeft, Pencil, Save, X, KanbanSquare, ArrowRight, MessageSquare, GitFork, FileText, BookOpen } from 'lucide-react'
 import { Textarea } from '@/components/ui/textarea'
+import { MarkdownEditor } from '@/components/shared/editor/MarkdownEditor'
+import { MarkdownRenderer } from '@/components/shared/editor/MarkdownRenderer'
 import { marked } from 'marked'
 
 const PRIORITIES = [
@@ -364,16 +366,27 @@ export function WorkflowItemDetailPage() {
           </div>
 
           {['article', 'course', 'lesson'].includes(workflowType) && (
-            <div className="mt-4">
-              <EditableField
-                label="Content (Markdown)"
-                value={metadata?.body || ''}
-                editing={editing}
-                onChange={(val) => setMetadata({ ...metadata, body: val })}
-                type="richtext"
-                placeholder="Write your content here..."
-                mono={true}
-              />
+            <div className="mt-8 border-t pt-8">
+              <div className="flex items-center gap-2 mb-4">
+                <BookOpen className="h-5 w-5 text-muted-foreground" />
+                <h3 className="text-lg font-medium">Content</h3>
+              </div>
+              {editing ? (
+                <MarkdownEditor
+                  value={metadata?.body || ''}
+                  onChange={(val) => setMetadata({ ...metadata, body: val })}
+                  placeholder="Write your content here..."
+                  minHeight="min-h-[400px]"
+                />
+              ) : (
+                <div className="bg-card border rounded-md p-6">
+                  {metadata?.body ? (
+                    <MarkdownRenderer content={metadata.body} />
+                  ) : (
+                    <p className="text-muted-foreground italic text-sm">No content provided.</p>
+                  )}
+                </div>
+              )}
             </div>
           )}
 
@@ -518,10 +531,10 @@ export function WorkflowItemDetailPage() {
               </p>
             </div>
             <Textarea
-              rows={3}
               value={transitionComment}
-              onChange={(e) => setTransitionComment(e.target.value)}
-              placeholder="Add a comment explaining this transition..."
+              onChange={(e: any) => setTransitionComment(e.target.value)}
+              placeholder="Add an optional comment..."
+              className="mt-4"
             />
             <div className="flex items-center gap-2">
               <Button
