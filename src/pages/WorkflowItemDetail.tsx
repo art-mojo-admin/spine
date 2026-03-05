@@ -99,7 +99,7 @@ export function WorkflowItemDetailPage() {
         setOwnerPersonId(itemRes.owner_person_id || '')
         setPriority(itemRes.priority || 'medium')
         setDueDate(itemRes.due_date ? itemRes.due_date.split('T')[0] : '')
-        setWorkflowType(itemRes.workflow_type || 'deal')
+        setWorkflowType(itemRes.item_type || 'task')
         setMetadata(itemRes.metadata || {})
 
         if (itemRes.workflow_definition_id) {
@@ -186,7 +186,7 @@ export function WorkflowItemDetailPage() {
       setOwnerPersonId(item.owner_person_id || '')
       setPriority(item.priority || 'medium')
       setDueDate(item.due_date ? item.due_date.split('T')[0] : '')
-      setWorkflowType(item.workflow_type || 'deal')
+      setWorkflowType(item.item_type || 'task')
       setMetadata(item.metadata || {})
     }
     setEditing(false)
@@ -209,7 +209,7 @@ export function WorkflowItemDetailPage() {
           owner_person_id: ownerPersonId || undefined,
           priority,
           due_date: dueDate || undefined,
-          workflow_type: workflowType,
+          item_type: workflowType,
         })
         navigate(`/workflow-items/${created.id}`, { replace: true })
       } else {
