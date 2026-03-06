@@ -56,6 +56,20 @@ const CLONE_SEQUENCE: { table: typeof PACK_TABLES[number]; entityType: string }[
   { table: 'entity_links', entityType: 'entity_link' },
 ]
 
+function logPackAction(ctx: RequestContext, packId: string | undefined, step: string, meta: Record<string, unknown> = {}) {
+  try {
+    const payload = {
+      accountId: ctx.accountId ?? null,
+      personId: ctx.personId ?? null,
+      packId: packId ?? null,
+      ...meta,
+    }
+    console.log('[config-pack]', step, JSON.stringify(payload))
+  } catch (err) {
+    console.error('[config-pack] log failed', (err as Error).message)
+  }
+}
+
 function combineCounts(...datasets: Record<string, number>[]) {
   const result: Record<string, number> = {}
   for (const data of datasets) {
@@ -486,6 +500,10 @@ export default createHandler({
       const { data: pack } = await db.from('config_packs').select('id, name').eq('id', packId).single()
       if (!pack) return error('Pack not found', 404)
 
+      logPackAction(ctx, packId, 'install.start', {
+        includeTestData: body.include_test_data === true,
+      })
+
       // Check if already installed
       const { data: existing } = await db
         .from('pack_activations')
@@ -501,6 +519,7 @@ export default createHandler({
       // Clone config rows (workflows, fields, views, apps, etc.)
       await cloneTemplatesForPack(packId, accountId, false)
       await setClonedEntitiesActive(accountId, packId, true, false)
+      logPackAction(ctx, packId, 'install.config_cloned')
 
       // Optionally clone test data
       const includeTestData = body.include_test_data === true
@@ -508,6 +527,7 @@ export default createHandler({
         await cloneTemplatesForPack(packId, accountId, true)
         await setClonedEntitiesActive(accountId, packId, true, true)
         await setSharedTestDataActive(true, accountId)
+        logPackAction(ctx, packId, 'install.test_data_cloned')
       }
 
       // Record activation
@@ -519,9 +539,13 @@ export default createHandler({
         activated_by: ctx.personId,
         activated_at: new Date().toISOString(),
       }, { onConflict: 'account_id,pack_id' })
+      logPackAction(ctx, packId, 'install.activation_upserted', {
+        activationPersonId: ctx.personId ?? null,
+      })
 
       // Recalculate admin counts
       await recalcAllCounts(accountId)
+      logPackAction(ctx, packId, 'install.recalc_complete')
 
       await emitActivity(ctx, 'config_pack.installed', `Installed pack "${pack.name}"${includeTestData ? ' with test data' : ''}`, 'config_pack', packId)
       return json({ success: true, action: 'installed', include_test_data: includeTestData })
