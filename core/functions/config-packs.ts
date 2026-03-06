@@ -497,58 +497,74 @@ export default createHandler({
     if (action === 'install_pack') {
       if (!packId) return error('pack_id required')
 
-      const { data: pack } = await db.from('config_packs').select('id, name').eq('id', packId).single()
-      if (!pack) return error('Pack not found', 404)
+      try {
+        const { data: pack } = await db.from('config_packs').select('id, name').eq('id', packId).single()
+        if (!pack) return error('Pack not found', 404)
 
-      logPackAction(ctx, packId, 'install.start', {
-        includeTestData: body.include_test_data === true,
-      })
+        logPackAction(ctx, packId, 'install.start', {
+          includeTestData: body.include_test_data === true,
+        })
 
-      // Check if already installed
-      const { data: existing } = await db
-        .from('pack_activations')
-        .select('config_active')
-        .eq('account_id', accountId)
-        .eq('pack_id', packId)
-        .maybeSingle()
+        // Check if already installed
+        const { data: existing } = await db
+          .from('pack_activations')
+          .select('config_active')
+          .eq('account_id', accountId)
+          .eq('pack_id', packId)
+          .maybeSingle()
 
-      if (existing?.config_active) {
-        return error('Pack is already installed. Uninstall first to reinstall.', 409)
+        if (existing?.config_active) {
+          return error('Pack is already installed. Uninstall first to reinstall.', 409)
+        }
+
+        // Clone config rows (workflows, fields, views, apps, etc.)
+        await cloneTemplatesForPack(packId, accountId, false)
+        await setClonedEntitiesActive(accountId, packId, true, false)
+        logPackAction(ctx, packId, 'install.config_cloned')
+
+        // Optionally clone test data
+        const includeTestData = body.include_test_data === true
+        if (includeTestData) {
+          await cloneTemplatesForPack(packId, accountId, true)
+          await setClonedEntitiesActive(accountId, packId, true, true)
+          await setSharedTestDataActive(true, accountId)
+          logPackAction(ctx, packId, 'install.test_data_cloned')
+        }
+
+        // Record activation
+        await db.from('pack_activations').upsert({
+          account_id: accountId,
+          pack_id: packId,
+          config_active: true,
+          test_data_active: includeTestData,
+          activated_by: ctx.personId,
+          activated_at: new Date().toISOString(),
+        }, { onConflict: 'account_id,pack_id' })
+        logPackAction(ctx, packId, 'install.activation_upserted', {
+          activationPersonId: ctx.personId ?? null,
+        })
+
+        // Recalculate admin counts
+        await recalcAllCounts(accountId)
+        logPackAction(ctx, packId, 'install.recalc_complete')
+
+        await emitActivity(ctx, 'config_pack.installed', `Installed pack "${pack.name}"${includeTestData ? ' with test data' : ''}`, 'config_pack', packId)
+        return json({ success: true, action: 'installed', include_test_data: includeTestData })
+      } catch (err) {
+        const meta: Record<string, unknown> = {}
+        if (typeof err === 'object' && err !== null) {
+          if ('message' in err && typeof (err as any).message === 'string') meta.message = (err as any).message
+          if ('code' in err) meta.code = (err as any).code
+          if ('details' in err) meta.details = (err as any).details
+          if ('hint' in err) meta.hint = (err as any).hint
+        } else if (err !== undefined) {
+          meta.message = String(err)
+        }
+
+        logPackAction(ctx, packId, 'install.error', meta)
+        console.error('[config-pack] install.error', err)
+        return error(meta.message ? `Pack install failed: ${meta.message}` : 'Pack install failed. See logs for details.', 500)
       }
-
-      // Clone config rows (workflows, fields, views, apps, etc.)
-      await cloneTemplatesForPack(packId, accountId, false)
-      await setClonedEntitiesActive(accountId, packId, true, false)
-      logPackAction(ctx, packId, 'install.config_cloned')
-
-      // Optionally clone test data
-      const includeTestData = body.include_test_data === true
-      if (includeTestData) {
-        await cloneTemplatesForPack(packId, accountId, true)
-        await setClonedEntitiesActive(accountId, packId, true, true)
-        await setSharedTestDataActive(true, accountId)
-        logPackAction(ctx, packId, 'install.test_data_cloned')
-      }
-
-      // Record activation
-      await db.from('pack_activations').upsert({
-        account_id: accountId,
-        pack_id: packId,
-        config_active: true,
-        test_data_active: includeTestData,
-        activated_by: ctx.personId,
-        activated_at: new Date().toISOString(),
-      }, { onConflict: 'account_id,pack_id' })
-      logPackAction(ctx, packId, 'install.activation_upserted', {
-        activationPersonId: ctx.personId ?? null,
-      })
-
-      // Recalculate admin counts
-      await recalcAllCounts(accountId)
-      logPackAction(ctx, packId, 'install.recalc_complete')
-
-      await emitActivity(ctx, 'config_pack.installed', `Installed pack "${pack.name}"${includeTestData ? ' with test data' : ''}`, 'config_pack', packId)
-      return json({ success: true, action: 'installed', include_test_data: includeTestData })
     }
 
     if (action === 'install_test_data') {
