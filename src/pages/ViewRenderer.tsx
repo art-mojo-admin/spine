@@ -7,6 +7,7 @@ import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { LayoutGrid, Plus } from 'lucide-react'
 import { DashboardRenderer } from '@/components/shared/DashboardRenderer'
+import { PageRenderer } from '@/components/page-renderer/PageRenderer'
 
 interface ViewDefinition {
   id: string
@@ -191,6 +192,11 @@ export function ViewRendererPage() {
         </div>
       </div>
     )
+  }
+
+  // Page view (WYSIWYG page builder)
+  if (viewDef.view_type === 'page' && viewDef.config) {
+    return <PageRenderer config={viewDef.config} name={viewDef.name} />
   }
 
   // Dashboard view

@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react'
+import { useNavigate } from 'react-router-dom'
 import { apiGet, apiPost, apiPatch, apiDelete } from '@/lib/api'
 import { useAuth } from '@/hooks/useAuth'
 import { Button } from '@/components/ui/button'
@@ -6,13 +7,14 @@ import { Input } from '@/components/ui/input'
 import { Textarea } from '@/components/ui/textarea'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
-import { Plus, LayoutGrid, Pencil, Trash2, Power, GripVertical, X, ArrowUp, ArrowDown, Copy } from 'lucide-react'
+import { Plus, LayoutGrid, Pencil, Trash2, Power, GripVertical, X, ArrowUp, ArrowDown, Copy, PaintBucket } from 'lucide-react'
 
 const VIEW_TYPES = [
   { value: 'list', label: 'List' },
   { value: 'board', label: 'Board' },
   { value: 'detail', label: 'Detail' },
   { value: 'dashboard', label: 'Dashboard' },
+  { value: 'page', label: 'Page (Builder)' },
   { value: 'portal_page', label: 'Portal Page' },
 ]
 
@@ -54,6 +56,7 @@ function slugify(s: string) {
 }
 
 export function ViewDefinitionsPage() {
+  const navigate = useNavigate()
   const { currentAccountId } = useAuth()
   const [views, setViews] = useState<any[]>([])
   const [loading, setLoading] = useState(true)
@@ -386,6 +389,11 @@ export function ViewDefinitionsPage() {
                 <Badge variant={v.is_active ? 'default' : 'secondary'} className="text-[10px]">
                   {v.is_active ? 'Active' : 'Off'}
                 </Badge>
+                {v.view_type === 'page' && (
+                  <Button variant="outline" size="sm" className="h-7 text-[10px]" onClick={() => navigate(`/admin/views/${v.id}/page-builder`)} title="Open Page Builder">
+                    <PaintBucket className="mr-1 h-3 w-3" /> Builder
+                  </Button>
+                )}
                 <Button variant="ghost" size="sm" className="h-7 w-7 p-0" onClick={() => duplicateView(v)} title="Duplicate">
                   <Copy className="h-3 w-3" />
                 </Button>

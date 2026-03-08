@@ -51,6 +51,7 @@ const CustomActionTypesPage = lazy(() => import('@/pages/admin/CustomActionTypes
 const ViewDefinitionsPage = lazy(() => import('@/pages/admin/ViewDefinitions').then(m => ({ default: m.ViewDefinitionsPage })))
 const AppDefinitionsPage = lazy(() => import('@/pages/admin/AppDefinitions').then(m => ({ default: m.AppDefinitionsPage })))
 const AppBuilderPage = lazy(() => import('@/pages/admin/AppBuilder').then(m => ({ default: m.AppBuilderPage })))
+const CanvasBuilderPage = lazy(() => import('@/components/canvas-builder/CanvasBuilder').then(m => ({ default: m.CanvasBuilderPage })))
 const ReportsPage = lazy(() => import('@/pages/admin/Reports').then(m => ({ default: m.ReportsPage })))
 const AccountBrowserPage = lazy(() => import('@/pages/admin/AccountBrowser').then(m => ({ default: m.AccountBrowserPage })))
 const SetupWizardPage = lazy(() => import('@/pages/admin/SetupWizard').then(m => ({ default: m.SetupWizardPage })))
@@ -157,6 +158,7 @@ export default function App() {
           <Route path="/admin/modules" element={<AccountModulesPage />} />
           <Route path="/admin/custom-actions" element={<CustomActionTypesPage />} />
           <Route path="/admin/views" element={<ViewDefinitionsPage />} />
+          <Route path="/admin/views/:viewId/page-builder" element={<CanvasBuilderPage />} />
           <Route path="/admin/apps" element={<AppDefinitionsPage />} />
           <Route path="/admin/apps/:appId/builder" element={<AppBuilderPage />} />
           <Route path="/admin/workflows" element={<WorkflowsPage />} />

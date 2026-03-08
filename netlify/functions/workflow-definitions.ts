@@ -43,12 +43,18 @@ export default createHandler({
     const roleCheck = requireRole(ctx, ['admin', 'operator'])
     if (roleCheck) return roleCheck
 
-    const body = await parseBody<{ name: string; description?: string; config?: any }>(req)
-    if (!body.name) return error('name required')
+    const body = await parseBody<{ name: string; description?: string; config?: any; custom_field_keys?: any }>(req)
+    if (!body.name) return error('Name required')
 
     const { data, error: dbErr } = await db
       .from('workflow_definitions')
-      .insert({ account_id: ctx.accountId, name: body.name, description: body.description || null, config: body.config || {} })
+      .insert({ 
+        account_id: ctx.accountId, 
+        name: body.name, 
+        description: body.description || null, 
+        config: body.config || {},
+        custom_field_keys: body.custom_field_keys || null,
+      })
       .select()
       .single()
 
@@ -81,6 +87,7 @@ export default createHandler({
     if (body.status !== undefined) updates.status = body.status
     if (body.config !== undefined) updates.config = body.config
     if (body.public_config !== undefined) updates.public_config = body.public_config
+    if (body.custom_field_keys !== undefined) updates.custom_field_keys = body.custom_field_keys
 
     const { data, error: dbErr } = await db.from('workflow_definitions').update(updates).eq('id', id).select().single()
     if (dbErr) return error(dbErr.message, 500)

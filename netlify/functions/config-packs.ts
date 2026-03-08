@@ -56,6 +56,20 @@ const CLONE_SEQUENCE: { table: typeof PACK_TABLES[number]; entityType: string }[
   { table: 'entity_links', entityType: 'entity_link' },
 ]
 
+function logPackAction(ctx: RequestContext, packId: string | undefined, step: string, meta: Record<string, unknown> = {}) {
+  try {
+    const payload = {
+      accountId: ctx.accountId ?? null,
+      personId: ctx.personId ?? null,
+      packId: packId ?? null,
+      ...meta,
+    }
+    console.log('[config-pack]', step, JSON.stringify(payload))
+  } catch (err) {
+    console.error('[config-pack] log failed', (err as Error).message)
+  }
+}
+
 function combineCounts(...datasets: Record<string, number>[]) {
   const result: Record<string, number> = {}
   for (const data of datasets) {
@@ -106,27 +120,20 @@ async function upsertMapping(accountId: string, packId: string, entityType: stri
 }
 
 async function fetchPackTemplates(packId: string, templateAccountId: string) {
-  const templates: Record<string, any[]> = {}
-
-  for (const table of PACK_TABLES) {
-    let query = (db.from(table) as any)
-      .select('*')
-      .eq('pack_id', packId)
-
-    // Only filter by account_id for tables that have the column
-    if (TABLES_WITH_ACCOUNT_ID.has(table)) {
-      query = query.eq('account_id', templateAccountId)
-    }
-
-    const { data } = await query
-    templates[table] = data || []
-  }
-
-  return templates
+  const entries = await Promise.all(
+    PACK_TABLES.map(async (table) => {
+      let query = (db.from(table) as any).select('*').eq('pack_id', packId)
+      if (TABLES_WITH_ACCOUNT_ID.has(table)) {
+        query = query.eq('account_id', templateAccountId)
+      }
+      const { data } = await query
+      return [table, data || []] as [string, any[]]
+    })
+  )
+  return Object.fromEntries(entries) as Record<string, any[]>
 }
 
-async function cloneTemplateRow(table: string, template: any, accountId: string, packId: string, entityMap: Record<string, string>) {
-  const newId = randomUUID()
+function prepareClonedRow(template: any, accountId: string, packId: string, entityMap: Record<string, string>, newId: string) {
   const cloned = { ...template }
 
   cloned.id = newId
@@ -162,9 +169,7 @@ async function cloneTemplateRow(table: string, template: any, accountId: string,
   delete cloned.created_at
   delete cloned.updated_at
 
-  await (db.from(table) as any).insert(cloned)
-
-  return newId
+  return cloned
 }
 
 function remapJsonIds(value: any, entityMap: Record<string, string>): any {
@@ -191,28 +196,71 @@ async function cloneTemplatesForPack(packId: string, accountId: string, isTestDa
   const entityMap = { ...mapByTemplate }
 
   for (const { table, entityType } of CLONE_SEQUENCE) {
-    const rows = templates[table] || []
+    const rows = (templates[table] || []).filter(
+      (t: any) => (t.is_test_data === true) === isTestData
+    )
+    if (rows.length === 0) continue
+
+    // Batch check: which already-mapped clones still exist?
+    const mappedRows = rows.filter((t: any) => entityMap[t.id])
+    let existingCloneIds = new Set<string>()
+    if (mappedRows.length > 0) {
+      const cloneIds = mappedRows.map((t: any) => entityMap[t.id])
+      const { data } = await (db.from(table) as any).select('id').in('id', cloneIds)
+      existingCloneIds = new Set((data || []).map((r: any) => r.id))
+    }
+
+    // Determine which rows need cloning
+    const toClone: any[] = []
+    const staleMappingIds: string[] = []
     for (const template of rows) {
-      const templateIsTest = template.is_test_data === true
-      if (templateIsTest !== isTestData) continue
-
       const mappedId = entityMap[template.id]
+      if (mappedId && existingCloneIds.has(mappedId)) continue
       if (mappedId) {
-        const { data: stillExists } = await (db.from(table) as any)
-          .select('id')
-          .eq('id', mappedId)
-          .maybeSingle()
-        if (stillExists) continue
-
-        await removeMapping(accountId, packId, entityType, template.id)
+        staleMappingIds.push(template.id)
         delete entityMap[template.id]
       }
-
-      const clonedId = await cloneTemplateRow(table, template, accountId, packId, entityMap)
-      entityMap[template.id] = clonedId
-
-      await upsertMapping(accountId, packId, entityType, template.id, clonedId)
+      toClone.push(template)
     }
+
+    // Remove stale mappings in batch
+    if (staleMappingIds.length > 0) {
+      await db.from('pack_entity_mappings')
+        .delete()
+        .eq('account_id', accountId)
+        .eq('pack_id', packId)
+        .eq('entity_type', entityType)
+        .in('template_id', staleMappingIds)
+    }
+
+    if (toClone.length === 0) continue
+
+    // First pass: assign new IDs and populate entityMap
+    const newIds = new Map<string, string>()
+    for (const template of toClone) {
+      const newId = randomUUID()
+      newIds.set(template.id, newId)
+      entityMap[template.id] = newId
+    }
+
+    // Second pass: prepare cloned rows (entityMap now has all IDs for this table)
+    const clonedRows = toClone.map((template) =>
+      prepareClonedRow(template, accountId, packId, entityMap, newIds.get(template.id)!)
+    )
+
+    // Batch insert all rows for this table
+    await (db.from(table) as any).insert(clonedRows)
+
+    // Batch upsert all mappings for this table
+    const mappingRows = toClone.map((template) => ({
+      account_id: accountId,
+      pack_id: packId,
+      entity_type: entityType,
+      template_id: template.id,
+      cloned_id: newIds.get(template.id)!,
+    }))
+    await db.from('pack_entity_mappings')
+      .upsert(mappingRows, { onConflict: 'account_id,entity_type,template_id' })
   }
 }
 
@@ -229,31 +277,30 @@ async function setClonedEntitiesActive(accountId: string, packId: string, active
   const clonedIds = Object.values(mapByTemplate)
   if (clonedIds.length === 0) return {} as Record<string, number>
 
-  const counts: Record<string, number> = {}
+  const results = await Promise.all(
+    PACK_TABLES.map(async (table) => {
+      let query = (db.from(table) as any)
+        .update({ is_active: active })
+        .eq('pack_id', packId)
 
-  for (const table of PACK_TABLES) {
-    let query = (db.from(table) as any)
-      .update({ is_active: active })
-      .eq('pack_id', packId)
+      if (TABLES_WITH_ACCOUNT_ID.has(table)) {
+        query = query.eq('account_id', accountId)
+      } else {
+        query = query.in('id', clonedIds)
+      }
 
-    if (TABLES_WITH_ACCOUNT_ID.has(table)) {
-      query = query.eq('account_id', accountId)
-    } else {
-      // For child tables without account_id, scope to cloned IDs
-      query = query.in('id', clonedIds)
-    }
+      if (testDataOnly === true) {
+        query = query.eq('is_test_data', true)
+      } else if (testDataOnly === false) {
+        query = query.eq('is_test_data', false)
+      }
 
-    if (testDataOnly === true) {
-      query = query.eq('is_test_data', true)
-    } else if (testDataOnly === false) {
-      query = query.eq('is_test_data', false)
-    }
+      const { data } = await query.select('id')
+      return [table, data?.length || 0] as [string, number]
+    })
+  )
 
-    const { data } = await query.select('id')
-    counts[table] = data?.length || 0
-  }
-
-  return counts
+  return Object.fromEntries(results) as Record<string, number>
 }
 
 async function setPackConfigActive(accountId: string, packId: string, active: boolean) {
@@ -307,13 +354,17 @@ async function uninstallPack(accountId: string, packId: string) {
 
 // ── Shared test data helpers ──────────────────────────────────────────
 async function setSharedTestDataActive(active: boolean, accountId?: string) {
-  for (const table of SHARED_TEST_TABLES) {
-    if (table === 'memberships') continue // handled below
-    await (db.from(table) as any)
-      .update({ is_active: active })
-      .eq('is_test_data', true)
-      .is('pack_id', null)
-  }
+  // Update shared test accounts/persons in parallel
+  await Promise.all(
+    (SHARED_TEST_TABLES as readonly string[])
+      .filter(t => t !== 'memberships')
+      .map(table =>
+        (db.from(table) as any)
+          .update({ is_active: active })
+          .eq('is_test_data', true)
+          .is('pack_id', null)
+      )
+  )
 
   const [{ data: testPersons }, { data: testAccounts }] = await Promise.all([
     db.from('persons').select('id').eq('is_test_data', true).is('pack_id', null),
@@ -331,18 +382,24 @@ async function setSharedTestDataActive(active: boolean, accountId?: string) {
   if (targetAccountIds.size === 0) return
 
   if (active) {
+    // Build all membership rows and upsert in batches
+    const membershipRows: any[] = []
     for (const targetId of targetAccountIds) {
       for (const personId of testPersonIds) {
-        await (db.from('memberships') as any)
-          .upsert({
-            person_id: personId,
-            account_id: targetId,
-            account_role: 'member',
-            status: 'active',
-            is_active: true,
-            is_test_data: true,
-          }, { onConflict: 'person_id,account_id' })
+        membershipRows.push({
+          person_id: personId,
+          account_id: targetId,
+          account_role: 'member',
+          status: 'active',
+          is_active: true,
+          is_test_data: true,
+        })
       }
+    }
+    const CHUNK = 500
+    for (let i = 0; i < membershipRows.length; i += CHUNK) {
+      await (db.from('memberships') as any)
+        .upsert(membershipRows.slice(i, i + CHUNK), { onConflict: 'person_id,account_id' })
     }
     return
   }
@@ -483,48 +540,74 @@ export default createHandler({
     if (action === 'install_pack') {
       if (!packId) return error('pack_id required')
 
-      const { data: pack } = await db.from('config_packs').select('id, name').eq('id', packId).single()
-      if (!pack) return error('Pack not found', 404)
+      try {
+        const { data: pack } = await db.from('config_packs').select('id, name').eq('id', packId).single()
+        if (!pack) return error('Pack not found', 404)
 
-      // Check if already installed
-      const { data: existing } = await db
-        .from('pack_activations')
-        .select('config_active')
-        .eq('account_id', accountId)
-        .eq('pack_id', packId)
-        .maybeSingle()
+        logPackAction(ctx, packId, 'install.start', {
+          includeTestData: body.include_test_data === true,
+        })
 
-      if (existing?.config_active) {
-        return error('Pack is already installed. Uninstall first to reinstall.', 409)
+        // Check if already installed
+        const { data: existing } = await db
+          .from('pack_activations')
+          .select('config_active')
+          .eq('account_id', accountId)
+          .eq('pack_id', packId)
+          .maybeSingle()
+
+        if (existing?.config_active) {
+          return error('Pack is already installed. Uninstall first to reinstall.', 409)
+        }
+
+        // Clone config rows (workflows, fields, views, apps, etc.)
+        await cloneTemplatesForPack(packId, accountId, false)
+        await setClonedEntitiesActive(accountId, packId, true, false)
+        logPackAction(ctx, packId, 'install.config_cloned')
+
+        // Optionally clone test data
+        const includeTestData = body.include_test_data === true
+        if (includeTestData) {
+          await cloneTemplatesForPack(packId, accountId, true)
+          await setClonedEntitiesActive(accountId, packId, true, true)
+          await setSharedTestDataActive(true, accountId)
+          logPackAction(ctx, packId, 'install.test_data_cloned')
+        }
+
+        // Record activation
+        await db.from('pack_activations').upsert({
+          account_id: accountId,
+          pack_id: packId,
+          config_active: true,
+          test_data_active: includeTestData,
+          activated_by: ctx.personId,
+          activated_at: new Date().toISOString(),
+        }, { onConflict: 'account_id,pack_id' })
+        logPackAction(ctx, packId, 'install.activation_upserted', {
+          activationPersonId: ctx.personId ?? null,
+        })
+
+        // Recalculate admin counts
+        await recalcAllCounts(accountId)
+        logPackAction(ctx, packId, 'install.recalc_complete')
+
+        await emitActivity(ctx, 'config_pack.installed', `Installed pack "${pack.name}"${includeTestData ? ' with test data' : ''}`, 'config_pack', packId)
+        return json({ success: true, action: 'installed', include_test_data: includeTestData })
+      } catch (err) {
+        const meta: Record<string, unknown> = {}
+        if (typeof err === 'object' && err !== null) {
+          if ('message' in err && typeof (err as any).message === 'string') meta.message = (err as any).message
+          if ('code' in err) meta.code = (err as any).code
+          if ('details' in err) meta.details = (err as any).details
+          if ('hint' in err) meta.hint = (err as any).hint
+        } else if (err !== undefined) {
+          meta.message = String(err)
+        }
+
+        logPackAction(ctx, packId, 'install.error', meta)
+        console.error('[config-pack] install.error', err)
+        return error(meta.message ? `Pack install failed: ${meta.message}` : 'Pack install failed. See logs for details.', 500)
       }
-
-      // Clone config rows (workflows, fields, views, apps, etc.)
-      await cloneTemplatesForPack(packId, accountId, false)
-      await setClonedEntitiesActive(accountId, packId, true, false)
-
-      // Optionally clone test data
-      const includeTestData = body.include_test_data === true
-      if (includeTestData) {
-        await cloneTemplatesForPack(packId, accountId, true)
-        await setClonedEntitiesActive(accountId, packId, true, true)
-        await setSharedTestDataActive(true, accountId)
-      }
-
-      // Record activation
-      await db.from('pack_activations').upsert({
-        account_id: accountId,
-        pack_id: packId,
-        config_active: true,
-        test_data_active: includeTestData,
-        activated_by: ctx.personId,
-        activated_at: new Date().toISOString(),
-      }, { onConflict: 'account_id,pack_id' })
-
-      // Recalculate admin counts
-      await recalcAllCounts(accountId)
-
-      await emitActivity(ctx, 'config_pack.installed', `Installed pack "${pack.name}"${includeTestData ? ' with test data' : ''}`, 'config_pack', packId)
-      return json({ success: true, action: 'installed', include_test_data: includeTestData })
     }
 
     if (action === 'install_test_data') {
