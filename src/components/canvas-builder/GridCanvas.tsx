@@ -1,5 +1,5 @@
 import { useCallback, useMemo } from 'react'
-import WidthProvider, { Responsive } from 'react-grid-layout'
+import { Responsive as ResponsiveReactGridLayout, WidthProvider } from 'react-grid-layout/legacy'
 import 'react-grid-layout/css/styles.css'
 import 'react-resizable/css/styles.css'
 import { cn } from '@/lib/utils'
@@ -8,6 +8,7 @@ import { LucideIconDisplay } from '@/components/app-builder/LucideIconPicker'
 import type { PageConfig, WidgetConfig } from '@/lib/widgetRegistry'
 import { getWidgetStyleProps } from '@/lib/widgetStyle'
 import WidgetRendererContext from '@/components/page-renderer/WidgetRendererContext'
+import type { Layout as RGLLayout, LayoutItem as RGLLayoutItem } from 'react-grid-layout/legacy'
 
 // Runtime imports for preview mode
 import { ChartWidget } from '@/components/page-renderer/widgets/ChartWidget'
@@ -26,7 +27,7 @@ import { TabsWidget } from '@/components/page-renderer/widgets/TabsWidget'
 import { AccordionWidget } from '@/components/page-renderer/widgets/AccordionWidget'
 import type { BuilderScope } from '@/lib/pageBuilderUtils'
 
-const ResponsiveGridLayout = WidthProvider(Responsive)
+const ResponsiveGridLayout = WidthProvider(ResponsiveReactGridLayout)
 
 type Breakpoint = 'lg' | 'md' | 'sm'
 
@@ -35,7 +36,7 @@ interface GridCanvasProps {
   layoutConfig: PageConfig['layout']
   selectedWidgetId: string | null
   onSelect: (id: string | null) => void
-  onLayoutChange: (layout: ReactGridLayout.Layout[], breakpoint: Breakpoint) => void
+  onLayoutChange: (layout: RGLLayout, breakpoint: Breakpoint) => void
   previewMode: boolean
   activeBreakpoint: Breakpoint
   onEnterContainer?: (scope: BuilderScope) => void
@@ -77,7 +78,9 @@ export function GridCanvas({
   }, [])
 
   const layouts = useMemo(() => {
-    const createLayout = (bp: Breakpoint, accessor: (w: any) => { x: number; y: number; w: number; h: number }) =>
+    const createLayout = (
+      accessor: (w: WidgetConfig) => { x: number; y: number; w: number; h: number },
+    ): RGLLayoutItem[] =>
       widgets.map((w) => {
         const pos = accessor(w)
         const def = WIDGET_TYPE_MAP.get(w.widget_type)
@@ -93,15 +96,19 @@ export function GridCanvas({
         }
       })
 
-    const lg = createLayout('lg', (w) => w.position || { x: 0, y: 0, w: 6, h: 3 })
-    const md = createLayout('md', (w) => w.position_md || w.position || { x: 0, y: 0, w: 4, h: 3 })
-    const sm = createLayout('sm', (w) => w.position_sm || w.position_md || w.position || { x: 0, y: 0, w: 2, h: 3 })
-    return { lg, md, sm }
+    const lg = createLayout((w) => w.position || { x: 0, y: 0, w: 6, h: 3 })
+    const md = createLayout((w) => w.position_md || w.position || { x: 0, y: 0, w: 4, h: 3 })
+    const sm = createLayout((w) => w.position_sm || w.position_md || w.position || { x: 0, y: 0, w: 2, h: 3 })
+    return {
+      lg: lg as RGLLayout,
+      md: md as RGLLayout,
+      sm: sm as RGLLayout,
+    }
   }, [widgets, previewMode])
 
-  function handleLayoutChange(currentLayout: ReactGridLayout.Layout[], allLayouts: any) {
+  function handleLayoutChange(currentLayout: RGLLayout, allLayouts: { breakpoint?: Breakpoint }) {
     if (previewMode) return
-    const breakpoint = (allLayouts?.breakpoint || activeBreakpoint) as Breakpoint
+    const breakpoint = allLayouts?.breakpoint || activeBreakpoint
     onLayoutChange(currentLayout, breakpoint)
   }
 

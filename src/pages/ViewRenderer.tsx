@@ -8,6 +8,7 @@ import { Button } from '@/components/ui/button'
 import { LayoutGrid, Plus } from 'lucide-react'
 import { DashboardRenderer } from '@/components/shared/DashboardRenderer'
 import { PageRenderer } from '@/components/page-renderer/PageRenderer'
+import type { PageConfig } from '@/lib/widgetRegistry'
 
 interface ViewDefinition {
   id: string
@@ -16,8 +17,16 @@ interface ViewDefinition {
   view_type: string
   target_type: string | null
   target_filter: Record<string, any>
-  config: Record<string, any>
+  config: Record<string, any> | null
   min_role: string
+}
+
+function isPageConfig(value: unknown): value is PageConfig {
+  if (!value || typeof value !== 'object') return false
+  const config = value as PageConfig
+  const hasLayout = config.layout && typeof config.layout === 'object'
+  const hasWidgets = Array.isArray(config.widgets)
+  return Boolean(hasLayout && hasWidgets)
 }
 
 export function ViewRendererPage() {
@@ -195,7 +204,20 @@ export function ViewRendererPage() {
   }
 
   // Page view (WYSIWYG page builder)
-  if (viewDef.view_type === 'page' && viewDef.config) {
+  if (viewDef.view_type === 'page') {
+    if (!isPageConfig(viewDef.config)) {
+      return (
+        <div className="space-y-4 p-6">
+          <div>
+            <h1 className="text-3xl font-bold tracking-tight">{viewDef.name}</h1>
+            <p className="mt-1 text-muted-foreground">Page view</p>
+          </div>
+          <p className="text-sm text-muted-foreground">
+            This page view does not yet have a builder configuration. Please open it in the builder to create a layout.
+          </p>
+        </div>
+      )
+    }
     return <PageRenderer config={viewDef.config} name={viewDef.name} />
   }
 

@@ -9,6 +9,10 @@ export type ContainerScope = Exclude<BuilderScope, { kind: 'root' }>
 
 export const ROOT_SCOPE: BuilderScope = { kind: 'root' }
 
+export function isContainerScope(scope: BuilderScope): scope is ContainerScope {
+  return scope.kind === 'tabs' || scope.kind === 'accordion'
+}
+
 export function getWidgetsAtScope(config: PageConfig, scopeStack: BuilderScope[]): WidgetConfig[] {
   if (scopeStack.length === 0 || scopeStack[0].kind !== 'root') {
     throw new Error('Scope stack must start with root')
@@ -17,6 +21,7 @@ export function getWidgetsAtScope(config: PageConfig, scopeStack: BuilderScope[]
   let widgets = config.widgets || []
   for (let i = 1; i < scopeStack.length; i += 1) {
     const scope = scopeStack[i]
+    if (!isContainerScope(scope)) continue
     const container = widgets.find((w) => w.id === scope.widgetId)
     if (!container) return []
 
@@ -49,7 +54,7 @@ export function updateConfigAtScope(
     return { ...config, widgets: updater(config.widgets || []) }
   }
 
-  const scopes = scopeStack.slice(1)
+  const scopes = scopeStack.slice(1).filter(isContainerScope)
   const widgets = applyToWidgets(config.widgets || [], scopes, updater)
   return { ...config, widgets }
 }
@@ -219,6 +224,7 @@ export function normalizeScopeStack(config: PageConfig, scopeStack: BuilderScope
 
   for (let i = 1; i < scopeStack.length; i += 1) {
     const scope = scopeStack[i]
+    if (!isContainerScope(scope)) continue
     const parentWidgets = getWidgetsAtScope(config, normalized)
     const container = parentWidgets.find((w) => w.id === scope.widgetId)
     if (!container) break

@@ -1,13 +1,13 @@
 import { useMemo } from 'react'
-import { Responsive, WidthProvider } from 'react-grid-layout'
+import { Responsive as ResponsiveReactGridLayout, WidthProvider } from 'react-grid-layout/legacy'
 import 'react-grid-layout/css/styles.css'
 import 'react-resizable/css/styles.css'
-import type { Layout as RGLLayout } from 'react-grid-layout'
+import type { Layout, LayoutItem as RGLLayoutItem, ResponsiveLayouts } from 'react-grid-layout/legacy'
 import type { WidgetConfig, PageConfig } from '@/lib/widgetRegistry'
 import { cn } from '@/lib/utils'
 import { getWidgetStyleProps } from '@/lib/widgetStyle'
 
-const ResponsiveGridLayout = WidthProvider(Responsive)
+const ResponsiveGridLayout = WidthProvider(ResponsiveReactGridLayout)
 
 interface WidgetGridProps {
   widgets: WidgetConfig[]
@@ -19,6 +19,8 @@ interface WidgetGridProps {
   emptyState?: React.ReactNode
 }
 
+type GridBreakpoint = 'lg' | 'md' | 'sm'
+
 export function WidgetGrid({
   widgets,
   layoutConfig,
@@ -28,10 +30,10 @@ export function WidgetGrid({
   containerPadding = [0, 0],
   emptyState,
 }: WidgetGridProps) {
-  const layouts = useMemo(() => {
-    const lg: RGLLayout[] = []
-    const md: RGLLayout[] = []
-    const sm: RGLLayout[] = []
+  const layouts = useMemo<ResponsiveLayouts<GridBreakpoint>>(() => {
+    const lg: RGLLayoutItem[] = []
+    const md: RGLLayoutItem[] = []
+    const sm: RGLLayoutItem[] = []
 
     for (const w of widgets) {
       const pos = w.position || { x: 0, y: 0, w: 6, h: 3 }
@@ -44,7 +46,11 @@ export function WidgetGrid({
       sm.push({ i: w.id, x: posSm.x, y: posSm.y, w: posSm.w, h: posSm.h, static: true })
     }
 
-    return { lg, md, sm }
+    return {
+      lg: lg as Layout,
+      md: md as Layout,
+      sm: sm as Layout,
+    }
   }, [widgets, layoutConfig.cols.md, layoutConfig.cols.sm])
 
   if (widgets.length === 0) {

@@ -21,6 +21,221 @@ import type {
 } from '@/lib/widgetRegistry'
 import type { BuilderScope } from '@/lib/pageBuilderUtils'
 
+interface ListEditorProps<T> {
+  value?: T[]
+  onChange: (items: T[]) => void
+  renderItem: (item: T, index: number, helpers: ListEditorHelpers<T>) => React.ReactNode
+  emptyLabel: string
+  createItem: () => T
+}
+
+interface ListEditorHelpers<T> {
+  updateItem: (index: number, updates: Partial<T>) => void
+  removeItem: (index: number) => void
+  moveItem: (from: number, to: number) => void
+}
+
+function reorder<T>(list: T[], from: number, to: number): T[] {
+  const next = [...list]
+  const [item] = next.splice(from, 1)
+  next.splice(to, 0, item)
+  return next
+}
+
+function ListEditor<T>({ value = [], onChange, renderItem, emptyLabel, createItem }: ListEditorProps<T>) {
+  const helpers: ListEditorHelpers<T> = {
+    updateItem: (index, updates) => {
+      onChange(value.map((item, idx) => (idx === index ? { ...item, ...updates } : item)))
+    },
+    removeItem: (index) => {
+      onChange(value.filter((_, idx) => idx !== index))
+    },
+    moveItem: (from, to) => {
+      if (to < 0 || to >= value.length) return
+      onChange(reorder(value, from, to))
+    },
+  }
+
+  return (
+    <div className="space-y-2">
+      {value.length === 0 ? (
+        <p className="text-xs text-muted-foreground">{emptyLabel}</p>
+      ) : (
+        value.map((item, idx) => (
+          <div key={idx} className="rounded-lg border p-3 space-y-2 bg-muted/30">
+            {renderItem(item, idx, helpers)}
+          </div>
+        ))
+      )}
+      <Button
+        type="button"
+        variant="outline"
+        size="sm"
+        className="w-full text-xs"
+        onClick={() => onChange([...value, createItem()])}
+      >
+        <Plus className="mr-1 h-3 w-3" /> Add
+      </Button>
+    </div>
+  )
+}
+
+interface TabsStructureEditorProps {
+  value?: TabsConfig
+  onChange: (config: TabsConfig) => void
+  onEnterTab?: (index: number) => void
+}
+
+function TabsStructureEditor({ value, onChange, onEnterTab }: TabsStructureEditorProps) {
+  const tabs = value?.tabs || []
+
+  function updateTabs(nextTabs: TabsConfig['tabs']) {
+    onChange({ tabs: nextTabs })
+  }
+
+  return (
+    <ListEditor
+      value={tabs}
+      onChange={updateTabs}
+      emptyLabel="No tabs yet. Add one to start nesting widgets."
+      createItem={() => ({ label: `Tab ${tabs.length + 1}`, widgets: [] })}
+      renderItem={(tab, index, helpers) => (
+        <div className="space-y-2">
+          <div className="flex items-center gap-2">
+            <Input
+              value={tab.label}
+              onChange={(e) => helpers.updateItem(index, { label: e.target.value })}
+              placeholder={`Tab ${index + 1}`}
+            />
+            <div className="flex gap-1">
+              <Button
+                type="button"
+                variant="ghost"
+                size="icon"
+                className="h-7 w-7"
+                onClick={() => helpers.moveItem(index, index - 1)}
+                disabled={index === 0}
+              >
+                <ChevronUp className="h-3 w-3" />
+              </Button>
+              <Button
+                type="button"
+                variant="ghost"
+                size="icon"
+                className="h-7 w-7"
+                onClick={() => helpers.moveItem(index, index + 1)}
+                disabled={index === tabs.length - 1}
+              >
+                <ChevronDown className="h-3 w-3" />
+              </Button>
+              <Button
+                type="button"
+                variant="ghost"
+                size="icon"
+                className="h-7 w-7 text-muted-foreground"
+                onClick={() => onEnterTab?.(index)}
+                title="Enter tab"
+              >
+                <ArrowRight className="h-3 w-3" />
+              </Button>
+              <Button
+                type="button"
+                variant="ghost"
+                size="icon"
+                className="h-7 w-7 text-destructive"
+                onClick={() => helpers.removeItem(index)}
+              >
+                <Trash2 className="h-3 w-3" />
+              </Button>
+            </div>
+          </div>
+          <p className="text-[11px] text-muted-foreground">
+            {tab.widgets?.length || 0} widget{(tab.widgets?.length || 0) === 1 ? '' : 's'} inside
+          </p>
+        </div>
+      )}
+    />
+  )
+}
+
+interface AccordionStructureEditorProps {
+  value?: AccordionConfig
+  onChange: (config: AccordionConfig) => void
+  onEnterItem?: (index: number) => void
+}
+
+function AccordionStructureEditor({ value, onChange, onEnterItem }: AccordionStructureEditorProps) {
+  const items = value?.items || []
+
+  function updateItems(nextItems: AccordionConfig['items']) {
+    onChange({ items: nextItems })
+  }
+
+  return (
+    <ListEditor
+      value={items}
+      onChange={updateItems}
+      emptyLabel="No accordion sections yet. Add one to start nesting widgets."
+      createItem={() => ({ label: `Section ${items.length + 1}`, widgets: [] })}
+      renderItem={(item, index, helpers) => (
+        <div className="space-y-2">
+          <div className="flex items-center gap-2">
+            <Input
+              value={item.label}
+              onChange={(e) => helpers.updateItem(index, { label: e.target.value })}
+              placeholder={`Section ${index + 1}`}
+            />
+            <div className="flex gap-1">
+              <Button
+                type="button"
+                variant="ghost"
+                size="icon"
+                className="h-7 w-7"
+                onClick={() => helpers.moveItem(index, index - 1)}
+                disabled={index === 0}
+              >
+                <ChevronUp className="h-3 w-3" />
+              </Button>
+              <Button
+                type="button"
+                variant="ghost"
+                size="icon"
+                className="h-7 w-7"
+                onClick={() => helpers.moveItem(index, index + 1)}
+                disabled={index === items.length - 1}
+              >
+                <ChevronDown className="h-3 w-3" />
+              </Button>
+              <Button
+                type="button"
+                variant="ghost"
+                size="icon"
+                className="h-7 w-7 text-muted-foreground"
+                onClick={() => onEnterItem?.(index)}
+                title="Enter section"
+              >
+                <ArrowRight className="h-3 w-3" />
+              </Button>
+              <Button
+                type="button"
+                variant="ghost"
+                size="icon"
+                className="h-7 w-7 text-destructive"
+                onClick={() => helpers.removeItem(index)}
+              >
+                <Trash2 className="h-3 w-3" />
+              </Button>
+            </div>
+          </div>
+          <p className="text-[11px] text-muted-foreground">
+            {item.widgets?.length || 0} widget{(item.widgets?.length || 0) === 1 ? '' : 's'} inside
+          </p>
+        </div>
+      )}
+    />
+  )
+}
+
 const MIN_ROLES = [
   { value: 'portal', label: 'Portal' },
   { value: 'member', label: 'Member' },

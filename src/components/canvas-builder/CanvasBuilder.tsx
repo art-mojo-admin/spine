@@ -10,7 +10,7 @@ import { GridCanvas } from './GridCanvas'
 import { WidgetInspector } from './WidgetInspector'
 import type { WidgetConfig, PageConfig } from '@/lib/widgetRegistry'
 import { DEFAULT_PAGE_CONFIG, WIDGET_TYPE_MAP } from '@/lib/widgetRegistry'
-import type { Layout } from 'react-grid-layout'
+import type { Layout, LayoutItem } from 'react-grid-layout/legacy'
 import { cn } from '@/lib/utils'
 import type { BuilderScope } from '@/lib/pageBuilderUtils'
 import {
@@ -222,7 +222,7 @@ export function CanvasBuilderPage() {
     setSelectedWidgetId(id)
   }
 
-  function onLayoutChange(layout: Layout[], breakpoint: Breakpoint) {
+  function onLayoutChange(layout: Layout, breakpoint: Breakpoint) {
     const targetWidgets = getWidgetsAtScope(config, scopeStack)
     const layoutMap = new Map(layout.map((item) => [item.i, item]))
     const updatedConfig = updateConfigAtScope(config, scopeStack, (widgets) =>
