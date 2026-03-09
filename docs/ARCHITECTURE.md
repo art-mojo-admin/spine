@@ -54,9 +54,8 @@ spine-ia/
 │   ├── lib/                     # Utilities (api, auth, config, theme, etc.)
 │   └── pages/                   # Route pages (lazy-loaded)
 ├── supabase/
-│   ├── migrations/              # 26 SQL migration files
-│   ├── install.sql              # Master DB installer (all-in-one)
-│   ├── install-safe.sql         # Idempotent installer
+│   ├── migrations/              # 24-file v2 chain (001_foundations → 028_allow_page_view_type)
+│   ├── migrations_legacy/       # Archived v1 migrations (unused)
 │   └── seed-config-packs.sql    # Template pack seed data
 ├── scripts/
 │   ├── assemble-functions.sh    # Merge core + custom → netlify/functions/

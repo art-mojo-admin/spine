@@ -34,13 +34,19 @@ npm install
 
 ## 3. Apply the Database
 
-In the Supabase SQL Editor, paste and run:
+Run the migration chain (`supabase/migrations/001_foundations.sql` → latest). Two common ways:
 
-```
-supabase/install.sql
+**Supabase CLI (recommended)**
+```bash
+supabase link --project-ref <project>
+supabase db push
 ```
 
-This creates all tables, indexes, triggers, and seed data in one shot. For an existing project where tables may already exist, use `install-safe.sql` instead.
+**SQL Editor**
+1. Upload each file in `supabase/migrations/` sequentially.
+2. Finish by applying `028_allow_page_view_type.sql` to unlock the page builder.
+
+See [`sql_migrations.md`](sql_migrations.md) for deeper guidance plus pack seed instructions.
 
 ---
 
@@ -180,7 +186,7 @@ After deployment, confirm:
 
 | Problem | Solution |
 |---|---|
-| `relation "accounts" does not exist` | Run `supabase/install.sql` in the SQL editor |
+| `relation "accounts" does not exist` | Ensure migrations 001–013 ran (especially `001_foundations.sql`) |
 | CORS errors in browser | Set `SITE_URL` env var to your domain |
 | Functions return 500 | Check `SUPABASE_SERVICE_ROLE_KEY` is set |
 | AI actions do nothing | Set `OPENAI_API_KEY` env var |

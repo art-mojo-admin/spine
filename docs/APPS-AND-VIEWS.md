@@ -9,7 +9,7 @@ Apps and views are Spine's configuration-driven UI system. They let tenants buil
 ```
 app_definitions        → Groups of nav items that drive the sidebar
   └── nav_items[]      → Each points to a view, URL path, or external link
-view_definitions       → Configurable data views (list, kanban, detail, etc.)
+view_definitions       → Configurable data + page views (list, board, detail, page)
 account_modules        → Feature flags that enable/disable capabilities
 compute-nav            → Server-side endpoint that filters nav by role
 ```
@@ -94,7 +94,7 @@ Views are configurable data presentations rendered by `ViewRenderer.tsx` at `/v/
 |---|---|---|
 | `slug` | text | URL path component (unique per account) |
 | `name` | text | Display name |
-| `view_type` | text | `"list"`, `"kanban"`, `"detail"`, `"calendar"`, `"chart"` |
+| `view_type` | text | `"list"`, `"board"`, `"detail"`, `"portal_page"`, `"dashboard"`, `"page"` |
 | `target_type` | text | Entity type to display (e.g., `"item"`, `"person"`) |
 | `target_filter` | jsonb | Filter criteria for querying data |
 | `columns` | jsonb | Column definitions for list/table views |
@@ -128,7 +128,7 @@ Table view with sortable columns.
 ```
 
 #### `kanban`
-Board view grouped by workflow stage.
+Board view grouped by workflow stage (formerly `kanban`).
 
 ```json
 {
@@ -163,6 +163,9 @@ Single-entity detail view.
 #### `chart`
 Visualization view powered by Recharts.
 
+#### `page`
+Rendered through the React builder. Stores a `PageConfig` with responsive layouts and widget configs (see `PageRenderer.tsx`).
+
 ```json
 {
   "view_type": "chart",
@@ -194,7 +197,7 @@ The `ViewRenderer.tsx` page at `/v/:viewSlug`:
 1. Fetches the view definition by slug
 2. Fetches the target data based on `target_type` and `target_filter`
 3. Renders the appropriate view component based on `view_type`
-4. Supports inline editing, sorting, filtering, and pagination
+4. Supports inline editing, sorting, filtering, pagination, and the page builder runtime (when `view_type = 'page'`)
 
 ---
 
@@ -337,6 +340,13 @@ The App Builder (`/admin/apps/:appId/builder`) provides a visual editor for app 
 3. **Publish the app** (set `is_active: true`)
 4. The sidebar automatically switches to app-driven mode
 
+### Installing Pack Views
+
+1. Apply the migration chain through `028_allow_page_view_type.sql` so view/app tables exist.
+2. Run pack seed migrations (`014`–`024`) or `supabase/seed-config-packs.sql`.
+3. Trigger the `pack-installer` Netlify function for the tenant account.
+4. Use **Admin → Views/Apps** to tweak layouts, then reference [`admin_views.md`](./admin_views.md) for builder guidance.
+
 ### Example: CRM App
 
 ```
@@ -368,3 +378,5 @@ The App Builder (`/admin/apps/:appId/builder`) provides a visual editor for app 
 - [FRONTEND.md](FRONTEND.md) — Sidebar and routing details
 - [CONFIG-PACKS.md](CONFIG-PACKS.md) — Apps and views installed by packs
 - [WORKFLOW-ENGINE.md](WORKFLOW-ENGINE.md) — Workflow items displayed in views
+- [admin_views.md](admin_views.md) — Admin workflow for page builder
+- [code_widgets.md](code_widgets.md) — Implementing widgets
