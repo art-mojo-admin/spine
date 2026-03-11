@@ -157,11 +157,11 @@ CREATE TRIGGER trg_principal_scopes_updated_at
 INSERT INTO auth_scopes (id, slug, label, category, description, default_role, default_bundle, metadata)
 VALUES
   ('28090c29-bd44-4f6e-a816-6da08bcb9f85', 'support.inbox', 'Support Inbox', 'support', 'Work and triage customer tickets, assign owners, and collaborate in the shared inbox.', 'operator', '{"record":["view","list","assign"],"actions":["reply","transition"]}'::jsonb, '{"pack_slug":"support-portal","docs":"support/inbox"}'::jsonb),
-  ('6f31230a-4a4b-4a97-a1e2-fbf88bed3875', 'support.escalations', 'support', 'Manage SLA escalations, approval ladders, and incident bridges.', 'manager', '{"record":["view","list","transition"],"actions":["escalate","close"]}'::jsonb, '{"pack_slug":"support-portal","docs":"support/escalations"}'::jsonb),
-  ('8e0d9d71-5d4e-41f6-80f5-2ad88662bba1', 'crm.pipeline', 'crm', 'Operate the opportunity pipeline, including editing deals and forecasting.', 'manager', '{"record":["view","create","edit","assign"],"actions":["stage_move","forecast"]}'::jsonb, '{"pack_slug":"crm","docs":"crm/pipeline"}'::jsonb),
-  ('9b47b7d2-303d-4a61-8a66-92e97ff6de1e', 'crm.accounts', 'crm', 'Access account and contact records, including enrichment and segmentation fields.', 'operator', '{"record":["view","edit"],"fields":["field.view","field.edit"]}'::jsonb, '{"pack_slug":"crm","docs":"crm/accounts"}'::jsonb),
-  ('4d329aa2-5a94-4ed2-98af-9b60c1ca4a39', 'automation.workflows', 'automation', 'Author and run workflow automations, webhook steps, and AI copilots.', 'architect', '{"record":["view","create","edit","delete"],"actions":["publish","execute"]}'::jsonb, '{"pack_slug":"monday","docs":"automation/workflows"}'::jsonb),
-  ('e1892741-732d-492d-915d-6c9b25a4d11a', 'automation.integrations', 'automation', 'Connect integrations, manage credentials, and control data sync schedules.', 'architect', '{"record":["view","edit"],"actions":["connect","disconnect","sync_now"]}'::jsonb, '{"pack_slug":"jira","docs":"automation/integrations"}'::jsonb)
+  ('6f31230a-4a4b-4a97-a1e2-fbf88bed3875', 'support.escalations', 'Support Escalations', 'support', 'Manage SLA escalations, approval ladders, and incident bridges.', 'manager', '{"record":["view","list","transition"],"actions":["escalate","close"]}'::jsonb, '{"pack_slug":"support-portal","docs":"support/escalations"}'::jsonb),
+  ('8e0d9d71-5d4e-41f6-80f5-2ad88662bba1', 'crm.pipeline', 'CRM Pipeline', 'crm', 'Operate the opportunity pipeline, including editing deals and forecasting.', 'manager', '{"record":["view","create","edit","assign"],"actions":["stage_move","forecast"]}'::jsonb, '{"pack_slug":"crm","docs":"crm/pipeline"}'::jsonb),
+  ('9b47b7d2-303d-4a61-8a66-92e97ff6de1e', 'crm.accounts', 'CRM Accounts', 'crm', 'Access account and contact records, including enrichment and segmentation fields.', 'operator', '{"record":["view","edit"],"fields":["field.view","field.edit"]}'::jsonb, '{"pack_slug":"crm","docs":"crm/accounts"}'::jsonb),
+  ('4d329aa2-5a94-4ed2-98af-9b60c1ca4a39', 'automation.workflows', 'Automation Workflows', 'automation', 'Author and run workflow automations, webhook steps, and AI copilots.', 'architect', '{"record":["view","create","edit","delete"],"actions":["publish","execute"]}'::jsonb, '{"pack_slug":"monday","docs":"automation/workflows"}'::jsonb),
+  ('e1892741-732d-492d-915d-6c9b25a4d11a', 'automation.integrations', 'Automation Integrations', 'automation', 'Connect integrations, manage credentials, and control data sync schedules.', 'architect', '{"record":["view","edit"],"actions":["connect","disconnect","sync_now"]}'::jsonb, '{"pack_slug":"jira","docs":"automation/integrations"}'::jsonb)
 ON CONFLICT (slug) DO NOTHING;
 
 -- Seed canonical capability definitions per scope
@@ -213,13 +213,14 @@ WITH demo_accounts AS (
   )
 ),
 account_scope_map(account_id, scope_slug, source) AS (
-  VALUES
-    ('00000000-0000-0000-0002-000000000001', 'support.inbox', 'pack'),
-    ('00000000-0000-0000-0002-000000000001', 'support.escalations', 'pack'),
-    ('00000000-0000-0000-0002-000000000002', 'crm.pipeline', 'pack'),
-    ('00000000-0000-0000-0002-000000000002', 'crm.accounts', 'pack'),
-    ('00000000-0000-0000-0002-000000000003', 'automation.workflows', 'pack'),
-    ('00000000-0000-0000-0002-000000000003', 'automation.integrations', 'pack')
+  SELECT * FROM (VALUES
+    ('00000000-0000-0000-0002-000000000001'::uuid, 'support.inbox', 'pack'),
+    ('00000000-0000-0000-0002-000000000001'::uuid, 'support.escalations', 'pack'),
+    ('00000000-0000-0000-0002-000000000002'::uuid, 'crm.pipeline', 'pack'),
+    ('00000000-0000-0000-0002-000000000002'::uuid, 'crm.accounts', 'pack'),
+    ('00000000-0000-0000-0002-000000000003'::uuid, 'automation.workflows', 'pack'),
+    ('00000000-0000-0000-0002-000000000003'::uuid, 'automation.integrations', 'pack')
+  ) AS v(account_id, scope_slug, source)
 )
 INSERT INTO account_scopes (account_id, scope_id, status, source, ownership, enabled_at, notes)
 SELECT m.account_id,
