@@ -9,4 +9,3 @@ dist
 .DS_Store
 *.tsbuildinfo
 .vite
-.spine-manifest.json
