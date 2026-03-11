@@ -69,12 +69,16 @@ export default createHandler({
       })
 
       const auditCtx = {
-        requestId: ctx.requestId,
+        ...ctx,
         personId: person.id,
         accountId: targetAccount.id,
+        accountNodeId: targetAccount.id,
         accountRole: 'portal',
         systemRole: null,
         authUid: ctx.authUid,
+        impersonating: false,
+        realPersonId: null,
+        impersonationSessionId: null,
       }
 
       await emitAudit(auditCtx, 'create', 'person', person.id, null, person)
@@ -136,12 +140,16 @@ export default createHandler({
 
       // Build a minimal context for audit
       const auditCtx = {
-        requestId: ctx.requestId,
+        ...ctx,
         personId: person.id,
         accountId: invite.account_id,
+        accountNodeId: invite.account_id,
         accountRole: invite.account_role,
         systemRole: null,
         authUid: ctx.authUid,
+        impersonating: false,
+        realPersonId: null,
+        impersonationSessionId: null,
       }
 
       await emitAudit(auditCtx, 'create', 'person', person.id, null, person)
@@ -197,12 +205,16 @@ export default createHandler({
       })
 
       const auditCtx = {
-        requestId: ctx.requestId,
+        ...ctx,
         personId: person.id,
         accountId: account.id,
+        accountNodeId: account.id,
         accountRole: 'admin',
         systemRole: null,
         authUid: ctx.authUid,
+        impersonating: false,
+        realPersonId: null,
+        impersonationSessionId: null,
       }
 
       await emitAudit(auditCtx, 'create', 'person', person.id, null, person)

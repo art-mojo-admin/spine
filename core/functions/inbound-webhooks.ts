@@ -246,6 +246,7 @@ export default async function handler(req: Request): Promise<Response> {
     requestId: crypto.randomUUID(),
     personId: null,
     accountId: auth.accountId,
+    accountNodeId: auth.accountId,
     accountRole: 'operator',
     systemRole: null,
     authUid: null,

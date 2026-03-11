@@ -1,6 +1,15 @@
 import { randomUUID } from 'crypto'
 
-import { createHandler, requireAuth, requireTenant, requireRole, json, error, parseBody } from './_shared/middleware'
+import {
+  createHandler,
+  requireAuth,
+  requireTenant,
+  requireRole,
+  json,
+  error,
+  parseBody,
+} from './_shared/middleware'
+import type { RequestContext } from './_shared/middleware'
 import { db } from './_shared/db'
 import { emitActivity } from './_shared/audit'
 import { recalcAllCounts } from './_shared/counts'
@@ -615,7 +624,12 @@ export default createHandler({
 
       const [{ data: pack }, { data: activation }] = await Promise.all([
         db.from('config_packs').select('id, name').eq('id', packId).single(),
-        db.from('pack_activations').select('config_active, activated_at, activated_by').eq('account_id', accountId).eq('pack_id', packId).maybeSingle(),
+        db
+          .from('pack_activations')
+          .select('config_active, test_data_active, activated_at, activated_by')
+          .eq('account_id', accountId)
+          .eq('pack_id', packId)
+          .maybeSingle(),
       ])
 
       if (!pack) return error('Pack not found', 404)
@@ -663,7 +677,12 @@ export default createHandler({
 
       const [{ data: pack }, { data: activation }] = await Promise.all([
         db.from('config_packs').select('id, name').eq('id', packId).single(),
-        db.from('pack_activations').select('config_active').eq('account_id', accountId).eq('pack_id', packId).maybeSingle(),
+        db
+          .from('pack_activations')
+          .select('config_active, test_data_active')
+          .eq('account_id', accountId)
+          .eq('pack_id', packId)
+          .maybeSingle(),
       ])
 
       if (!pack) return error('Pack not found', 404)
