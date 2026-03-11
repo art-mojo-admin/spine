@@ -30,6 +30,9 @@ import {
   HeartPulse,
   LayoutGrid,
   BarChart3,
+  ShieldCheck,
+  Bot,
+  UserCheck,
 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { signOut } from '@/lib/auth'
@@ -75,6 +78,9 @@ const ICON_MAP: Record<string, React.ComponentType<{ className?: string }>> = {
   HeartPulse,
   LayoutGrid,
   BarChart3,
+  ShieldCheck,
+  Bot,
+  UserCheck,
 }
 
 interface AppNavItem {
@@ -107,6 +113,10 @@ const adminItems: { to: string; icon: any; label: string; countKey?: string }[] 
   { to: '/admin/link-types', icon: Link2, label: 'Link Types', countKey: 'link_types' },
   { to: '/admin/members', icon: UserPlus, label: 'Members', countKey: 'members' },
   { to: '/admin/modules', icon: Blocks, label: 'Modules', countKey: 'modules' },
+  { to: '/admin/scopes', icon: Shield, label: 'Scope Library' },
+  { to: '/admin/account-scopes', icon: ShieldCheck, label: 'Account Scopes' },
+  { to: '/admin/machine-principals', icon: Bot, label: 'Machine Principals' },
+  { to: '/admin/principal-scopes', icon: UserCheck, label: 'Principal Scopes' },
   { to: '/admin/packs', icon: Package, label: 'Templates', countKey: 'templates' },
   { to: '/admin/reports', icon: BarChart3, label: 'Reports' },
   { to: '/admin/roles', icon: Shield, label: 'Roles' },

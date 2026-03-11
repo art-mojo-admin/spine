@@ -23,6 +23,14 @@
       "@custom/*": ["./custom/src/*"]
     }
   },
-  "include": ["src", "custom/src"],
+  "include": ["src", "custom/src", "core/functions", "custom/functions"],
+  "exclude": [
+    "node_modules",
+    "dist",
+    "netlify/functions",
+    "supabase",
+    "scripts",
+    ".netlify"
+  ],
   "references": [{ "path": "./tsconfig.node.json" }]
 }

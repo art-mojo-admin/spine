@@ -489,19 +489,11 @@ export default createHandler({
       return json(pack)
     }
 
-    const includeInactive = params.get('include_inactive') === 'true'
-
-    // List packs (excluding inactive unless explicitly requested)
-    let listQuery = db
+    // List all packs with activation state for current account
+    const { data: packs } = await db
       .from('config_packs')
-      .select('id, name, slug, icon, category, description, is_system, pack_data, created_at, is_active')
+      .select('id, name, slug, icon, category, description, is_system, pack_data, created_at')
       .order('name')
-
-    if (!includeInactive) {
-      listQuery = listQuery.eq('is_active', true)
-    }
-
-    const { data: packs } = await listQuery
 
     // Get activations for current account
     let activations: any[] = []

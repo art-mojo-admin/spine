@@ -47,6 +47,7 @@ const ScheduledTriggersPage = lazy(() => import('@/pages/admin/ScheduledTriggers
 const LinkTypeDefinitionsPage = lazy(() => import('@/pages/admin/LinkTypeDefinitions').then(m => ({ default: m.LinkTypeDefinitionsPage })))
 const ConfigPacksPage = lazy(() => import('@/pages/admin/ConfigPacks').then(m => ({ default: m.ConfigPacksPage })))
 const AccountModulesPage = lazy(() => import('@/pages/admin/AccountModules').then(m => ({ default: m.AccountModulesPage })))
+const AccountScopesPage = lazy(() => import('@/pages/admin/AccountScopes').then(m => ({ default: m.AccountScopesPage })))
 const CustomActionTypesPage = lazy(() => import('@/pages/admin/CustomActionTypes').then(m => ({ default: m.CustomActionTypesPage })))
 const ViewDefinitionsPage = lazy(() => import('@/pages/admin/ViewDefinitions').then(m => ({ default: m.ViewDefinitionsPage })))
 const AppDefinitionsPage = lazy(() => import('@/pages/admin/AppDefinitions').then(m => ({ default: m.AppDefinitionsPage })))
@@ -55,6 +56,9 @@ const CanvasBuilderPage = lazy(() => import('@/components/canvas-builder/CanvasB
 const ReportsPage = lazy(() => import('@/pages/admin/Reports').then(m => ({ default: m.ReportsPage })))
 const AccountBrowserPage = lazy(() => import('@/pages/admin/AccountBrowser').then(m => ({ default: m.AccountBrowserPage })))
 const SetupWizardPage = lazy(() => import('@/pages/admin/SetupWizard').then(m => ({ default: m.SetupWizardPage })))
+const ScopeLibraryPage = lazy(() => import('@/pages/admin/ScopeLibrary').then(m => ({ default: m.ScopeLibraryPage })))
+const MachinePrincipalsPage = lazy(() => import('@/pages/admin/MachinePrincipals').then(m => ({ default: m.MachinePrincipalsPage })))
+const PrincipalScopesPage = lazy(() => import('@/pages/admin/PrincipalScopes').then(m => ({ default: m.PrincipalScopesPage })))
 
 // Public pages
 const PublicHomePage = lazy(() => import('@/pages/public/PublicHome').then(m => ({ default: m.PublicHomePage })))
@@ -156,7 +160,11 @@ export default function App() {
           <Route path="/admin/link-types" element={<LinkTypeDefinitionsPage />} />
           <Route path="/admin/packs" element={<ConfigPacksPage />} />
           <Route path="/admin/modules" element={<AccountModulesPage />} />
+          <Route path="/admin/account-scopes" element={<AccountScopesPage />} />
           <Route path="/admin/custom-actions" element={<CustomActionTypesPage />} />
+          <Route path="/admin/scopes" element={<ScopeLibraryPage />} />
+          <Route path="/admin/machine-principals" element={<MachinePrincipalsPage />} />
+          <Route path="/admin/principal-scopes" element={<PrincipalScopesPage />} />
           <Route path="/admin/views" element={<ViewDefinitionsPage />} />
           <Route path="/admin/views/:viewId/page-builder" element={<CanvasBuilderPage />} />
           <Route path="/admin/apps" element={<AppDefinitionsPage />} />

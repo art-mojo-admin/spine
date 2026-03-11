@@ -286,3 +286,4 @@ interface AuthState {
 - [DATA-MODEL.md](DATA-MODEL.md) — Tables: persons, profiles, memberships, impersonation_sessions
 - [FRONTEND.md](FRONTEND.md) — useAuth hook and account context
 - [EXTENDING.md](EXTENDING.md) — How to use RBAC in custom functions
+- [AUTH-SCOPE-MODEL.md](AUTH-SCOPE-MODEL.md) — Proposed scope-driven authorization evolution
