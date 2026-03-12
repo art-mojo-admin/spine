@@ -56,6 +56,11 @@ const CLONE_SEQUENCE: { table: typeof PACK_TABLES[number]; entityType: string }[
   { table: 'entity_links', entityType: 'entity_link' },
 ]
 
+function isLegacyPack(pack: any): boolean {
+  const flag = pack?.pack_data?.legacy
+  return flag === true || flag === 'true'
+}
+
 function logPackAction(ctx: RequestContext, packId: string | undefined, step: string, meta: Record<string, unknown> = {}) {
   try {
     const payload = {
@@ -508,7 +513,9 @@ export default createHandler({
 
     const activationMap = new Map(activations.map((a: any) => [a.pack_id, a]))
 
-    const result = (packs || []).map((pack: any) => {
+    const visiblePacks = (packs || []).filter((pack: any) => !isLegacyPack(pack))
+
+    const result = visiblePacks.map((pack: any) => {
       const activation = activationMap.get(pack.id)
       return {
         ...pack,
@@ -541,8 +548,11 @@ export default createHandler({
       if (!packId) return error('pack_id required')
 
       try {
-        const { data: pack } = await db.from('config_packs').select('id, name').eq('id', packId).single()
+        const { data: pack } = await db.from('config_packs').select('id, name, pack_data').eq('id', packId).single()
         if (!pack) return error('Pack not found', 404)
+        if (isLegacyPack(pack)) {
+          return error('Pack is legacy and can no longer be installed', 400)
+        }
 
         logPackAction(ctx, packId, 'install.start', {
           includeTestData: body.include_test_data === true,
