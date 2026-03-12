@@ -1,5 +1,17 @@
-import { createHandler, requireAuth, requireRole, json, error } from './_shared/middleware'
+import { createHandler, requireAuth, json, error } from './_shared/middleware'
 import { db } from './_shared/db'
+
+interface ScopeRow {
+  id: string
+  slug: string
+  label: string
+  [key: string]: any
+}
+
+interface AccountScopeRow {
+  scope_id: string
+  [key: string]: any
+}
 
 function isSystem(ctxRole: string | null): boolean {
   return !!ctxRole && ['system_admin', 'system_operator'].includes(ctxRole)
@@ -52,8 +64,10 @@ export default createHandler({
     const { data: scopes, error: scopesErr } = await query
     if (scopesErr) return error(scopesErr.message, 500)
 
+    const scopeRows: ScopeRow[] = Array.isArray(scopes) ? (scopes as unknown as ScopeRow[]) : []
+
     if (!targetAccountId) {
-      return json(scopes || [])
+      return json(scopeRows)
     }
 
     const { data: accountScopes, error: accountErr } = await db
@@ -63,8 +77,12 @@ export default createHandler({
 
     if (accountErr) return error(accountErr.message, 500)
 
-    const scopedMap = new Map((accountScopes || []).map((row) => [row.scope_id, row]))
-    const enriched = (scopes || []).map((scope) => ({
+    const accountRows: AccountScopeRow[] = Array.isArray(accountScopes)
+      ? (accountScopes as unknown as AccountScopeRow[])
+      : []
+
+    const scopedMap = new Map(accountRows.map((row) => [row.scope_id, row]))
+    const enriched = scopeRows.map((scope) => ({
       ...scope,
       account_scope: scopedMap.get(scope.id) || null,
     }))

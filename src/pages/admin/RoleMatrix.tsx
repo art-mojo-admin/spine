@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from 'react'
+import type { ChangeEvent } from 'react'
 import { apiGet, apiPost } from '@/lib/api'
 import { useAuth } from '@/hooks/useAuth'
 import { Button } from '@/components/ui/button'
@@ -7,7 +8,7 @@ import { Input } from '@/components/ui/input'
 import { Textarea } from '@/components/ui/textarea'
 import { Badge } from '@/components/ui/badge'
 import { Switch } from '@/components/ui/switch'
-import { Select } from '@/components/ui/select'
+import { SelectNative } from '@/components/ui/select-native'
 import { ChevronDown, ChevronRight, Shield, ShieldQuestion } from 'lucide-react'
 
 interface PackSummary {
@@ -102,6 +103,11 @@ function tryParseJson(value: string): Record<string, unknown> {
   } catch {
     return {}
   }
+}
+
+function resolveDefaultRole(value: Record<string, unknown> | null | undefined) {
+  const defaultRole = value?.['default_role']
+  return typeof defaultRole === 'string' ? defaultRole : 'member'
 }
 
 function EntityIcon({ summary }: { summary: EntitySummary | null }) {
@@ -275,11 +281,15 @@ export default function RoleMatrixPage() {
           </div>
           <div>
             <label className="text-xs uppercase text-muted-foreground">State</label>
-            <Select value={stateFilter} onValueChange={(value) => setStateFilter(value as any)}>
-              <option value="all">All</option>
-              <option value="account">Account Only</option>
-              <option value="template">Template Only</option>
-            </Select>
+            <SelectNative
+              value={stateFilter}
+              onChange={(event: ChangeEvent<HTMLSelectElement>) => setStateFilter(event.target.value as 'all' | 'account' | 'template')}
+              options={[
+                { value: 'all', label: 'All' },
+                { value: 'account', label: 'Account Only' },
+                { value: 'template', label: 'Template Only' },
+              ]}
+            />
           </div>
           <div>
             <label className="text-xs uppercase text-muted-foreground">Include Account</label>
@@ -326,6 +336,8 @@ export default function RoleMatrixPage() {
                   <div className="divide-y divide-border">
                     {policies.map((policy) => {
                       const isExpanded = expanded.has(policy.id)
+                      const visibilityDefault = resolveDefaultRole(policy.visibility)
+                      const editDefault = resolveDefaultRole(policy.editability)
                       return (
                         <div key={policy.id}>
                           <button className="flex w-full items-center gap-3 px-4 py-3 text-left hover:bg-muted/70" onClick={() => toggleExpanded(policy.id)}>
@@ -338,11 +350,11 @@ export default function RoleMatrixPage() {
                                 {policy.pack && <span className="text-xs text-muted-foreground">· {policy.pack.name}</span>}
                               </div>
                               <p className="text-xs text-muted-foreground">
-                                visibility default: {policy.visibility?.default_role || 'member'} · edit default: {policy.editability?.default_role || 'member'}
+                                visibility default: {visibilityDefault} · edit default: {editDefault}
                               </p>
                             </div>
-                            <Button size="xs" variant="outline" onClick={(e) => { e.stopPropagation(); openInspector(policy) }}>Inspect</Button>
-                            <Button size="xs" variant="ghost" onClick={(e) => { e.stopPropagation(); handleDelete(policy.id) }}>Delete</Button>
+                            <Button size="sm" variant="outline" onClick={(e) => { e.stopPropagation(); openInspector(policy) }}>Inspect</Button>
+                            <Button size="sm" variant="ghost" onClick={(e) => { e.stopPropagation(); handleDelete(policy.id) }}>Delete</Button>
                           </button>
                           {isExpanded && (
                             <div className="bg-muted/30 px-5 py-3 text-sm">
@@ -354,7 +366,7 @@ export default function RoleMatrixPage() {
                                   {policy.fields.map((field) => (
                                     <li key={field.id} className="rounded-md bg-background px-3 py-2">
                                       <div className="font-medium">{field.field_path}</div>
-                                      <div className="text-muted-foreground">Vis: {field.visibility?.default_role || 'member'} · Edit: {field.editability?.default_role || 'member'}</div>
+                                      <div className="text-muted-foreground">Vis: {resolveDefaultRole(field.visibility)} · Edit: {resolveDefaultRole(field.editability)}</div>
                                     </li>
                                   ))}
                                 </ul>
@@ -395,7 +407,7 @@ export default function RoleMatrixPage() {
                 <CardHeader>
                   <CardTitle className="flex items-center justify-between">
                     Editing Policy
-                    <Button size="xs" variant="ghost" onClick={() => setInspector(null)}>
+                    <Button size="sm" variant="ghost" onClick={() => setInspector(null)}>
                       Close
                     </Button>
                   </CardTitle>

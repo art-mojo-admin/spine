@@ -1,6 +1,15 @@
 import { randomUUID } from 'crypto'
 
-import { createHandler, requireAuth, requireTenant, requireRole, json, error, parseBody } from './_shared/middleware'
+import {
+  createHandler,
+  requireAuth,
+  requireTenant,
+  requireRole,
+  json,
+  error,
+  parseBody,
+} from './_shared/middleware'
+import type { RequestContext } from './_shared/middleware'
 import { db } from './_shared/db'
 import { emitActivity } from './_shared/audit'
 import { recalcAllCounts } from './_shared/counts'
@@ -55,11 +64,6 @@ const CLONE_SEQUENCE: { table: typeof PACK_TABLES[number]; entityType: string }[
   { table: 'items', entityType: 'item' },
   { table: 'entity_links', entityType: 'entity_link' },
 ]
-
-function isLegacyPack(pack: any): boolean {
-  const flag = pack?.pack_data?.legacy
-  return flag === true || flag === 'true'
-}
 
 function logPackAction(ctx: RequestContext, packId: string | undefined, step: string, meta: Record<string, unknown> = {}) {
   try {
@@ -316,7 +320,7 @@ async function setPackTestDataActive(accountId: string, packId: string, active: 
   return setClonedEntitiesActive(accountId, packId, active, true)
 }
 
-async function uninstallPack(accountId: string, packId: string) {
+export async function uninstallPack(accountId: string, packId: string) {
   const { mapByTemplate } = await fetchMappings(accountId, packId)
   const clonedIds = Object.values(mapByTemplate)
 
@@ -513,9 +517,7 @@ export default createHandler({
 
     const activationMap = new Map(activations.map((a: any) => [a.pack_id, a]))
 
-    const visiblePacks = (packs || []).filter((pack: any) => !isLegacyPack(pack))
-
-    const result = visiblePacks.map((pack: any) => {
+    const result = (packs || []).map((pack: any) => {
       const activation = activationMap.get(pack.id)
       return {
         ...pack,
@@ -548,11 +550,8 @@ export default createHandler({
       if (!packId) return error('pack_id required')
 
       try {
-        const { data: pack } = await db.from('config_packs').select('id, name, pack_data').eq('id', packId).single()
+        const { data: pack } = await db.from('config_packs').select('id, name').eq('id', packId).single()
         if (!pack) return error('Pack not found', 404)
-        if (isLegacyPack(pack)) {
-          return error('Pack is legacy and can no longer be installed', 400)
-        }
 
         logPackAction(ctx, packId, 'install.start', {
           includeTestData: body.include_test_data === true,
@@ -625,7 +624,12 @@ export default createHandler({
 
       const [{ data: pack }, { data: activation }] = await Promise.all([
         db.from('config_packs').select('id, name').eq('id', packId).single(),
-        db.from('pack_activations').select('config_active, activated_at, activated_by').eq('account_id', accountId).eq('pack_id', packId).maybeSingle(),
+        db
+          .from('pack_activations')
+          .select('config_active, test_data_active, activated_at, activated_by')
+          .eq('account_id', accountId)
+          .eq('pack_id', packId)
+          .maybeSingle(),
       ])
 
       if (!pack) return error('Pack not found', 404)
@@ -673,7 +677,12 @@ export default createHandler({
 
       const [{ data: pack }, { data: activation }] = await Promise.all([
         db.from('config_packs').select('id, name').eq('id', packId).single(),
-        db.from('pack_activations').select('config_active').eq('account_id', accountId).eq('pack_id', packId).maybeSingle(),
+        db
+          .from('pack_activations')
+          .select('config_active, test_data_active')
+          .eq('account_id', accountId)
+          .eq('pack_id', packId)
+          .maybeSingle(),
       ])
 
       if (!pack) return error('Pack not found', 404)

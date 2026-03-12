@@ -57,7 +57,7 @@ export default createHandler({
     }
 
     const navItems: ComputedNavItem[] = []
-    const visibleApps: { slug: string; name: string; icon?: string }[] = []
+    const visibleApps: { slug: string; name: string; icon?: string; position?: number }[] = []
 
     for (const app of apps) {
       const appMinRank = ROLE_RANK[app.min_role] ?? 1

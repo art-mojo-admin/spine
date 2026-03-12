@@ -44,7 +44,7 @@ export default createHandler({
 
     if (!node) return error('Node not found', 404)
 
-    const { data: ancestorRows = [] } = await db
+    const { data: ancestorRows } = await db
       .from('account_paths')
       .select(`
         depth,
@@ -61,7 +61,7 @@ export default createHandler({
       .gt('depth', 0)
       .order('depth', { ascending: true })
 
-    const ancestors: AccountSummary[] = ancestorRows
+    const ancestors: AccountSummary[] = (ancestorRows ?? [])
       .map((row: any) => row.ancestor as AccountSummary | null)
       .filter((item): item is AccountSummary => !!item)
 
