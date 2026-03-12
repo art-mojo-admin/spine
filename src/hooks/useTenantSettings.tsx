@@ -3,17 +3,33 @@ import { apiGet, apiPost } from '@/lib/api'
 import { useAuth } from '@/hooks/useAuth'
 
 type OrgModel = 'single' | 'multi'
+type TenantType = 'individual' | 'organization' | 'service_provider'
 
 export interface TenantSettings {
   org_model: OrgModel
+  tenant_type: TenantType
   installed_packs: string[]
   configured_at: string | null
   configured_by: string | null
   metadata: Record<string, any>
+  active_pack_id: string | null
+  workspace_last_purged_at: string | null
+  workspace_last_purged_by: string | null
 }
 
 interface TenantSettingsResponse extends TenantSettings {
   configured_by_person?: {
+    id: string
+    full_name: string | null
+    email: string | null
+  } | null
+  active_pack?: {
+    id: string
+    name: string | null
+    slug: string | null
+    icon: string | null
+  } | null
+  workspace_last_purged_by_person?: {
     id: string
     full_name: string | null
     email: string | null

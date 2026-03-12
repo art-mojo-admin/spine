@@ -320,7 +320,7 @@ async function setPackTestDataActive(accountId: string, packId: string, active: 
   return setClonedEntitiesActive(accountId, packId, active, true)
 }
 
-async function uninstallPack(accountId: string, packId: string) {
+export async function uninstallPack(accountId: string, packId: string) {
   const { mapByTemplate } = await fetchMappings(accountId, packId)
   const clonedIds = Object.values(mapByTemplate)
 
