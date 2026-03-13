@@ -1,4 +1,4 @@
-import { createHandler, requireAuth, requireTenant, requireRole, json, error, parseBody, clampLimit } from './_shared/middleware'
+import { createHandler, requireAuth, requireTenant, requireRole, json, error, parseBody, clampLimit, type HandlerResult } from './_shared/middleware'
 import { db } from './_shared/db'
 import { emitActivity } from './_shared/audit'
 import { adjustCount } from './_shared/counts'
@@ -10,7 +10,13 @@ type OwnedPack = {
   is_system: boolean
 }
 
-async function fetchOwnedPack(packId: string, accountId: string): Promise<OwnedPack | Response> {
+type PackLookupResult = OwnedPack | HandlerResult
+
+function isHandlerResult(value: PackLookupResult): value is HandlerResult {
+  return (value as HandlerResult).statusCode !== undefined
+}
+
+async function fetchOwnedPack(packId: string, accountId: string): Promise<PackLookupResult> {
   const { data: pack } = await db
     .from('config_packs')
     .select('id, owner_account_id, primary_app_id, is_system')
@@ -130,7 +136,7 @@ export default createHandler({
     let ownership: 'tenant' | 'pack' = 'tenant'
     if (packId) {
       const ownedPack = await fetchOwnedPack(packId, ctx.accountId!)
-      if (ownedPack instanceof Response) return ownedPack
+      if (isHandlerResult(ownedPack)) return ownedPack
       if (ownedPack.primary_app_id) {
         return error('Pack already has an app. Delete it before creating another.', 409)
       }

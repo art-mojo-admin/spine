@@ -89,6 +89,29 @@ function combineCounts(...datasets: Record<string, number>[]) {
   return result
 }
 
+function normalizePackSlug(value?: string | null) {
+  if (!value) return ''
+  return value
+    .toString()
+    .trim()
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/^-+|-+$/g, '')
+}
+
+function derivePackSlug(name: string, slug?: string | null) {
+  const provided = normalizePackSlug(slug)
+  if (provided) return provided
+  const fromName = normalizePackSlug(name)
+  if (fromName) return fromName
+  return `pack-${randomUUID().slice(0, 8)}`
+}
+
+async function packSlugExists(slug: string) {
+  const { data } = await db.from('config_packs').select('id').eq('slug', slug).limit(1).maybeSingle()
+  return Boolean(data)
+}
+
 async function fetchMappings(accountId: string, packId: string) {
   const { data } = await db
     .from('pack_entity_mappings')
@@ -448,6 +471,9 @@ export default createHandler({
     if (id && action === 'export') {
       const { data: pack } = await db.from('config_packs').select('*').eq('id', id).single()
       if (!pack) return error('Not found', 404)
+      if (!pack.is_system && pack.owner_account_id && pack.owner_account_id !== ctx.accountId) {
+        return error('Not authorized to export this pack', 403)
+      }
 
       const [workflows, stages, transitions, fields, linkTypes, automations, views, apps] = await Promise.all([
         db.from('workflow_definitions').select('*').eq('pack_id', id).eq('is_test_data', false),
@@ -495,14 +521,23 @@ export default createHandler({
     if (id) {
       const { data: pack } = await db.from('config_packs').select('*').eq('id', id).single()
       if (!pack) return error('Not found', 404)
+      if (!pack.is_system && pack.owner_account_id !== ctx.accountId) {
+        return error('Not authorized to view this pack', 403)
+      }
       return json(pack)
     }
 
-    // List all packs with activation state for current account
-    const { data: packs } = await db
+    let packQuery = db
       .from('config_packs')
-      .select('id, name, slug, icon, category, description, is_system, pack_data, created_at')
-      .order('name')
+      .select('id, name, slug, icon, category, description, is_system, pack_data, created_at, owner_account_id, primary_app_id')
+
+    if (ctx.accountId) {
+      packQuery = packQuery.or(`is_system.eq.true,owner_account_id.eq.${ctx.accountId}`)
+    } else {
+      packQuery = packQuery.eq('is_system', true)
+    }
+
+    const { data: packs } = await packQuery.order('name')
 
     // Get activations for current account
     let activations: any[] = []
@@ -519,6 +554,10 @@ export default createHandler({
 
     const result = (packs || []).map((pack: any) => {
       const activation = activationMap.get(pack.id)
+      if (!pack.is_system && pack.owner_account_id !== ctx.accountId) {
+        return null
+      }
+
       return {
         ...pack,
         config_active: activation?.config_active || false,
@@ -528,7 +567,7 @@ export default createHandler({
       }
     })
 
-    return json(result)
+    return json(result.filter(Boolean))
   },
 
   async POST(req, ctx) {
@@ -543,6 +582,38 @@ export default createHandler({
     const action = body.action
     const packId = body.pack_id
     const accountId = ctx.accountId!
+
+    if (action === 'create_pack') {
+      const name = (body.name || '').trim()
+      if (!name) return error('name required')
+
+      const slug = derivePackSlug(name, body.slug)
+      if (await packSlugExists(slug)) {
+        return error('Pack slug already exists', 409)
+      }
+
+      const insertPayload: Record<string, any> = {
+        name,
+        slug,
+        icon: body.icon ?? null,
+        category: body.category ?? null,
+        description: body.description ?? null,
+        pack_data: body.pack_data ?? null,
+        is_system: false,
+        owner_account_id: accountId,
+      }
+
+      const { data: newPack, error: insertErr } = await db
+        .from('config_packs')
+        .insert(insertPayload)
+        .select()
+        .single()
+
+      if (insertErr) return error(insertErr.message, 500)
+
+      await emitActivity(ctx, 'config_pack.created', `Created pack "${newPack.name}"`, 'config_pack', newPack.id)
+      return json(newPack, 201)
+    }
 
     // ── Install Pack ──────────────────────────────────────────────────
     // Clones all config (and optionally test data) as tenant-owned, active rows
@@ -709,6 +780,6 @@ export default createHandler({
       return json({ success: true, action: 'test_data_uninstalled' })
     }
 
-    return error('Unknown action. Use install_pack or uninstall_pack')
+    return error('Unknown action. Use create_pack, install_pack, or uninstall_pack')
   },
 })

@@ -1,7 +1,33 @@
-import { createHandler, requireAuth, requireTenant, requireRole, json, error, parseBody, clampLimit } from './_shared/middleware'
+import { createHandler, requireAuth, requireTenant, requireRole, json, error, parseBody, clampLimit, type HandlerResult } from './_shared/middleware'
 import { db } from './_shared/db'
 import { emitActivity } from './_shared/audit'
 import { adjustCount } from './_shared/counts'
+
+type OwnedPack = {
+  id: string
+  owner_account_id: string | null
+  primary_app_id: string | null
+  is_system: boolean
+}
+
+type PackLookupResult = OwnedPack | HandlerResult
+
+function isHandlerResult(value: PackLookupResult): value is HandlerResult {
+  return (value as HandlerResult).statusCode !== undefined
+}
+
+async function fetchOwnedPack(packId: string, accountId: string): Promise<PackLookupResult> {
+  const { data: pack } = await db
+    .from('config_packs')
+    .select('id, owner_account_id, primary_app_id, is_system')
+    .eq('id', packId)
+    .maybeSingle()
+
+  if (!pack) return error('Pack not found', 404)
+  if (pack.is_system) return error('Cannot attach system template packs', 400)
+  if (pack.owner_account_id !== accountId) return error('Not authorized for this pack', 403)
+  return pack as OwnedPack
+}
 
 export default createHandler({
   async GET(req, ctx, params) {
@@ -91,6 +117,7 @@ export default createHandler({
           integration_deps: source.integration_deps || [],
           is_active: false,
           ownership: 'tenant',
+          pack_id: null,
         })
         .select()
         .single()
@@ -103,6 +130,17 @@ export default createHandler({
 
     if (!body.slug || !body.name) {
       return error('slug and name required')
+    }
+
+    const packId = body.pack_id ? String(body.pack_id) : null
+    let ownership: 'tenant' | 'pack' = 'tenant'
+    if (packId) {
+      const ownedPack = await fetchOwnedPack(packId, ctx.accountId!)
+      if (isHandlerResult(ownedPack)) return ownedPack
+      if (ownedPack.primary_app_id) {
+        return error('Pack already has an app. Delete it before creating another.', 409)
+      }
+      ownership = 'pack'
     }
 
     const { data, error: dbErr } = await db
@@ -118,12 +156,21 @@ export default createHandler({
         min_role: body.min_role || 'member',
         integration_deps: body.integration_deps || [],
         is_active: body.is_active ?? false,
-        ownership: 'tenant',
+        ownership,
+        pack_id: packId,
       })
       .select()
       .single()
 
     if (dbErr) return error(dbErr.message, 500)
+
+    if (data.pack_id) {
+      await db
+        .from('config_packs')
+        .update({ primary_app_id: data.id })
+        .eq('id', data.pack_id)
+        .eq('owner_account_id', ctx.accountId)
+    }
 
     await emitActivity(ctx, 'app_definition.created', `Created app "${data.name}"`, 'app', data.id)
     if (data.is_active) await adjustCount(ctx.accountId!, 'apps', 1)
@@ -141,7 +188,12 @@ export default createHandler({
     const id = params.get('id')
     if (!id) return error('id required')
 
-    const { data: existing } = await db.from('app_definitions').select('id, is_active').eq('id', id).eq('account_id', ctx.accountId).single()
+    const { data: existing } = await db
+      .from('app_definitions')
+      .select('id, is_active, pack_id, ownership')
+      .eq('id', id)
+      .eq('account_id', ctx.accountId)
+      .single()
     if (!existing) return error('Not found', 404)
 
     const body = await parseBody<any>(req)
@@ -158,7 +210,7 @@ export default createHandler({
 
     if (Object.keys(updates).length === 0) return error('No fields to update')
 
-    updates.ownership = 'tenant'
+    updates.ownership = existing.pack_id ? 'pack' : 'tenant'
 
     const { data, error: dbErr } = await db
       .from('app_definitions')
@@ -189,7 +241,12 @@ export default createHandler({
     if (!id) return error('id required')
 
     // Check if it was active before deleting
-    const { data: before } = await db.from('app_definitions').select('is_active').eq('id', id).eq('account_id', ctx.accountId).single()
+    const { data: before } = await db
+      .from('app_definitions')
+      .select('is_active, pack_id')
+      .eq('id', id)
+      .eq('account_id', ctx.accountId)
+      .single()
 
     const { error: dbErr } = await db
       .from('app_definitions')
@@ -198,6 +255,14 @@ export default createHandler({
       .eq('account_id', ctx.accountId)
 
     if (dbErr) return error(dbErr.message, 500)
+    if (before?.pack_id) {
+      await db
+        .from('config_packs')
+        .update({ primary_app_id: null })
+        .eq('id', before.pack_id)
+        .eq('owner_account_id', ctx.accountId)
+        .eq('primary_app_id', id)
+    }
     if (before?.is_active) await adjustCount(ctx.accountId!, 'apps', -1)
     return json({ success: true })
   },
