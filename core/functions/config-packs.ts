@@ -598,7 +598,7 @@ export default createHandler({
         icon: body.icon ?? null,
         category: body.category ?? null,
         description: body.description ?? null,
-        pack_data: body.pack_data ?? null,
+        pack_data: body.pack_data ?? {},
         is_system: false,
         owner_account_id: accountId,
       }

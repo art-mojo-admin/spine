@@ -58,6 +58,7 @@ export function ConfigPacksPage() {
   const [creating, setCreating] = useState(false)
   const [newPackName, setNewPackName] = useState('')
   const [newPackSlug, setNewPackSlug] = useState('')
+  const [slugTouched, setSlugTouched] = useState(false)
   const [newPackCategory, setNewPackCategory] = useState('')
   const [newPackIcon, setNewPackIcon] = useState('')
   const [newPackDescription, setNewPackDescription] = useState('')
@@ -89,11 +90,13 @@ export function ConfigPacksPage() {
 
   useEffect(() => {
     if (!newPackName.trim()) {
-      setNewPackSlug('')
+      if (!slugTouched) setNewPackSlug('')
       return
     }
-    setNewPackSlug((prev) => (prev ? prev : slugify(newPackName)))
-  }, [newPackName])
+    if (!slugTouched) {
+      setNewPackSlug(slugify(newPackName))
+    }
+  }, [newPackName, slugTouched])
 
   async function handleCreatePack() {
     if (!newPackName.trim()) {
@@ -113,6 +116,7 @@ export function ConfigPacksPage() {
       setShowCreate(false)
       setNewPackName('')
       setNewPackSlug('')
+      setSlugTouched(false)
       setNewPackIcon('')
       setNewPackCategory('')
       setNewPackDescription('')
@@ -223,7 +227,10 @@ export function ConfigPacksPage() {
                 <label className="text-sm font-medium">Slug</label>
                 <Input
                   value={newPackSlug}
-                  onChange={(e) => setNewPackSlug(slugify(e.target.value))}
+                  onChange={(e) => {
+                    setSlugTouched(true)
+                    setNewPackSlug(slugify(e.target.value))
+                  }}
                   placeholder="auto-generated"
                   className="font-mono text-xs"
                 />
@@ -250,6 +257,7 @@ export function ConfigPacksPage() {
                 onClick={() => {
                   setShowCreate(false)
                   setCreateError(null)
+                  setSlugTouched(false)
                 }}
               >
                 Cancel
