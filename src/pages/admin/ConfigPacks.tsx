@@ -284,10 +284,90 @@ export function ConfigPacksPage() {
             const icon = pack.icon ? ICON_MAP[pack.icon] : <Package className="h-5 w-5" />
             const categoryColor = pack.category ? CATEGORY_COLORS[pack.category] || 'bg-gray-100 text-gray-700' : null
 
-            return (
-              <Card key={pack.id} className={pack.config_active ? 'ring-1 ring-primary/20' : ''}>
-                <CardHeader className="pb-3">
-                  <div className="flex items-start justify-between">
+    {showCreate && (
+      <Card>
+        <CardHeader>
+          <CardTitle className="text-lg">Create Tenant Pack</CardTitle>
+          <CardDescription>
+            New packs start empty with ownership tied to this tenant. You can add apps, views, workflows, and export them later.
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          {createError && (
+            <p className="text-sm text-destructive">{createError}</p>
+          )}
+          <div className="grid gap-4 md:grid-cols-2">
+            <div className="space-y-1">
+              <label className="text-sm font-medium">Name</label>
+              <Input value={newPackName} onChange={(e) => setNewPackName(e.target.value)} placeholder="e.g. Customer Training" />
+            </div>
+            <div className="space-y-1">
+              <label className="text-sm font-medium">Slug</label>
+              <Input
+                value={newPackSlug}
+                onChange={(e) => setNewPackSlug(slugify(e.target.value))}
+                placeholder="auto-generated"
+                className="font-mono text-xs"
+              />
+            </div>
+            <div className="space-y-1">
+              <label className="text-sm font-medium">Category</label>
+              <Input value={newPackCategory} onChange={(e) => setNewPackCategory(e.target.value)} placeholder="sales, service…" />
+            </div>
+            <div className="space-y-1">
+              <label className="text-sm font-medium">Icon (lucide slug)</label>
+              <Input value={newPackIcon} onChange={(e) => setNewPackIcon(e.target.value)} placeholder="layout-grid" />
+            </div>
+          </div>
+          <div className="space-y-1">
+            <label className="text-sm font-medium">Description</label>
+            <Textarea value={newPackDescription} onChange={(e) => setNewPackDescription(e.target.value)} placeholder="What is included in this pack?" rows={3} />
+          </div>
+          <div className="flex gap-2">
+            <Button onClick={handleCreatePack} disabled={creating}>
+              {creating ? 'Creating…' : 'Create Pack'}
+            </Button>
+            <Button
+              variant="ghost"
+              onClick={() => {
+                setShowCreate(false)
+                setCreateError(null)
+              }}
+            >
+              Cancel
+            </Button>
+          </div>
+        </CardContent>
+      </Card>
+    )}
+
+    {errorMessage && (
+      <Card><CardContent className="py-3 text-sm text-destructive">{errorMessage}</CardContent></Card>
+    )}
+
+    {loading ? (
+      <p className="text-sm text-muted-foreground">Loading packs...</p>
+    ) : sortedPacks.length === 0 ? (
+      <Card>
+        <CardContent className="py-12 text-center">
+          <Package className="mx-auto h-8 w-8 text-muted-foreground/50 mb-2" />
+          <p className="text-sm text-muted-foreground">No template packs available.</p>
+        </CardContent>
+      </Card>
+    ) : (
+      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+        {sortedPacks.map((pack) => {
+          const tenantOwned = isTenantAuthoredPack(pack, currentAccountId)
+          const Icon = pack.icon && ICON_MAP[pack.icon] ? ICON_MAP[pack.icon] : <Package className="h-5 w-5" />
+          const isExpanded = expanded.has(pack.id)
+          const features = pack.pack_data?.features || []
+          const icon = pack.icon ? ICON_MAP[pack.icon] : <Package className="h-5 w-5" />
+          const categoryColor = pack.category ? CATEGORY_COLORS[pack.category] || 'bg-gray-100 text-gray-700' : null
+
+          return (
+            <Card key={pack.id} className={pack.config_active ? 'ring-1 ring-primary/20' : ''}>
+              <CardHeader className="pb-3">
+                <div className="flex items-start justify-between">
                   <div className="flex items-center gap-2">
                     <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-primary/10">
                       {Icon}
@@ -308,17 +388,12 @@ export function ConfigPacksPage() {
                     )}
                   </div>
                 </div>
-                  {pack.description && (
-                    <CardDescription className="text-xs mt-1">{pack.description}</CardDescription>
-                  )}
-                </CardHeader>
-                <CardContent className="space-y-4">
-                      </Button>
-                    </div>
-                  ) : (
-                    <div className="space-y-3 pt-1 border-t">
-                      {pack.activated_at && (
-                        <div className="flex items-center justify-between text-xs text-muted-foreground">
+                {pack.description && (
+                  <CardDescription className="text-xs mt-1">{pack.description}</CardDescription>
+                )}
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <div className="flex items-center justify-between text-xs text-muted-foreground">
                   <div className="flex items-center gap-2">
                     <span>{pack.config_active ? 'Config active' : 'Config inactive'}</span>
                     <span className="text-border">•</span>
@@ -405,8 +480,8 @@ export function ConfigPacksPage() {
               </CardContent>
             </Card>
           )})}
-        </div>
-      )}
-    </div>
-  )
+      </div>
+    )}
+  </div>
+)
 }
