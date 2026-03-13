@@ -159,6 +159,7 @@ export default function App() {
           <Route path="/admin/schedules" element={<ScheduledTriggersPage />} />
           <Route path="/admin/link-types" element={<LinkTypeDefinitionsPage />} />
           <Route path="/admin/packs" element={<ConfigPacksPage />} />
+          <Route path="/admin/config-packs" element={<ConfigPacksPage />} />
           <Route path="/admin/modules" element={<AccountModulesPage />} />
           <Route path="/admin/account-scopes" element={<AccountScopesPage />} />
           <Route path="/admin/custom-actions" element={<CustomActionTypesPage />} />

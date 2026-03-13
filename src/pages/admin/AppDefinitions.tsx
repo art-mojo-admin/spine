@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { apiGet, apiPost, apiPatch, apiDelete } from '@/lib/api'
 import { useAuth } from '@/hooks/useAuth'
@@ -7,6 +7,7 @@ import { Input } from '@/components/ui/input'
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { Plus, Copy, Pencil, Trash2, Power, Package, LayoutGrid } from 'lucide-react'
+import { ConfigPack, createConfigPack, isTenantAuthoredPack, listConfigPacks } from '@/lib/packs'
 
 interface AppDef {
   id: string
@@ -37,6 +38,17 @@ export function AppDefinitionsPage() {
   const [newSlug, setNewSlug] = useState('')
   const [cloning, setCloning] = useState<string | null>(null)
   const [errorMsg, setErrorMsg] = useState<string | null>(null)
+  const [packs, setPacks] = useState<ConfigPack[]>([])
+  const [packLoading, setPackLoading] = useState(false)
+  const [packError, setPackError] = useState<string | null>(null)
+  const [selectedPackId, setSelectedPackId] = useState('')
+  const [createPackInline, setCreatePackInline] = useState(false)
+  const [packName, setPackName] = useState('')
+  const [packSlug, setPackSlug] = useState('')
+  const [packCategory, setPackCategory] = useState('')
+  const [packIcon, setPackIcon] = useState('')
+  const [packDescription, setPackDescription] = useState('')
+  const [creatingPack, setCreatingPack] = useState(false)
 
   useEffect(() => {
     if (currentAccountId) loadApps()
@@ -54,21 +66,98 @@ export function AppDefinitionsPage() {
     }
   }
 
+  const tenantPackOptions = useMemo(
+    () => packs.filter((pack) => isTenantAuthoredPack(pack, currentAccountId) && !pack.primary_app_id),
+    [packs, currentAccountId]
+  )
+
+  useEffect(() => {
+    if (!showCreate || !currentAccountId) return
+    async function fetchPacks() {
+      setPackLoading(true)
+      setPackError(null)
+      try {
+        const data = await listConfigPacks()
+        setPacks(data)
+      } catch (err: any) {
+        setPackError(err?.message || 'Failed to load packs')
+      } finally {
+        setPackLoading(false)
+      }
+    }
+    fetchPacks()
+  }, [showCreate, currentAccountId])
+
+  useEffect(() => {
+    if (createPackInline) return
+    if (!selectedPackId && tenantPackOptions.length > 0) {
+      setSelectedPackId(tenantPackOptions[0].id)
+    }
+  }, [tenantPackOptions, createPackInline, selectedPackId])
+
+  useEffect(() => {
+    if (tenantPackOptions.length === 0 && showCreate) {
+      setCreatePackInline(true)
+    }
+  }, [tenantPackOptions.length, showCreate])
+
+  useEffect(() => {
+    if (!packName.trim()) {
+      setPackSlug('')
+      return
+    }
+    setPackSlug((prev) => (prev ? prev : slugify(packName)))
+  }, [packName])
+
   async function createApp() {
     if (!newName.trim()) return
     setErrorMsg(null)
     try {
+      let packId = selectedPackId
+      if (createPackInline) {
+        if (!packName.trim()) {
+          setErrorMsg('Pack name is required to create a new pack')
+          return
+        }
+        setCreatingPack(true)
+        const newPack = await createConfigPack({
+          name: packName.trim(),
+          slug: packSlug.trim() || slugify(packName),
+          category: packCategory.trim() || null,
+          icon: packIcon.trim() || null,
+          description: packDescription.trim() || null,
+        })
+        packId = newPack.id
+        setCreatingPack(false)
+      }
+
+      if (!packId) {
+        setErrorMsg('Select a tenant pack before creating an app')
+        return
+      }
+
       const app = await apiPost<AppDef>('app-definitions', {
         name: newName,
         slug: newSlug || slugify(newName),
         is_active: false,
+        pack_id: packId,
       })
       setShowCreate(false)
       setNewName('')
       setNewSlug('')
+      setSelectedPackId('')
+      setCreatePackInline(false)
+      setPackName('')
+      setPackSlug('')
+      setPackCategory('')
+      setPackIcon('')
+      setPackDescription('')
+      loadApps()
       navigate(`/admin/apps/${app.id}/builder`)
     } catch (err: any) {
       setErrorMsg(err?.message || 'Failed to create app')
+    } finally {
+      setCreatingPack(false)
     }
   }
 
@@ -155,8 +244,89 @@ export function AppDefinitionsPage() {
               </div>
             </div>
             <div className="flex gap-2">
-              <Button onClick={createApp} disabled={!newName.trim()}>Create & Open Builder</Button>
+              <Button onClick={createApp} disabled={!newName.trim() || creatingPack}>
+                {creatingPack ? 'Creating Pack…' : 'Create & Open Builder'}
+              </Button>
               <Button variant="ghost" onClick={() => { setShowCreate(false); setNewName(''); setNewSlug('') }}>Cancel</Button>
+            </div>
+
+            <div className="space-y-3 border-t pt-4">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-sm font-medium">Pack</p>
+                  <p className="text-xs text-muted-foreground">Each new app must live inside a tenant-owned pack.</p>
+                </div>
+                {tenantPackOptions.length > 0 && (
+                  <Button variant="link" className="h-auto px-0 text-xs" onClick={() => setCreatePackInline((prev) => !prev)}>
+                    {createPackInline ? 'Select existing pack' : 'Create new pack'}
+                  </Button>
+                )}
+              </div>
+
+              {!createPackInline && (
+                <div className="space-y-1">
+                  <label className="text-sm font-medium">Choose an existing pack</label>
+                  {packLoading ? (
+                    <p className="text-xs text-muted-foreground">Loading packs…</p>
+                  ) : tenantPackOptions.length === 0 ? (
+                    <p className="text-xs text-muted-foreground">No available tenant packs. Create one below.</p>
+                  ) : (
+                    <select
+                      className="w-full rounded-md border bg-background p-2 text-sm"
+                      value={selectedPackId}
+                      onChange={(e) => setSelectedPackId(e.target.value)}
+                    >
+                      <option value="">Select a pack</option>
+                      {tenantPackOptions.map((pack) => (
+                        <option key={pack.id} value={pack.id}>
+                          {pack.name}
+                        </option>
+                      ))}
+                    </select>
+                  )}
+                  {packError && <p className="text-xs text-destructive">{packError}</p>}
+                </div>
+              )}
+
+              {createPackInline && (
+                <div className="space-y-3 rounded-md border p-3">
+                  <p className="text-sm font-medium">New Pack Details</p>
+                  <div className="grid gap-3 sm:grid-cols-2">
+                    <div className="space-y-1">
+                      <label className="text-xs font-medium">Pack Name</label>
+                      <Input value={packName} onChange={(e) => setPackName(e.target.value)} placeholder="e.g. Training Pack" />
+                    </div>
+                    <div className="space-y-1">
+                      <label className="text-xs font-medium">Pack Slug</label>
+                      <Input
+                        value={packSlug || (packName ? slugify(packName) : '')}
+                        onChange={(e) => setPackSlug(slugify(e.target.value))}
+                        placeholder="auto-generated"
+                        className="font-mono text-xs"
+                      />
+                    </div>
+                  </div>
+                  <div className="grid gap-3 sm:grid-cols-2">
+                    <div className="space-y-1">
+                      <label className="text-xs font-medium">Category</label>
+                      <Input value={packCategory} onChange={(e) => setPackCategory(e.target.value)} placeholder="sales, service…" />
+                    </div>
+                    <div className="space-y-1">
+                      <label className="text-xs font-medium">Icon</label>
+                      <Input value={packIcon} onChange={(e) => setPackIcon(e.target.value)} placeholder="layout-grid" />
+                    </div>
+                  </div>
+                  <div className="space-y-1">
+                    <label className="text-xs font-medium">Description</label>
+                    <Input value={packDescription} onChange={(e) => setPackDescription(e.target.value)} placeholder="What will this pack include?" />
+                  </div>
+                  {tenantPackOptions.length > 0 && (
+                    <Button variant="link" className="h-auto px-0 text-xs" onClick={() => setCreatePackInline(false)}>
+                      Use an existing pack instead
+                    </Button>
+                  )}
+                </div>
+              )}
             </div>
           </CardContent>
         </Card>
