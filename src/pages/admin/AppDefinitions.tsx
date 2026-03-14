@@ -76,9 +76,13 @@ export function AppDefinitionsPage() {
     }
   }
 
-  const tenantPackOptions = useMemo(
-    () => packs.filter((pack) => isTenantAuthoredPack(pack, currentAccountId) && !pack.primary_app_id),
+  const tenantPacks = useMemo(
+    () => packs.filter((pack) => isTenantAuthoredPack(pack, currentAccountId)),
     [packs, currentAccountId]
+  )
+  const availableTenantPacks = useMemo(
+    () => tenantPacks.filter((pack) => !pack.primary_app_id),
+    [tenantPacks]
   )
 
   const loadTenantPacks = useCallback(async () => {
@@ -107,16 +111,16 @@ export function AppDefinitionsPage() {
 
   useEffect(() => {
     if (createPackInline) return
-    if (!selectedPackId && tenantPackOptions.length > 0) {
-      setSelectedPackId(tenantPackOptions[0].id)
+    if (!selectedPackId && availableTenantPacks.length > 0) {
+      setSelectedPackId(availableTenantPacks[0].id)
     }
-  }, [tenantPackOptions, createPackInline, selectedPackId])
+  }, [availableTenantPacks, createPackInline, selectedPackId])
 
   useEffect(() => {
-    if (tenantPackOptions.length === 0 && showCreate) {
+    if (availableTenantPacks.length === 0 && showCreate) {
       setCreatePackInline(true)
     }
-  }, [tenantPackOptions.length, showCreate])
+  }, [availableTenantPacks.length, showCreate])
 
   useEffect(() => {
     if (!packName.trim()) {
@@ -267,9 +271,26 @@ export function AppDefinitionsPage() {
   const templateGuardMessage = 'Template apps are read-only. Clone to edit or publish.'
   const isAppGuarded = (app: AppDef) => {
     if (isTemplateApp(app)) return false
+    if (!app.pack_id) return false
     if (!activePackId) return false
-    if (!app.pack_id) return true
     return app.pack_id !== activePackId
+  }
+
+  const orphanedApps = useMemo(() => apps.filter(app => !app.pack_id && !isTemplateApp(app)), [apps])
+  const tenantApps = useMemo(() => apps.filter(app => app.pack_id || isTemplateApp(app)), [apps])
+
+  const [attachingApp, setAttachingApp] = useState<string | null>(null)
+  async function attachAppToPack(app: AppDef, packId: string) {
+    if (!packId) return
+    setAttachingApp(app.id)
+    try {
+      await apiPatch('app-definitions', { pack_id: packId }, { id: app.id })
+      loadApps()
+    } catch (err: any) {
+      setErrorMsg(err?.message || 'Failed to attach app')
+    } finally {
+      setAttachingApp(null)
+    }
   }
 
   return (
@@ -341,7 +362,7 @@ export function AppDefinitionsPage() {
                   <p className="text-sm font-medium">Pack</p>
                   <p className="text-xs text-muted-foreground">Each new app must live inside a tenant-owned pack.</p>
                 </div>
-                {tenantPackOptions.length > 0 && (
+                {availableTenantPacks.length > 0 && (
                   <Button variant="link" className="h-auto px-0 text-xs" onClick={() => setCreatePackInline((prev) => !prev)}>
                     {createPackInline ? 'Select existing pack' : 'Create new pack'}
                   </Button>
@@ -353,7 +374,7 @@ export function AppDefinitionsPage() {
                   <label className="text-sm font-medium">Choose an existing pack</label>
                   {packLoading ? (
                     <p className="text-xs text-muted-foreground">Loading packs…</p>
-                  ) : tenantPackOptions.length === 0 ? (
+                  ) : availableTenantPacks.length === 0 ? (
                     <p className="text-xs text-muted-foreground">No available tenant packs. Create one below.</p>
                   ) : (
                     <select
@@ -362,7 +383,7 @@ export function AppDefinitionsPage() {
                       onChange={(e) => setSelectedPackId(e.target.value)}
                     >
                       <option value="">Select a pack</option>
-                      {tenantPackOptions.map((pack) => (
+                      {availableTenantPacks.map((pack) => (
                         <option key={pack.id} value={pack.id}>
                           {pack.name}
                         </option>
@@ -405,7 +426,7 @@ export function AppDefinitionsPage() {
                     <label className="text-xs font-medium">Description</label>
                     <Input value={packDescription} onChange={(e) => setPackDescription(e.target.value)} placeholder="What will this pack include?" />
                   </div>
-                  {tenantPackOptions.length > 0 && (
+                  {availableTenantPacks.length > 0 && (
                     <Button variant="link" className="h-auto px-0 text-xs" onClick={() => setCreatePackInline(false)}>
                       Use an existing pack instead
                     </Button>
@@ -419,7 +440,7 @@ export function AppDefinitionsPage() {
 
       {loading ? (
         <p className="text-sm text-muted-foreground">Loading apps...</p>
-      ) : apps.length === 0 && !showCreate ? (
+      ) : tenantApps.length === 0 && !showCreate ? (
         <Card>
           <CardContent className="py-12 text-center">
             <LayoutGrid className="mx-auto h-8 w-8 text-muted-foreground/50 mb-2" />
@@ -429,7 +450,7 @@ export function AppDefinitionsPage() {
         </Card>
       ) : (
         <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-          {apps.map((app) => (
+          {tenantApps.map((app) => (
             <Card
               key={app.id}
               className={cn(
@@ -577,6 +598,50 @@ export function AppDefinitionsPage() {
             </Card>
           ))}
         </div>
+      )}
+
+      {orphanedApps.length > 0 && (
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-lg">Apps needing pack assignment</CardTitle>
+            <CardDescription>These tenant drafts were created before pack support. Attach them to a pack to unlock editing and guardrails.</CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-3">
+            {orphanedApps.map((app) => (
+              <div key={app.id} className="rounded-lg border p-3">
+                <div className="flex flex-wrap items-center justify-between gap-2">
+                  <div>
+                    <p className="font-medium">{app.name}</p>
+                    <code className="text-[11px] text-muted-foreground">{app.slug}</code>
+                  </div>
+                  <Badge variant="secondary" className="text-[10px]">Pack not set</Badge>
+                </div>
+                <div className="mt-3 grid gap-2 sm:flex sm:items-center sm:gap-3">
+                  <select
+                    className="w-full rounded-md border bg-background p-2 text-sm sm:max-w-xs"
+                    defaultValue=""
+                    onChange={(e) => {
+                      const value = e.target.value
+                      if (!value) return
+                      attachAppToPack(app, value)
+                      e.target.value = ''
+                    }}
+                    disabled={attachingApp === app.id}
+                  >
+                    <option value="">Select pack…</option>
+                    {tenantPacks.map((pack) => (
+                      <option key={pack.id} value={pack.id}>
+                        {pack.name}
+                        {pack.primary_app_id ? ' (in use)' : ''}
+                      </option>
+                    ))}
+                  </select>
+                  {attachingApp === app.id && <span className="text-xs text-muted-foreground">Attaching…</span>}
+                </div>
+              </div>
+            ))}
+          </CardContent>
+        </Card>
       )}
     </div>
   )

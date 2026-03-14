@@ -208,9 +208,22 @@ export default createHandler({
     if (body.integration_deps !== undefined) updates.integration_deps = body.integration_deps
     if (body.is_active !== undefined) updates.is_active = body.is_active
 
+    let nextPackId = existing.pack_id
+    if (body.pack_id !== undefined) {
+      nextPackId = body.pack_id ? String(body.pack_id) : null
+      if (nextPackId) {
+        const ownedPack = await fetchOwnedPack(nextPackId, ctx.accountId!)
+        if (isHandlerResult(ownedPack)) return ownedPack
+        if (ownedPack.primary_app_id && ownedPack.primary_app_id !== id) {
+          return error('Pack already has an app. Delete or detach it before reassigning.', 409)
+        }
+      }
+      updates.pack_id = nextPackId
+    }
+
     if (Object.keys(updates).length === 0) return error('No fields to update')
 
-    updates.ownership = existing.pack_id ? 'pack' : 'tenant'
+    updates.ownership = nextPackId ? 'pack' : 'tenant'
 
     const { data, error: dbErr } = await db
       .from('app_definitions')
@@ -220,6 +233,22 @@ export default createHandler({
       .single()
 
     if (dbErr) return error(dbErr.message, 500)
+
+    if (existing.pack_id && existing.pack_id !== nextPackId) {
+      await db
+        .from('config_packs')
+        .update({ primary_app_id: null })
+        .eq('id', existing.pack_id)
+        .eq('owner_account_id', ctx.accountId)
+        .eq('primary_app_id', id)
+    }
+    if (nextPackId && nextPackId !== existing.pack_id) {
+      await db
+        .from('config_packs')
+        .update({ primary_app_id: id })
+        .eq('id', nextPackId)
+        .eq('owner_account_id', ctx.accountId)
+    }
 
     // Adjust count if is_active changed
     if (body.is_active !== undefined && existing.is_active !== data.is_active) {
