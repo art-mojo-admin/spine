@@ -393,9 +393,9 @@ export function BuilderSidePanel({
                     </Card>
                   ))
                 })()}
-              </>
+              </div>
             )}
-          </>
+          </div>
         )}
       </div>
     </div>
