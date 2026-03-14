@@ -6,7 +6,7 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
-import { Plus, Copy, Pencil, Trash2, Power, Package, LayoutGrid, Lock } from 'lucide-react'
+import { Plus, Copy, Pencil, Trash2, ArrowUpCircle, ArrowDownCircle, Package, LayoutGrid, Lock } from 'lucide-react'
 import { ConfigPack, createConfigPack, isTenantAuthoredPack, listConfigPacks } from '@/lib/packs'
 import { useActiveApp } from '@/hooks/useActiveApp'
 import { ActiveAppContextBar } from '@/components/admin/ActiveAppContext'
@@ -196,7 +196,10 @@ export function AppDefinitionsPage() {
 
   async function toggleApp(app: AppDef) {
     const activePackId = activeApp?.packId ?? null
-    if (isPack(app)) return
+    if (isTemplateApp(app)) {
+      setContextError(templateGuardMessage)
+      return
+    }
     if (activePackId && app.pack_id && app.pack_id !== activePackId) {
       setContextError('Locked to another pack. Set it active before editing.')
       return
@@ -212,7 +215,11 @@ export function AppDefinitionsPage() {
   async function deleteApp(id: string) {
     const target = apps.find((app) => app.id === id)
     const activePackId = activeApp?.packId ?? null
-    if (target && !isPack(target) && activePackId && target.pack_id && target.pack_id !== activePackId) {
+    if (target && isTemplateApp(target)) {
+      setContextError(templateGuardMessage)
+      return
+    }
+    if (target && activePackId && target.pack_id && target.pack_id !== activePackId) {
       setContextError('Locked to another pack. Set it active before editing.')
       return
     }
@@ -235,6 +242,15 @@ export function AppDefinitionsPage() {
     return map
   }, [packs])
 
+  const getPackForApp = (app: AppDef) => (app.pack_id ? packLookup[app.pack_id] : null)
+  const isTenantPackApp = (app: AppDef) => {
+    if (!isPack(app) || !app.pack_id) return false
+    const pack = getPackForApp(app)
+    if (!pack) return false
+    return isTenantAuthoredPack(pack, currentAccountId)
+  }
+  const isTemplateApp = (app: AppDef) => isPack(app) && !isTenantPackApp(app)
+
   function handleSetActiveApp(app: AppDef) {
     if (!app.pack_id) return
     setContextError(null)
@@ -248,9 +264,10 @@ export function AppDefinitionsPage() {
 
   const activePackId = activeApp?.packId ?? null
   const appGuardMessage = 'Locked to another pack. Set it active before editing.'
+  const templateGuardMessage = 'Template apps are read-only. Clone to edit or publish.'
   const isAppGuarded = (app: AppDef) => {
+    if (isTemplateApp(app)) return false
     if (!activePackId) return false
-    if (isPack(app)) return false
     if (!app.pack_id) return true
     return app.pack_id !== activePackId
   }
@@ -471,7 +488,7 @@ export function AppDefinitionsPage() {
                 </div>
 
                 <div className="flex items-center gap-1 border-t pt-3">
-                  {isPack(app) ? (
+                  {isTemplateApp(app) ? (
                     <Button
                       variant="outline"
                       size="sm"
@@ -517,18 +534,34 @@ export function AppDefinitionsPage() {
                         size="sm"
                         className="h-7 w-7 p-0"
                         onClick={() => toggleApp(app)}
-                        title={isAppGuarded(app) ? appGuardMessage : app.is_active ? 'Unpublish' : 'Publish'}
+                        title={
+                          isAppGuarded(app)
+                            ? appGuardMessage
+                            : app.is_active
+                              ? 'Demote to draft'
+                              : 'Promote to published'
+                        }
                         disabled={isAppGuarded(app)}
                       >
-                        <Power className="h-3 w-3" />
+                        {app.is_active ? (
+                          <ArrowDownCircle className="h-3 w-3" />
+                        ) : (
+                          <ArrowUpCircle className="h-3 w-3" />
+                        )}
                       </Button>
                       <Button
                         variant="ghost"
                         size="sm"
                         className="h-7 w-7 p-0 text-destructive"
                         onClick={() => deleteApp(app.id)}
-                        title={isAppGuarded(app) ? appGuardMessage : 'Delete'}
-                        disabled={isAppGuarded(app)}
+                        title={
+                          isTemplateApp(app)
+                            ? templateGuardMessage
+                            : isAppGuarded(app)
+                              ? appGuardMessage
+                              : 'Delete'
+                        }
+                        disabled={isAppGuarded(app) || isTemplateApp(app)}
                       >
                         <Trash2 className="h-3 w-3" />
                       </Button>
