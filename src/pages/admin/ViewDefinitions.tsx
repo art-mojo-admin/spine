@@ -231,8 +231,7 @@ export function ViewDefinitionsPage() {
   const guardMessage = 'Locked to another pack. Switch your Active App to edit.'
   const isPackGuarded = (view: any) => {
     if (!activePackId) return false
-    if (view.ownership !== 'pack') return false
-    if (!view.pack_id) return true
+    if (!view?.pack_id) return false
     return view.pack_id !== activePackId
   }
 
