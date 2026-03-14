@@ -52,7 +52,7 @@ export function ActiveAppSwitcher({
   }, [packs])
 
   const selectableApps = useMemo(() => {
-    return apps.filter(app => app.ownership !== 'pack' && !!app.pack_id)
+    return apps.filter(app => !!app.pack_id)
   }, [apps])
 
   const groupedApps = useMemo(() => {
