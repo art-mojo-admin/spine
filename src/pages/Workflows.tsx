@@ -175,16 +175,15 @@ export function WorkflowsPage() {
   const contextReady = !isHydrated || !!activeApp
   const packGuardMessage = 'Locked to another pack. Switch your Active App to edit.'
 
-  const isGuardedPackAsset = (packId?: string | null, ownership?: string | null) => {
+  const isGuardedPackAsset = (packId?: string | null) => {
     if (!activePackId) return false
-    if (ownership !== 'pack') return false
-    if (!packId) return true
+    if (!packId) return false
     return packId !== activePackId
   }
 
   const isItemGuarded = (entity: { pack_id?: string | null; ownership?: string | null } | null | undefined) => {
     if (!entity) return false
-    return isGuardedPackAsset(entity.pack_id ?? selectedDef?.pack_id, entity.ownership ?? selectedDef?.ownership)
+    return isGuardedPackAsset(entity.pack_id ?? selectedDef?.pack_id)
   }
 
   return (
