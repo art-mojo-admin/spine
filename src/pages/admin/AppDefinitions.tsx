@@ -276,8 +276,8 @@ export function AppDefinitionsPage() {
     return app.pack_id !== activePackId
   }
 
-  const orphanedApps = useMemo(() => apps.filter(app => !app.pack_id && !isTemplateApp(app)), [apps])
-  const tenantApps = useMemo(() => apps.filter(app => app.pack_id || isTemplateApp(app)), [apps])
+  const orphanedApps = useMemo(() => apps.filter(app => !app.pack_id && !isTemplateApp(app)), [apps, isTemplateApp])
+  const displayApps = apps
 
   const [attachingApp, setAttachingApp] = useState<string | null>(null)
   async function attachAppToPack(app: AppDef, packId: string) {
@@ -440,7 +440,7 @@ export function AppDefinitionsPage() {
 
       {loading ? (
         <p className="text-sm text-muted-foreground">Loading apps...</p>
-      ) : tenantApps.length === 0 && !showCreate ? (
+      ) : displayApps.length === 0 && !showCreate ? (
         <Card>
           <CardContent className="py-12 text-center">
             <LayoutGrid className="mx-auto h-8 w-8 text-muted-foreground/50 mb-2" />
@@ -450,7 +450,7 @@ export function AppDefinitionsPage() {
         </Card>
       ) : (
         <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-          {tenantApps.map((app) => (
+          {displayApps.map((app) => (
             <Card
               key={app.id}
               className={cn(
@@ -619,12 +619,10 @@ export function AppDefinitionsPage() {
                 <div className="mt-3 grid gap-2 sm:flex sm:items-center sm:gap-3">
                   <select
                     className="w-full rounded-md border bg-background p-2 text-sm sm:max-w-xs"
-                    defaultValue=""
+                    value={app.pack_id ?? ''}
                     onChange={(e) => {
                       const value = e.target.value
-                      if (!value) return
                       attachAppToPack(app, value)
-                      e.target.value = ''
                     }}
                     disabled={attachingApp === app.id}
                   >
@@ -632,7 +630,7 @@ export function AppDefinitionsPage() {
                     {tenantPacks.map((pack) => (
                       <option key={pack.id} value={pack.id}>
                         {pack.name}
-                        {pack.primary_app_id ? ' (in use)' : ''}
+                        {pack.primary_app_id && pack.primary_app_id !== app.id ? ' (in use)' : ''}
                       </option>
                     ))}
                   </select>
