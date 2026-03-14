@@ -7,6 +7,7 @@ import { ViewEditor } from './ViewEditor'
 import { CustomFieldsEditor } from './CustomFieldsEditor'
 import { AutomationsEditor } from './AutomationsEditor'
 import type { AppDef, NavItem, Selection } from '@/pages/admin/AppBuilder'
+import type { ConfigPack } from '@/lib/packs'
 
 const MIN_ROLES = [
   { value: 'portal', label: 'Portal' },
@@ -25,6 +26,10 @@ interface AppInspectorProps {
   onUpdateNavItem: (index: number, partial: Partial<NavItem>) => void
   onRemoveNavItem: (index: number) => void
   onReloadData: () => void
+  packOptions: ConfigPack[]
+  packLoading: boolean
+  packError: string | null
+  selectedPack: ConfigPack | null
 }
 
 export function AppInspector({
@@ -37,6 +42,10 @@ export function AppInspector({
   onUpdateNavItem,
   onRemoveNavItem,
   onReloadData,
+  packOptions,
+  packLoading,
+  packError,
+  selectedPack,
 }: AppInspectorProps) {
   return (
     <div className="w-[380px] flex-shrink-0 border-l bg-background overflow-y-auto">
@@ -53,7 +62,15 @@ export function AppInspector({
       <div className="p-4 space-y-4">
         {/* General / App Metadata */}
         {selection.type === 'general' && (
-          <GeneralEditor app={app} onUpdate={onUpdateApp} viewDefs={viewDefs} />
+          <GeneralEditor
+            app={app}
+            onUpdate={onUpdateApp}
+            viewDefs={viewDefs}
+            packOptions={packOptions}
+            packLoading={packLoading}
+            packError={packError}
+            selectedPack={selectedPack}
+          />
         )}
 
         {/* Nav Item */}
@@ -100,10 +117,18 @@ function GeneralEditor({
   app,
   onUpdate,
   viewDefs,
+  packOptions,
+  packLoading,
+  packError,
+  selectedPack,
 }: {
   app: AppDef
   onUpdate: (partial: Partial<AppDef>) => void
   viewDefs: any[]
+  packOptions: ConfigPack[]
+  packLoading: boolean
+  packError: string | null
+  selectedPack: ConfigPack | null
 }) {
   function slugify(s: string) {
     return s.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '')
@@ -178,6 +203,40 @@ function GeneralEditor({
               <option key={v.id} value={v.slug}>{v.name} ({v.slug})</option>
             ))}
         </select>
+      </div>
+
+      <div className="space-y-1">
+        <label className="text-xs font-medium text-muted-foreground">Pack Assignment</label>
+        <select
+          className="w-full rounded-md border bg-background px-3 py-2 text-sm"
+          value={app.pack_id || ''}
+          onChange={(e) => onUpdate({ pack_id: e.target.value || null })}
+          disabled={packLoading}
+        >
+          <option value="">Not linked to a pack</option>
+          {packOptions.map((pack) => (
+            <option
+              key={pack.id}
+              value={pack.id}
+              disabled={Boolean(pack.primary_app_id && pack.primary_app_id !== app.id)}
+            >
+              {pack.name}
+              {pack.slug ? ` (${pack.slug})` : ''}
+              {pack.primary_app_id && pack.primary_app_id !== app.id ? ' · already assigned' : ''}
+            </option>
+          ))}
+        </select>
+        {packLoading && <p className="text-[10px] text-muted-foreground">Loading packs…</p>}
+        {packError && <p className="text-[10px] text-destructive">{packError}</p>}
+        {selectedPack && (
+          <p className="text-[10px] text-muted-foreground">
+            Linked pack: {selectedPack.name}
+            {selectedPack.slug ? ` (${selectedPack.slug})` : ''}
+          </p>
+        )}
+        {!selectedPack && !packLoading && (
+          <p className="text-[10px] text-muted-foreground">Assigning a pack enables guardrails and active-context selection.</p>
+        )}
       </div>
 
       <div className="pt-2 border-t">
