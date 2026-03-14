@@ -215,7 +215,7 @@ export function WorkflowsPage() {
           ) : (
             definitions.map((def: any) => {
               const isPackAsset = def.ownership === 'pack'
-              const guarded = isGuardedPackAsset(def.pack_id, def.ownership)
+              const guarded = isGuardedPackAsset(def.pack_id)
               return (
                 <Card
                   key={def.id}
