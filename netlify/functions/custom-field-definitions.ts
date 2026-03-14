@@ -96,6 +96,7 @@ export default createHandler({
       .from('custom_field_definitions')
       .insert({
         account_id: ctx.accountId,
+        pack_id: body.pack_id || null,
         entity_type: body.entity_type,
         name: body.name,
         field_key: fieldKey,
