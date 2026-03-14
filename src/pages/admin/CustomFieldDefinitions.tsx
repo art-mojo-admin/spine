@@ -1,6 +1,8 @@
 import { useEffect, useState } from 'react'
 import { apiGet, apiPost, apiPatch, apiDelete } from '@/lib/api'
 import { useAuth } from '@/hooks/useAuth'
+import { useActiveApp } from '@/hooks/useActiveApp'
+import { withActiveAppScope, requireActiveAppScope, MissingActiveAppError } from '@/lib/activeApp'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
@@ -29,6 +31,7 @@ const FIELD_TYPES = [
 
 export function CustomFieldDefinitionsPage() {
   const { currentAccountId } = useAuth()
+  const { activeApp, isHydrated } = useActiveApp()
   const [tab, setTab] = useState('item')
   const [fields, setFields] = useState<any[]>([])
   const [loading, setLoading] = useState(true)
@@ -45,6 +48,7 @@ export function CustomFieldDefinitionsPage() {
   const [section, setSection] = useState('')
   const [position, setPosition] = useState(0)
   const [workflowTypes, setWorkflowTypes] = useState<string>('')
+  const [contextError, setContextError] = useState<string | null>(null)
 
   useEffect(() => { if (currentAccountId) loadFields() }, [currentAccountId, tab])
 
@@ -88,6 +92,7 @@ export function CustomFieldDefinitionsPage() {
   async function saveField() {
     if (!name.trim()) return
 
+    setContextError(null)
     const parsedOptions = (fieldType === 'select' || fieldType === 'multi_select')
       ? options.split(',').map(o => o.trim()).filter(Boolean).map(o => ({ value: o, label: o }))
       : []
@@ -103,27 +108,58 @@ export function CustomFieldDefinitionsPage() {
       workflow_types: workflowTypes ? workflowTypes.split(',').map(s => s.trim()).filter(Boolean) : null,
     }
 
-    if (editingField) {
-      await apiPatch('custom-field-definitions', payload, { id: editingField.id })
-    } else {
-      payload.entity_type = tab
-      payload.field_key = fieldKey || slugify(name)
-      await apiPost('custom-field-definitions', payload)
-    }
+    try {
+      if (editingField) {
+        requireActiveAppScope()
+        await apiPatch('custom-field-definitions', payload, { id: editingField.id })
+      } else {
+        payload.entity_type = tab
+        payload.field_key = fieldKey || slugify(name)
+        await apiPost('custom-field-definitions', withActiveAppScope(payload, { required: true }))
+      }
 
-    resetForm()
-    loadFields()
+      resetForm()
+      loadFields()
+    } catch (err) {
+      if (err instanceof MissingActiveAppError) {
+        setContextError(err.message)
+      } else {
+        throw err
+      }
+    }
   }
 
   async function toggleField(f: any) {
-    await apiPatch('custom-field-definitions', { enabled: !f.enabled }, { id: f.id })
-    loadFields()
+    setContextError(null)
+    try {
+      requireActiveAppScope()
+      await apiPatch('custom-field-definitions', { enabled: !f.enabled }, { id: f.id })
+      loadFields()
+    } catch (err) {
+      if (err instanceof MissingActiveAppError) {
+        setContextError(err.message)
+      } else {
+        throw err
+      }
+    }
   }
 
   async function deleteField(id: string) {
-    await apiDelete(`custom-field-definitions?id=${id}`)
-    loadFields()
+    setContextError(null)
+    try {
+      requireActiveAppScope()
+      await apiDelete(`custom-field-definitions?id=${id}`)
+      loadFields()
+    } catch (err) {
+      if (err instanceof MissingActiveAppError) {
+        setContextError(err.message)
+      } else {
+        throw err
+      }
+    }
   }
+
+  const contextReady = !isHydrated || !!activeApp
 
   return (
     <div className="space-y-6">
@@ -131,6 +167,12 @@ export function CustomFieldDefinitionsPage() {
         <h1 className="text-3xl font-bold tracking-tight">Custom Fields</h1>
         <p className="mt-1 text-muted-foreground">Define custom data points for each entity type</p>
       </div>
+
+      {contextError && (
+        <Card>
+          <CardContent className="py-2 text-sm text-destructive">{contextError}</CardContent>
+        </Card>
+      )}
 
       <div className="flex flex-wrap gap-2">
         {ENTITY_TYPES.map(et => (
@@ -146,7 +188,7 @@ export function CustomFieldDefinitionsPage() {
       </div>
 
       <div className="flex justify-end">
-        <Button size="sm" onClick={() => { resetForm(); setShowForm(true) }}>
+        <Button size="sm" onClick={() => { resetForm(); setShowForm(true) }} disabled={!contextReady} title={!contextReady ? 'Select an app to add fields' : undefined}>
           <Plus className="mr-1 h-3 w-3" /> New Field
         </Button>
       </div>
@@ -223,7 +265,9 @@ export function CustomFieldDefinitionsPage() {
             </div>
 
             <div className="flex gap-2">
-              <Button onClick={saveField} disabled={!name.trim()}>{editingField ? 'Save' : 'Create'}</Button>
+              <Button onClick={saveField} disabled={!name.trim() || !contextReady} title={!contextReady ? 'Select an app to save fields' : undefined}>
+                {editingField ? 'Save' : 'Create'}
+              </Button>
               <Button variant="ghost" onClick={resetForm}>Cancel</Button>
             </div>
           </CardContent>
@@ -267,13 +311,13 @@ export function CustomFieldDefinitionsPage() {
                 <Badge variant={f.enabled ? 'default' : 'secondary'} className="text-[10px]">
                   {f.enabled ? 'Active' : 'Off'}
                 </Badge>
-                <Button variant="ghost" size="sm" className="h-7 w-7 p-0" onClick={() => startEdit(f)}>
+                <Button variant="ghost" size="sm" className="h-7 w-7 p-0" onClick={() => startEdit(f)} disabled={!contextReady} title={!contextReady ? 'Select an app to edit fields' : undefined}>
                   <Pencil className="h-3 w-3" />
                 </Button>
-                <Button variant="ghost" size="sm" className="h-7 w-7 p-0" onClick={() => toggleField(f)}>
+                <Button variant="ghost" size="sm" className="h-7 w-7 p-0" onClick={() => toggleField(f)} disabled={!contextReady} title={!contextReady ? 'Select an app to toggle fields' : undefined}>
                   <Power className="h-3 w-3" />
                 </Button>
-                <Button variant="ghost" size="sm" className="h-7 w-7 p-0 text-destructive" onClick={() => deleteField(f.id)}>
+                <Button variant="ghost" size="sm" className="h-7 w-7 p-0 text-destructive" onClick={() => deleteField(f.id)} disabled={!contextReady} title={!contextReady ? 'Select an app to delete fields' : undefined}>
                   <Trash2 className="h-3 w-3" />
                 </Button>
               </CardContent>

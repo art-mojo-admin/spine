@@ -4,6 +4,8 @@ import { Input } from '@/components/ui/input'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { Card, CardContent } from '@/components/ui/card'
+import { useActiveApp } from '@/hooks/useActiveApp'
+import { withActiveAppScope, MissingActiveAppError, requireActiveAppScope } from '@/lib/activeApp'
 import { ConditionEditor } from './ConditionEditor'
 import { ActionEditor } from './ActionEditor'
 import { X, Plus, Trash2, Zap, Pencil } from 'lucide-react'
@@ -44,6 +46,9 @@ export function BuilderSidePanel({
   const [requireComment, setRequireComment] = useState(false)
   const [requireFields, setRequireFields] = useState('')
   const [transConditions, setTransConditions] = useState<any[]>([])
+  const [contextError, setContextError] = useState<string | null>(null)
+
+  const { activeApp, isHydrated } = useActiveApp()
 
   useEffect(() => {
     if (!data) return
@@ -90,33 +95,57 @@ export function BuilderSidePanel({
 
   async function saveStage() {
     if (!data?.id) return
-    await apiPatch('stage-definitions', {
-      name: stageName,
-      description: stageDesc || null,
-      is_initial: isInitial,
-      is_terminal: isTerminal,
-      is_public: isPublic,
-    }, { id: data.id })
-    onStageUpdated()
+    setContextError(null)
+    try {
+      requireActiveAppScope()
+      await apiPatch('stage-definitions', {
+        name: stageName,
+        description: stageDesc || null,
+        is_initial: isInitial,
+        is_terminal: isTerminal,
+        is_public: isPublic,
+      }, { id: data.id })
+      onStageUpdated()
+    } catch (err) {
+      if (err instanceof MissingActiveAppError) {
+        setContextError(err.message)
+      }
+    }
   }
 
   async function saveTransition() {
     if (!data?.id) return
     const fields = requireFields.split(',').map((f) => f.trim()).filter(Boolean)
-    await apiPatch('transition-definitions', {
-      name: transName,
-      require_comment: requireComment,
-      require_fields: fields,
-      conditions: transConditions,
-    }, { id: data.id })
-    onTransitionUpdated()
+    setContextError(null)
+    try {
+      requireActiveAppScope()
+      await apiPatch('transition-definitions', {
+        name: transName,
+        require_comment: requireComment,
+        require_fields: fields,
+        conditions: transConditions,
+      }, { id: data.id })
+      onTransitionUpdated()
+    } catch (err) {
+      if (err instanceof MissingActiveAppError) {
+        setContextError(err.message)
+      }
+    }
   }
 
   async function deleteTransition() {
     if (!data?.id) return
-    await apiDelete('transition-definitions', { id: data.id })
-    onTransitionUpdated()
-    onClose()
+    setContextError(null)
+    try {
+      requireActiveAppScope()
+      await apiDelete('transition-definitions', { id: data.id })
+      onTransitionUpdated()
+      onClose()
+    } catch (err) {
+      if (err instanceof MissingActiveAppError) {
+        setContextError(err.message)
+      }
+    }
   }
 
   async function saveAction(actionData: any) {
@@ -125,48 +154,66 @@ export function BuilderSidePanel({
       tab === 'on_exit' ? 'on_exit_stage' :
       'on_transition'
 
-    if (actionData.id) {
-      await apiPatch('workflow-actions', {
-        name: actionData.name,
-        action_type: actionData.action_type,
-        action_config: actionData.action_config,
-        conditions: actionData.conditions,
-        enabled: actionData.enabled,
-      }, { id: actionData.id })
-    } else {
-      await apiPost('workflow-actions', {
-        workflow_definition_id: workflowId,
-        name: actionData.name,
-        trigger_type: triggerType,
-        trigger_ref_id: data.id,
-        action_type: actionData.action_type,
-        action_config: actionData.action_config,
-        conditions: actionData.conditions,
-        enabled: actionData.enabled,
-        position: getFilteredActions(triggerType).length,
-      })
-    }
-    setEditingAction(null)
-    setShowNewAction(false)
-    await loadActions()
-    
-    if (tab === 'on_enter' || tab === 'on_exit') {
-      onStageUpdated()
-    } else if (tab === 'actions' && type === 'transition') {
-      onTransitionUpdated()
+    setContextError(null)
+    try {
+      if (actionData.id) {
+        requireActiveAppScope()
+        await apiPatch('workflow-actions', {
+          name: actionData.name,
+          action_type: actionData.action_type,
+          action_config: actionData.action_config,
+          conditions: actionData.conditions,
+          enabled: actionData.enabled,
+        }, { id: actionData.id })
+      } else {
+        await apiPost('workflow-actions', withActiveAppScope({
+          workflow_definition_id: workflowId,
+          name: actionData.name,
+          trigger_type: triggerType,
+          trigger_ref_id: data.id,
+          action_type: actionData.action_type,
+          action_config: actionData.action_config,
+          conditions: actionData.conditions,
+          enabled: actionData.enabled,
+          position: getFilteredActions(triggerType).length,
+        }, { required: true }))
+      }
+      setEditingAction(null)
+      setShowNewAction(false)
+      await loadActions()
+      
+      if (tab === 'on_enter' || tab === 'on_exit') {
+        onStageUpdated()
+      } else if (tab === 'actions' && type === 'transition') {
+        onTransitionUpdated()
+      }
+    } catch (err) {
+      if (err instanceof MissingActiveAppError) {
+        setContextError(err.message)
+      }
     }
   }
 
   async function deleteAction(actionId: string) {
-    await apiDelete('workflow-actions', { id: actionId })
-    await loadActions()
+    setContextError(null)
+    try {
+      requireActiveAppScope()
+      await apiDelete('workflow-actions', { id: actionId })
+      await loadActions()
 
-    if (tab === 'on_enter' || tab === 'on_exit') {
-      onStageUpdated()
-    } else if (tab === 'actions' && type === 'transition') {
-      onTransitionUpdated()
+      if (tab === 'on_enter' || tab === 'on_exit') {
+        onStageUpdated()
+      } else if (tab === 'actions' && type === 'transition') {
+        onTransitionUpdated()
+      }
+    } catch (err) {
+      if (err instanceof MissingActiveAppError) {
+        setContextError(err.message)
+      }
     }
   }
+
+  const contextReady = !isHydrated || !!activeApp
 
   if (!type || !data) return null
 
@@ -183,6 +230,10 @@ export function BuilderSidePanel({
           </p>
           <p className="text-xs text-muted-foreground">{data.name || 'Untitled'}</p>
         </div>
+
+      {contextError && (
+        <div className="px-4 py-2 text-xs text-destructive border-b bg-destructive/5">{contextError}</div>
+      )}
         <Button variant="ghost" size="sm" className="h-7 w-7 p-0" onClick={onClose}>
           <X className="h-4 w-4" />
         </Button>
@@ -233,7 +284,7 @@ export function BuilderSidePanel({
               </label>
             </div>
             <p className="text-[10px] text-muted-foreground">Public stages are visible on the public listing page.</p>
-            <Button size="sm" onClick={saveStage}>Save Stage</Button>
+            <Button size="sm" onClick={saveStage} disabled={!contextReady} title={!contextReady ? 'Select an app to edit stages' : undefined}>Save Stage</Button>
           </>
         )}
 
@@ -257,8 +308,8 @@ export function BuilderSidePanel({
               />
             </div>
             <div className="flex items-center gap-2">
-              <Button size="sm" onClick={saveTransition}>Save Transition</Button>
-              <Button size="sm" variant="destructive" onClick={deleteTransition}>
+              <Button size="sm" onClick={saveTransition} disabled={!contextReady} title={!contextReady ? 'Select an app to edit transitions' : undefined}>Save Transition</Button>
+              <Button size="sm" variant="destructive" onClick={deleteTransition} disabled={!contextReady} title={!contextReady ? 'Select an app to delete transitions' : undefined}>
                 <Trash2 className="mr-1 h-3 w-3" /> Delete
               </Button>
             </div>
@@ -269,13 +320,13 @@ export function BuilderSidePanel({
         {type === 'transition' && tab === 'conditions' && (
           <>
             <ConditionEditor conditions={transConditions} onChange={setTransConditions} entityType="item" />
-            <Button size="sm" onClick={saveTransition}>Save Conditions</Button>
+            <Button size="sm" onClick={saveTransition} disabled={!contextReady} title={!contextReady ? 'Select an app to edit transitions' : undefined}>Save Conditions</Button>
           </>
         )}
 
         {/* Actions tabs (on_enter, on_exit, or transition actions) */}
         {(tab === 'on_enter' || tab === 'on_exit' || (type === 'transition' && tab === 'actions')) && (
-          <>
+          <div className="flex flex-col">
             {editingAction || showNewAction ? (
               <ActionEditor
                 action={editingAction}
@@ -284,14 +335,14 @@ export function BuilderSidePanel({
                 entityType="item"
               />
             ) : (
-              <>
+              <div className="flex flex-col">
                 <div className="flex items-center justify-between">
                   <p className="text-sm font-medium">
                     {tab === 'on_enter' ? 'On Enter Actions' :
                      tab === 'on_exit' ? 'On Exit Actions' :
                      'Transition Actions'}
                   </p>
-                  <Button variant="ghost" size="sm" onClick={() => setShowNewAction(true)}>
+                  <Button variant="ghost" size="sm" onClick={() => setShowNewAction(true)} disabled={!contextReady} title={!contextReady ? 'Select an app to add actions' : undefined}>
                     <Plus className="mr-1 h-3 w-3" /> Add
                   </Button>
                 </div>
@@ -323,6 +374,8 @@ export function BuilderSidePanel({
                           size="sm"
                           className="h-6 w-6 p-0"
                           onClick={() => setEditingAction(action)}
+                          disabled={!contextReady}
+                          title={!contextReady ? 'Select an app to edit actions' : undefined}
                         >
                           <Pencil className="h-3 w-3" />
                         </Button>
@@ -331,6 +384,8 @@ export function BuilderSidePanel({
                           size="sm"
                           className="h-6 w-6 p-0 text-destructive"
                           onClick={() => deleteAction(action.id)}
+                          disabled={!contextReady}
+                          title={!contextReady ? 'Select an app to delete actions' : undefined}
                         >
                           <Trash2 className="h-3 w-3" />
                         </Button>

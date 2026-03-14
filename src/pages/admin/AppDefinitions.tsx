@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { apiGet, apiPost, apiPatch, apiDelete } from '@/lib/api'
 import { useAuth } from '@/hooks/useAuth'
@@ -6,8 +6,11 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
-import { Plus, Copy, Pencil, Trash2, Power, Package, LayoutGrid } from 'lucide-react'
+import { Plus, Copy, Pencil, Trash2, Power, Package, LayoutGrid, Lock } from 'lucide-react'
 import { ConfigPack, createConfigPack, isTenantAuthoredPack, listConfigPacks } from '@/lib/packs'
+import { useActiveApp } from '@/hooks/useActiveApp'
+import { ActiveAppContextBar } from '@/components/admin/ActiveAppContext'
+import { cn } from '@/lib/utils'
 
 interface AppDef {
   id: string
@@ -22,6 +25,7 @@ interface AppDef {
   is_active: boolean
   ownership: string | null
   created_at: string
+  pack_id: string | null
 }
 
 function slugify(s: string) {
@@ -31,6 +35,7 @@ function slugify(s: string) {
 export function AppDefinitionsPage() {
   const navigate = useNavigate()
   const { currentAccountId } = useAuth()
+  const { activeApp, setActiveApp } = useActiveApp()
   const [apps, setApps] = useState<AppDef[]>([])
   const [loading, setLoading] = useState(true)
   const [showCreate, setShowCreate] = useState(false)
@@ -49,10 +54,15 @@ export function AppDefinitionsPage() {
   const [packIcon, setPackIcon] = useState('')
   const [packDescription, setPackDescription] = useState('')
   const [creatingPack, setCreatingPack] = useState(false)
+  const [contextError, setContextError] = useState<string | null>(null)
 
   useEffect(() => {
     if (currentAccountId) loadApps()
   }, [currentAccountId])
+
+  useEffect(() => {
+    setContextError(null)
+  }, [activeApp?.packId])
 
   async function loadApps() {
     setLoading(true)
@@ -71,22 +81,29 @@ export function AppDefinitionsPage() {
     [packs, currentAccountId]
   )
 
-  useEffect(() => {
-    if (!showCreate || !currentAccountId) return
-    async function fetchPacks() {
-      setPackLoading(true)
-      setPackError(null)
-      try {
-        const data = await listConfigPacks()
-        setPacks(data)
-      } catch (err: any) {
-        setPackError(err?.message || 'Failed to load packs')
-      } finally {
-        setPackLoading(false)
-      }
+  const loadTenantPacks = useCallback(async () => {
+    if (!currentAccountId) return
+    setPackLoading(true)
+    setPackError(null)
+    try {
+      const data = await listConfigPacks()
+      setPacks(data)
+    } catch (err: any) {
+      setPackError(err?.message || 'Failed to load packs')
+    } finally {
+      setPackLoading(false)
     }
-    fetchPacks()
-  }, [showCreate, currentAccountId])
+  }, [currentAccountId])
+
+  useEffect(() => {
+    loadTenantPacks()
+  }, [loadTenantPacks])
+
+  useEffect(() => {
+    if (showCreate) {
+      loadTenantPacks()
+    }
+  }, [showCreate, loadTenantPacks])
 
   useEffect(() => {
     if (createPackInline) return
@@ -178,6 +195,12 @@ export function AppDefinitionsPage() {
   }
 
   async function toggleApp(app: AppDef) {
+    const activePackId = activeApp?.packId ?? null
+    if (isPack(app)) return
+    if (activePackId && app.pack_id && app.pack_id !== activePackId) {
+      setContextError('Locked to another pack. Set it active before editing.')
+      return
+    }
     try {
       await apiPatch('app-definitions', { is_active: !app.is_active }, { id: app.id })
       loadApps()
@@ -187,6 +210,12 @@ export function AppDefinitionsPage() {
   }
 
   async function deleteApp(id: string) {
+    const target = apps.find((app) => app.id === id)
+    const activePackId = activeApp?.packId ?? null
+    if (target && !isPack(target) && activePackId && target.pack_id && target.pack_id !== activePackId) {
+      setContextError('Locked to another pack. Set it active before editing.')
+      return
+    }
     if (!confirm('Delete this app definition? This cannot be undone.')) return
     try {
       await apiDelete(`app-definitions?id=${id}`)
@@ -197,6 +226,34 @@ export function AppDefinitionsPage() {
   }
 
   const isPack = (app: AppDef) => app.ownership === 'pack'
+
+  const packLookup = useMemo(() => {
+    const map: Record<string, ConfigPack> = {}
+    packs.forEach((pack) => {
+      map[pack.id] = pack
+    })
+    return map
+  }, [packs])
+
+  function handleSetActiveApp(app: AppDef) {
+    if (!app.pack_id) return
+    setContextError(null)
+    setActiveApp({
+      packId: app.pack_id,
+      packName: packLookup[app.pack_id]?.name ?? null,
+      appId: app.id,
+      appName: app.name,
+    })
+  }
+
+  const activePackId = activeApp?.packId ?? null
+  const appGuardMessage = 'Locked to another pack. Set it active before editing.'
+  const isAppGuarded = (app: AppDef) => {
+    if (!activePackId) return false
+    if (isPack(app)) return false
+    if (!app.pack_id) return true
+    return app.pack_id !== activePackId
+  }
 
   return (
     <div className="space-y-6">
@@ -211,6 +268,17 @@ export function AppDefinitionsPage() {
           <Plus className="mr-1 h-4 w-4" /> New App
         </Button>
       </div>
+
+      <ActiveAppContextBar />
+
+      {contextError && (
+        <Card>
+          <CardContent className="flex items-center gap-2 py-3 text-sm text-amber-600">
+            <Lock className="h-4 w-4" />
+            <span>{contextError}</span>
+          </CardContent>
+        </Card>
+      )}
 
       {errorMsg && (
         <Card><CardContent className="py-3 text-sm text-destructive">{errorMsg}</CardContent></Card>
@@ -345,7 +413,16 @@ export function AppDefinitionsPage() {
       ) : (
         <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
           {apps.map((app) => (
-            <Card key={app.id} className={!app.is_active ? 'opacity-70' : ''}>
+            <Card
+              key={app.id}
+              className={cn(
+                'transition-shadow',
+                !app.is_active && 'opacity-70',
+                activeApp?.appId === app.id && 'border-primary shadow-lg shadow-primary/10',
+                isAppGuarded(app) && 'border-dashed border-muted/80 opacity-60',
+              )}
+              title={isAppGuarded(app) ? appGuardMessage : undefined}
+            >
               <CardHeader className="pb-3">
                 <div className="flex items-start justify-between">
                   <div className="flex items-center gap-2">
@@ -364,6 +441,21 @@ export function AppDefinitionsPage() {
                     {isPack(app) && (
                       <Badge variant="outline" className="text-[10px]">
                         <Package className="mr-0.5 h-2.5 w-2.5" /> Pack
+                      </Badge>
+                    )}
+                    {app.pack_id && (
+                      <Badge variant="outline" className="text-[10px] font-mono">
+                        {app.pack_id.slice(0, 8)}
+                      </Badge>
+                    )}
+                    {isAppGuarded(app) && (
+                      <Badge variant="destructive" className="text-[10px]">
+                        Locked
+                      </Badge>
+                    )}
+                    {activeApp?.appId === app.id && (
+                      <Badge variant="outline" className="text-[10px]">
+                        Editing
                       </Badge>
                     )}
                   </div>
@@ -396,19 +488,58 @@ export function AppDefinitionsPage() {
                         variant="outline"
                         size="sm"
                         className="h-7 text-xs"
-                        onClick={() => navigate(`/admin/apps/${app.id}/builder`)}
+                        onClick={() => {
+                          if (isAppGuarded(app)) {
+                            setContextError(appGuardMessage)
+                            return
+                          }
+                          if (app.pack_id) handleSetActiveApp(app)
+                          navigate(`/admin/apps/${app.id}/builder`)
+                        }}
+                        disabled={isAppGuarded(app)}
+                        title={isAppGuarded(app) ? appGuardMessage : undefined}
                       >
                         <Pencil className="mr-1 h-3 w-3" /> Builder
                       </Button>
-                      <Button variant="ghost" size="sm" className="h-7 w-7 p-0" onClick={() => toggleApp(app)} title={app.is_active ? 'Unpublish' : 'Publish'}>
+                      {app.pack_id && (
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          className="h-7 text-xs"
+                          onClick={() => handleSetActiveApp(app)}
+                          title={activePackId === app.pack_id ? 'Already active' : 'Set Active'}
+                        >
+                          Set Active
+                        </Button>
+                      )}
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        className="h-7 w-7 p-0"
+                        onClick={() => toggleApp(app)}
+                        title={isAppGuarded(app) ? appGuardMessage : app.is_active ? 'Unpublish' : 'Publish'}
+                        disabled={isAppGuarded(app)}
+                      >
                         <Power className="h-3 w-3" />
                       </Button>
-                      <Button variant="ghost" size="sm" className="h-7 w-7 p-0 text-destructive" onClick={() => deleteApp(app.id)} title="Delete">
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        className="h-7 w-7 p-0 text-destructive"
+                        onClick={() => deleteApp(app.id)}
+                        title={isAppGuarded(app) ? appGuardMessage : 'Delete'}
+                        disabled={isAppGuarded(app)}
+                      >
                         <Trash2 className="h-3 w-3" />
                       </Button>
                     </>
                   )}
                 </div>
+                {isAppGuarded(app) && (
+                  <div className="mt-2 flex items-center gap-1 text-[11px] text-amber-600">
+                    <Lock className="h-3 w-3" /> Locked to another pack
+                  </div>
+                )}
               </CardContent>
             </Card>
           ))}

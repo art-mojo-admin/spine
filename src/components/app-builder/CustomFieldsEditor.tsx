@@ -1,5 +1,7 @@
 import { useState } from 'react'
 import { apiPost, apiPatch, apiDelete } from '@/lib/api'
+import { useActiveApp } from '@/hooks/useActiveApp'
+import { withActiveAppScope, requireActiveAppScope, MissingActiveAppError } from '@/lib/activeApp'
 import { Input } from '@/components/ui/input'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
@@ -41,6 +43,9 @@ export function CustomFieldsEditor({ customFields, onReload }: CustomFieldsEdito
   const [options, setOptions] = useState('')
   const [required, setRequired] = useState(false)
   const [saving, setSaving] = useState(false)
+  const [contextError, setContextError] = useState<string | null>(null)
+
+  const { activeApp, isHydrated } = useActiveApp()
 
   const filtered = customFields.filter((f: any) => f.entity_type === tab)
 
@@ -70,40 +75,65 @@ export function CustomFieldsEditor({ customFields, onReload }: CustomFieldsEdito
   async function saveField() {
     if (!name.trim()) return
     setSaving(true)
+    setContextError(null)
     const parsedOptions = (fieldType === 'select' || fieldType === 'multi_select')
       ? options.split(',').map(o => o.trim()).filter(Boolean).map(o => ({ value: o, label: o }))
       : []
 
     try {
       if (editingField) {
+        requireActiveAppScope()
         await apiPatch('custom-field-definitions', {
           name, field_type: fieldType, options: parsedOptions, required,
         }, { id: editingField.id })
       } else {
-        await apiPost('custom-field-definitions', {
+        await apiPost('custom-field-definitions', withActiveAppScope({
           entity_type: tab, name, field_key: fieldKey || slugify(name),
           field_type: fieldType, options: parsedOptions, required,
-        })
+        }, { required: true }))
       }
       resetForm()
       onReload()
-    } catch {}
+    } catch (err) {
+      if (err instanceof MissingActiveAppError) {
+        setContextError(err.message)
+      }
+    }
     setSaving(false)
   }
 
   async function toggleField(f: any) {
-    await apiPatch('custom-field-definitions', { enabled: !f.enabled }, { id: f.id })
-    onReload()
+    setContextError(null)
+    try {
+      requireActiveAppScope()
+      await apiPatch('custom-field-definitions', { enabled: !f.enabled }, { id: f.id })
+      onReload()
+    } catch (err) {
+      if (err instanceof MissingActiveAppError) {
+        setContextError(err.message)
+      }
+    }
   }
 
   async function deleteField(id: string) {
-    await apiDelete(`custom-field-definitions?id=${id}`)
-    onReload()
+    setContextError(null)
+    try {
+      requireActiveAppScope()
+      await apiDelete(`custom-field-definitions?id=${id}`)
+      onReload()
+    } catch (err) {
+      if (err instanceof MissingActiveAppError) {
+        setContextError(err.message)
+      }
+    }
   }
+
+  const contextReady = !isHydrated || !!activeApp
 
   return (
     <div className="space-y-4">
       <p className="text-sm font-semibold">Custom Fields</p>
+      {contextError && <p className="text-xs text-destructive">{contextError}</p>}
 
       <div className="flex flex-wrap gap-1">
         {ENTITY_TYPES.map((et) => (
@@ -161,14 +191,14 @@ export function CustomFieldsEditor({ customFields, onReload }: CustomFieldsEdito
             Required
           </label>
           <div className="flex gap-2">
-            <Button size="sm" onClick={saveField} disabled={saving || !name.trim()}>
+            <Button size="sm" onClick={saveField} disabled={saving || !name.trim() || !contextReady} title={!contextReady ? 'Select an app to save fields' : undefined}>
               <Save className="mr-1 h-3 w-3" /> {editingField ? 'Save' : 'Create'}
             </Button>
             <Button size="sm" variant="ghost" onClick={resetForm}><X className="mr-1 h-3 w-3" /> Cancel</Button>
           </div>
         </div>
       ) : (
-        <Button variant="ghost" size="sm" className="h-7 text-xs" onClick={() => setShowForm(true)}>
+        <Button variant="ghost" size="sm" className="h-7 text-xs" onClick={() => setShowForm(true)} disabled={!contextReady} title={!contextReady ? 'Select an app to add fields' : undefined}>
           <Plus className="mr-1 h-3 w-3" /> New Field
         </Button>
       )}
@@ -188,13 +218,13 @@ export function CustomFieldsEditor({ customFields, onReload }: CustomFieldsEdito
                   <code className="text-[9px] text-muted-foreground">{f.field_key}</code>
                 </div>
               </div>
-              <Button variant="ghost" size="sm" className="h-5 w-5 p-0" onClick={() => startEdit(f)}>
+              <Button variant="ghost" size="sm" className="h-5 w-5 p-0" onClick={() => startEdit(f)} disabled={!contextReady} title={!contextReady ? 'Select an app to edit fields' : undefined}>
                 <Pencil className="h-2.5 w-2.5" />
               </Button>
-              <Button variant="ghost" size="sm" className="h-5 w-5 p-0" onClick={() => toggleField(f)}>
+              <Button variant="ghost" size="sm" className="h-5 w-5 p-0" onClick={() => toggleField(f)} disabled={!contextReady} title={!contextReady ? 'Select an app to toggle fields' : undefined}>
                 <Power className="h-2.5 w-2.5" />
               </Button>
-              <Button variant="ghost" size="sm" className="h-5 w-5 p-0 text-destructive" onClick={() => deleteField(f.id)}>
+              <Button variant="ghost" size="sm" className="h-5 w-5 p-0 text-destructive" onClick={() => deleteField(f.id)} disabled={!contextReady} title={!contextReady ? 'Select an app to delete fields' : undefined}>
                 <Trash2 className="h-2.5 w-2.5" />
               </Button>
             </CardContent>

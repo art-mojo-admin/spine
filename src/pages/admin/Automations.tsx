@@ -1,6 +1,8 @@
 import { useEffect, useState } from 'react'
 import { apiGet, apiPost, apiPatch, apiDelete } from '@/lib/api'
 import { useAuth } from '@/hooks/useAuth'
+import { useActiveApp } from '@/hooks/useActiveApp'
+import { withActiveAppScope, requireActiveAppScope, MissingActiveAppError } from '@/lib/activeApp'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card'
@@ -31,6 +33,7 @@ const ACTION_TYPES = [
 
 export function AutomationsPage() {
   const { currentAccountId } = useAuth()
+  const { activeApp, isHydrated } = useActiveApp()
   const [rules, setRules] = useState<any[]>([])
   const [showCreate, setShowCreate] = useState(false)
   const [loading, setLoading] = useState(true)
@@ -40,6 +43,7 @@ export function AutomationsPage() {
   const [actionType, setActionType] = useState('emit_event')
   const [actionConfig, setActionConfig] = useState('{}')
   const [conditions, setConditions] = useState<any[]>([])
+  const [contextError, setContextError] = useState<string | null>(null)
 
   useEffect(() => {
     if (!currentAccountId) return
@@ -58,30 +62,61 @@ export function AutomationsPage() {
     if (!name.trim()) return
     let parsedConfig = {}
     try { parsedConfig = JSON.parse(actionConfig) } catch {}
+    setContextError(null)
 
-    await apiPost('automation-rules', {
-      name,
-      trigger_event: triggerEvent,
-      action_type: actionType,
-      action_config: parsedConfig,
-      conditions,
-    })
-    setName('')
-    setActionConfig('{}')
-    setConditions([])
-    setShowCreate(false)
-    loadRules()
+    try {
+      await apiPost('automation-rules', withActiveAppScope({
+        name,
+        trigger_event: triggerEvent,
+        action_type: actionType,
+        action_config: parsedConfig,
+        conditions,
+      }, { required: true }))
+      setName('')
+      setActionConfig('{}')
+      setConditions([])
+      setShowCreate(false)
+      loadRules()
+    } catch (err) {
+      if (err instanceof MissingActiveAppError) {
+        setContextError(err.message)
+      } else {
+        throw err
+      }
+    }
   }
 
   async function toggleRule(rule: any) {
-    await apiPatch('automation-rules', { enabled: !rule.enabled }, { id: rule.id })
-    loadRules()
+    setContextError(null)
+    try {
+      requireActiveAppScope()
+      await apiPatch('automation-rules', { enabled: !rule.enabled }, { id: rule.id })
+      loadRules()
+    } catch (err) {
+      if (err instanceof MissingActiveAppError) {
+        setContextError(err.message)
+      } else {
+        throw err
+      }
+    }
   }
 
   async function deleteRule(id: string) {
-    await apiDelete(`automation-rules?id=${id}`)
-    loadRules()
+    setContextError(null)
+    try {
+      requireActiveAppScope()
+      await apiDelete(`automation-rules?id=${id}`)
+      loadRules()
+    } catch (err) {
+      if (err instanceof MissingActiveAppError) {
+        setContextError(err.message)
+      } else {
+        throw err
+      }
+    }
   }
+
+  const contextReady = !isHydrated || !!activeApp
 
   return (
     <div className="space-y-6">
@@ -90,10 +125,16 @@ export function AutomationsPage() {
           <h1 className="text-3xl font-bold tracking-tight">Automations</h1>
           <p className="mt-1 text-muted-foreground">Event-driven automation rules</p>
         </div>
-        <Button onClick={() => setShowCreate(true)} size="sm">
+        <Button onClick={() => setShowCreate(true)} size="sm" disabled={!contextReady} title={!contextReady ? 'Select an app to add automations' : undefined}>
           <Plus className="mr-2 h-4 w-4" /> New Rule
         </Button>
       </div>
+
+      {contextError && (
+        <Card>
+          <CardContent className="py-2 text-sm text-destructive">{contextError}</CardContent>
+        </Card>
+      )}
 
       {showCreate && (
         <Card>
@@ -147,7 +188,7 @@ export function AutomationsPage() {
             </div>
 
             <div className="flex gap-2">
-              <Button onClick={createRule}>Create Rule</Button>
+              <Button onClick={createRule} disabled={!contextReady} title={!contextReady ? 'Select an app to save automations' : undefined}>Create Rule</Button>
               <Button variant="ghost" onClick={() => setShowCreate(false)}>Cancel</Button>
             </div>
           </CardContent>
@@ -180,10 +221,10 @@ export function AutomationsPage() {
                 <Badge variant={rule.enabled ? 'default' : 'secondary'}>
                   {rule.enabled ? 'Active' : 'Disabled'}
                 </Badge>
-                <Button variant="ghost" size="sm" onClick={() => toggleRule(rule)}>
+                <Button variant="ghost" size="sm" onClick={() => toggleRule(rule)} disabled={!contextReady} title={!contextReady ? 'Select an app to toggle automations' : undefined}>
                   <Power className="h-4 w-4" />
                 </Button>
-                <Button variant="ghost" size="sm" onClick={() => deleteRule(rule.id)}>
+                <Button variant="ghost" size="sm" onClick={() => deleteRule(rule.id)} disabled={!contextReady} title={!contextReady ? 'Select an app to delete automations' : undefined}>
                   <Trash2 className="h-4 w-4 text-destructive" />
                 </Button>
               </CardContent>

@@ -2,6 +2,8 @@ import { useEffect, useState } from 'react'
 import { useNavigate, useParams, useSearchParams } from 'react-router-dom'
 import { apiGet, apiPost, apiPatch } from '@/lib/api'
 import { useAuth } from '@/hooks/useAuth'
+import { useActiveApp } from '@/hooks/useActiveApp'
+import { withActiveAppScope, requireActiveAppScope, MissingActiveAppError } from '@/lib/activeApp'
 import { EditableField } from '@/components/shared/EditableField'
 import { CustomFieldsRenderer } from '@/components/shared/CustomFieldsRenderer'
 import { EntityLinksPanel } from '@/components/shared/EntityLinksPanel'
@@ -29,6 +31,7 @@ export function WorkflowItemDetailPage() {
   const [searchParams] = useSearchParams()
   const navigate = useNavigate()
   const { currentAccountId, currentAccountNodeId } = useAuth()
+  const { activeApp, isHydrated } = useActiveApp()
   const isNew = itemId === 'new'
 
   const [item, setItem] = useState<any>(null)
@@ -45,6 +48,7 @@ export function WorkflowItemDetailPage() {
   const [transitionComment, setTransitionComment] = useState('')
   const [parentItem, setParentItem] = useState<any>(null)
   const [childItems, setChildItems] = useState<any[]>([])
+  const [contextError, setContextError] = useState<string | null>(null)
 
   // Draft fields
   const [title, setTitle] = useState('')
@@ -199,9 +203,10 @@ export function WorkflowItemDetailPage() {
     }
     setSaving(true)
     setErrorMessage(null)
+    setContextError(null)
     try {
       if (isNew) {
-        const created = await apiPost<any>('workflow-items', {
+        const created = await apiPost<any>('workflow-items', withActiveAppScope({
           title,
           description,
           workflow_definition_id: workflowDefId,
@@ -210,9 +215,10 @@ export function WorkflowItemDetailPage() {
           priority,
           due_date: dueDate || undefined,
           item_type: workflowType,
-        })
+        }, { required: true }))
         navigate(`/workflow-items/${created.id}`, { replace: true })
       } else {
+        requireActiveAppScope()
         const updated = await apiPatch<any>('workflow-items', {
           title,
           description,
@@ -226,7 +232,11 @@ export function WorkflowItemDetailPage() {
         setEditing(false)
       }
     } catch (err: any) {
-      setErrorMessage(err?.message || 'Save failed')
+      if (err instanceof MissingActiveAppError) {
+        setContextError(err.message)
+      } else {
+        setErrorMessage(err?.message || 'Save failed')
+      }
     } finally {
       setSaving(false)
     }
@@ -241,7 +251,9 @@ export function WorkflowItemDetailPage() {
     if (!item || !itemId) return
     setTransitioning(true)
     setErrorMessage(null)
+    setContextError(null)
     try {
+      requireActiveAppScope()
       const updated = await apiPatch<any>('workflow-items', {
         stage_definition_id: transition.to_stage_id,
         transition_id: transition.id,
@@ -252,11 +264,17 @@ export function WorkflowItemDetailPage() {
       setCommentTransition(null)
       setTransitionComment('')
     } catch (err: any) {
-      setErrorMessage(err?.message || 'Transition failed')
+      if (err instanceof MissingActiveAppError) {
+        setContextError(err.message)
+      } else {
+        setErrorMessage(err?.message || 'Transition failed')
+      }
     } finally {
       setTransitioning(false)
     }
   }
+
+  const contextReady = !isHydrated || !!activeApp
 
   if (loading) {
     return (
@@ -301,6 +319,9 @@ export function WorkflowItemDetailPage() {
 
       {errorMessage && (
         <Card><CardContent className="py-3 text-sm text-destructive">{errorMessage}</CardContent></Card>
+      )}
+      {contextError && (
+        <Card><CardContent className="py-3 text-sm text-destructive">{contextError}</CardContent></Card>
       )}
 
       <Card>
@@ -407,7 +428,7 @@ export function WorkflowItemDetailPage() {
 
       {editing && (
         <div className="flex items-center gap-3">
-          <Button onClick={handleSave} disabled={saving}>
+          <Button onClick={handleSave} disabled={saving || !contextReady} title={!contextReady ? 'Select an app to save changes' : undefined}>
             <Save className="mr-1 h-4 w-4" />{saving ? 'Saving...' : 'Save'}
           </Button>
           {!isNew && (
@@ -498,7 +519,8 @@ export function WorkflowItemDetailPage() {
                     key={t.id}
                     size="sm"
                     variant="outline"
-                    disabled={transitioning}
+                    disabled={transitioning || !contextReady}
+                    title={!contextReady ? 'Select an app to move items' : undefined}
                     onClick={() => {
                       if (t.require_comment) {
                         setCommentTransition(t)
@@ -541,7 +563,8 @@ export function WorkflowItemDetailPage() {
             <div className="flex items-center gap-2">
               <Button
                 size="sm"
-                disabled={!transitionComment.trim() || transitioning}
+                disabled={!transitionComment.trim() || transitioning || !contextReady}
+                title={!contextReady ? 'Select an app to move items' : undefined}
                 onClick={() => executeTransition(commentTransition, transitionComment)}
               >
                 {transitioning ? 'Processing...' : 'Confirm Transition'}

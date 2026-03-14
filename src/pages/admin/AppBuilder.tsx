@@ -2,6 +2,8 @@ import { useCallback, useEffect, useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import { apiGet, apiPatch } from '@/lib/api'
 import { useAuth } from '@/hooks/useAuth'
+import { useActiveApp } from '@/hooks/useActiveApp'
+import { requireActiveAppScope, MissingActiveAppError } from '@/lib/activeApp'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { ArrowLeft, Save, Power } from 'lucide-react'
@@ -44,12 +46,14 @@ export function AppBuilderPage() {
   const { appId } = useParams<{ appId: string }>()
   const navigate = useNavigate()
   const { currentAccountId } = useAuth()
+  const { activeApp, isHydrated } = useActiveApp()
 
   const [app, setApp] = useState<AppDef | null>(null)
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
   const [dirty, setDirty] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [contextError, setContextError] = useState<string | null>(null)
   const [selection, setSelection] = useState<Selection>({ type: 'general' })
 
   const [viewDefs, setViewDefs] = useState<any[]>([])
@@ -125,7 +129,9 @@ export function AppBuilderPage() {
     if (!app) return
     setSaving(true)
     setError(null)
+    setContextError(null)
     try {
+      requireActiveAppScope()
       const updated = await apiPatch<AppDef>('app-definitions', {
         name: app.name,
         slug: app.slug,
@@ -139,7 +145,11 @@ export function AppBuilderPage() {
       setApp(updated)
       setDirty(false)
     } catch (err: any) {
-      setError(err?.message || 'Save failed')
+      if (err instanceof MissingActiveAppError) {
+        setContextError(err.message)
+      } else {
+        setError(err?.message || 'Save failed')
+      }
     } finally {
       setSaving(false)
     }
@@ -149,8 +159,10 @@ export function AppBuilderPage() {
     if (!app) return
     setSaving(true)
     setError(null)
+    setContextError(null)
     try {
       // Save pending changes first
+      requireActiveAppScope()
       const updated = await apiPatch<AppDef>('app-definitions', {
         name: app.name,
         slug: app.slug,
@@ -165,11 +177,17 @@ export function AppBuilderPage() {
       setApp(updated)
       setDirty(false)
     } catch (err: any) {
-      setError(err?.message || 'Publish failed')
+      if (err instanceof MissingActiveAppError) {
+        setContextError(err.message)
+      } else {
+        setError(err?.message || 'Publish failed')
+      }
     } finally {
       setSaving(false)
     }
   }
+
+  const contextReady = !isHydrated || !!activeApp
 
   if (loading) {
     return (
@@ -204,15 +222,17 @@ export function AppBuilderPage() {
         </Badge>
         {dirty && <span className="text-xs text-muted-foreground">(unsaved changes)</span>}
         {error && <span className="text-xs text-destructive">{error}</span>}
+        {contextError && <span className="text-xs text-destructive">{contextError}</span>}
         <div className="ml-auto flex items-center gap-2">
-          <Button size="sm" variant="outline" onClick={saveApp} disabled={saving || !dirty}>
+          <Button size="sm" variant="outline" onClick={saveApp} disabled={saving || !dirty || !contextReady} title={!contextReady ? 'Select an app to save changes' : undefined}>
             <Save className="mr-1 h-3 w-3" /> {saving ? 'Saving...' : 'Save'}
           </Button>
           <Button
             size="sm"
             variant={app.is_active ? 'secondary' : 'default'}
             onClick={togglePublish}
-            disabled={saving}
+            disabled={saving || !contextReady}
+            title={!contextReady ? 'Select an app to publish changes' : undefined}
           >
             <Power className="mr-1 h-3 w-3" />
             {app.is_active ? 'Unpublish' : 'Publish'}

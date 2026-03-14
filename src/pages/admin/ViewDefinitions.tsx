@@ -2,12 +2,16 @@ import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { apiGet, apiPost, apiPatch, apiDelete } from '@/lib/api'
 import { useAuth } from '@/hooks/useAuth'
+import { useActiveApp } from '@/hooks/useActiveApp'
+import { withActiveAppScope, MissingActiveAppError, requireActiveAppScope } from '@/lib/activeApp'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Textarea } from '@/components/ui/textarea'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
-import { Plus, LayoutGrid, Pencil, Trash2, Power, GripVertical, X, ArrowUp, ArrowDown, Copy, PaintBucket } from 'lucide-react'
+import { ActiveAppContextBar } from '@/components/admin/ActiveAppContext'
+import { cn } from '@/lib/utils'
+import { Plus, LayoutGrid, Pencil, Trash2, Power, GripVertical, X, ArrowUp, ArrowDown, Copy, PaintBucket, Lock } from 'lucide-react'
 
 const VIEW_TYPES = [
   { value: 'list', label: 'List' },
@@ -58,9 +62,11 @@ function slugify(s: string) {
 export function ViewDefinitionsPage() {
   const navigate = useNavigate()
   const { currentAccountId } = useAuth()
+  const { activeApp, isHydrated } = useActiveApp()
   const [views, setViews] = useState<any[]>([])
   const [loading, setLoading] = useState(true)
   const [tab, setTab] = useState<string>('all')
+  const [contextError, setContextError] = useState<string | null>(null)
 
   // Form state
   const [showForm, setShowForm] = useState(false)
@@ -74,6 +80,10 @@ export function ViewDefinitionsPage() {
   const [panels, setPanels] = useState<PanelConfig[]>([])
 
   useEffect(() => { if (currentAccountId) loadViews() }, [currentAccountId])
+
+  useEffect(() => {
+    setContextError(null)
+  }, [activeApp?.packId])
 
   async function loadViews() {
     setLoading(true)
@@ -118,6 +128,8 @@ export function ViewDefinitionsPage() {
   async function saveView() {
     if (!name.trim() || !viewType) return
 
+    setContextError(null)
+
     let targetFilter = {}
     try { targetFilter = JSON.parse(targetFilterJson) } catch { /* keep empty */ }
 
@@ -132,26 +144,55 @@ export function ViewDefinitionsPage() {
       config: { panels: sortedPanels },
     }
 
-    if (editingView) {
-      await apiPatch('view-definitions', payload, { id: editingView.id })
-    } else {
-      payload.slug = slug || slugify(name)
-      await apiPost('view-definitions', payload)
-    }
+    try {
+      if (editingView) {
+        requireActiveAppScope()
+        await apiPatch('view-definitions', payload, { id: editingView.id })
+      } else {
+        payload.slug = slug || slugify(name)
+        await apiPost('view-definitions', withActiveAppScope(payload, { required: true }))
+      }
 
-    resetForm()
-    loadViews()
+      resetForm()
+      loadViews()
+    } catch (err) {
+      if (err instanceof MissingActiveAppError) {
+        setContextError(err.message)
+        return
+      }
+      throw err
+    }
   }
 
   async function toggleView(v: any) {
-    await apiPatch('view-definitions', { is_active: !v.is_active }, { id: v.id })
-    loadViews()
+    setContextError(null)
+    try {
+      requireActiveAppScope()
+      await apiPatch('view-definitions', { is_active: !v.is_active }, { id: v.id })
+      loadViews()
+    } catch (err) {
+      if (err instanceof MissingActiveAppError) {
+        setContextError(err.message)
+        return
+      }
+      throw err
+    }
   }
 
   async function deleteView(id: string) {
     if (!confirm('Delete this view definition?')) return
-    await apiDelete(`view-definitions?id=${id}`)
-    loadViews()
+    setContextError(null)
+    try {
+      requireActiveAppScope()
+      await apiDelete(`view-definitions?id=${id}`)
+      loadViews()
+    } catch (err) {
+      if (err instanceof MissingActiveAppError) {
+        setContextError(err.message)
+        return
+      }
+      throw err
+    }
   }
 
   // Panel helpers
@@ -185,12 +226,24 @@ export function ViewDefinitionsPage() {
     ? views
     : views.filter(v => v.view_type === tab)
 
+  const contextReady = !isHydrated || !!activeApp
+  const activePackId = activeApp?.packId ?? null
+  const guardMessage = 'Locked to another pack. Switch your Active App to edit.'
+  const isPackGuarded = (view: any) => {
+    if (!activePackId) return false
+    if (view.ownership !== 'pack') return false
+    if (!view.pack_id) return true
+    return view.pack_id !== activePackId
+  }
+
   return (
     <div className="space-y-6">
       <div>
         <h1 className="text-3xl font-bold tracking-tight">View Definitions</h1>
         <p className="mt-1 text-muted-foreground">Configure how entities are displayed — detail layouts, list views, boards, and dashboards</p>
       </div>
+
+      <ActiveAppContextBar />
 
       <div className="flex flex-wrap gap-2">
         <Button variant={tab === 'all' ? 'default' : 'outline'} size="sm" onClick={() => setTab('all')}>
@@ -204,10 +257,24 @@ export function ViewDefinitionsPage() {
       </div>
 
       <div className="flex justify-end">
-        <Button size="sm" onClick={() => { resetForm(); setShowForm(true) }}>
+        <Button
+          size="sm"
+          onClick={() => { resetForm(); setShowForm(true) }}
+          disabled={!contextReady}
+          title={!contextReady ? 'Select an app to create or edit views' : undefined}
+        >
           <Plus className="mr-1 h-3 w-3" /> New View
         </Button>
       </div>
+
+      {contextError && (
+        <Card>
+          <CardContent className="flex items-center gap-2 py-3 text-sm text-amber-600">
+            <Lock className="h-4 w-4" />
+            <span>{contextError}</span>
+          </CardContent>
+        </Card>
+      )}
 
       {showForm && (
         <Card>
@@ -283,7 +350,7 @@ export function ViewDefinitionsPage() {
             <div className="space-y-3">
               <div className="flex items-center justify-between">
                 <label className="text-sm font-medium">Panels</label>
-                <Button variant="outline" size="sm" onClick={addPanel}>
+                <Button variant="outline" size="sm" onClick={addPanel} disabled={!contextReady} title={!contextReady ? 'Select an app to add panels' : undefined}>
                   <Plus className="mr-1 h-3 w-3" /> Add Panel
                 </Button>
               </div>
@@ -342,7 +409,9 @@ export function ViewDefinitionsPage() {
             </div>
 
             <div className="flex gap-2 pt-2">
-              <Button onClick={saveView} disabled={!name.trim()}>{editingView ? 'Save' : 'Create'}</Button>
+              <Button onClick={saveView} disabled={!name.trim() || !contextReady} title={!contextReady ? 'Select an app to save changes' : undefined}>
+                {editingView ? 'Save' : 'Create'}
+              </Button>
               <Button variant="ghost" onClick={resetForm}>Cancel</Button>
             </div>
           </CardContent>
@@ -358,8 +427,17 @@ export function ViewDefinitionsPage() {
             No view definitions{tab !== 'all' ? ` of type "${tab}"` : ''}. Click "New View" to create one.
           </p>
         ) : (
-          filteredViews.map((v: any) => (
-            <Card key={v.id} className={!v.is_active ? 'opacity-60' : ''}>
+          filteredViews.map((v: any) => {
+            const guarded = isPackGuarded(v)
+            return (
+            <Card
+              key={v.id}
+              className={cn(
+                !v.is_active && 'opacity-60',
+                guarded && 'cursor-not-allowed border-dashed border-muted/80 opacity-60'
+              )}
+              title={guarded ? guardMessage : undefined}
+            >
               <CardContent className="flex items-center gap-4 py-3">
                 <LayoutGrid className="h-4 w-4 text-muted-foreground" />
                 <div className="flex-1 min-w-0">
@@ -384,31 +462,107 @@ export function ViewDefinitionsPage() {
                       </span>
                     )}
                     {v.ownership === 'pack' && <Badge variant="outline" className="text-[10px]">pack</Badge>}
+                    {v.pack_id && (
+                      <Badge variant="outline" className="text-[10px] font-mono">{v.pack_id.slice(0, 8)}</Badge>
+                    )}
+                    {guarded && (
+                      <Badge variant="destructive" className="text-[10px]">Locked</Badge>
+                    )}
                   </div>
                 </div>
                 <Badge variant={v.is_active ? 'default' : 'secondary'} className="text-[10px]">
                   {v.is_active ? 'Active' : 'Off'}
                 </Badge>
                 {v.view_type === 'page' && (
-                  <Button variant="outline" size="sm" className="h-7 text-[10px]" onClick={() => navigate(`/admin/views/${v.id}/page-builder`)} title="Open Page Builder">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="h-7 text-[10px]"
+                    onClick={() => {
+                      if (guarded) {
+                        setContextError(guardMessage)
+                        return
+                      }
+                      navigate(`/admin/views/${v.id}/page-builder`)
+                    }}
+                    title={guarded ? guardMessage : 'Open Page Builder'}
+                    disabled={guarded}
+                  >
                     <PaintBucket className="mr-1 h-3 w-3" /> Builder
                   </Button>
                 )}
-                <Button variant="ghost" size="sm" className="h-7 w-7 p-0" onClick={() => duplicateView(v)} title="Duplicate">
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  className="h-7 w-7 p-0"
+                  onClick={() => {
+                    if (guarded) {
+                      setContextError(guardMessage)
+                      return
+                    }
+                    duplicateView(v)
+                  }}
+                  title={guarded ? guardMessage : 'Duplicate'}
+                  disabled={guarded}
+                >
                   <Copy className="h-3 w-3" />
                 </Button>
-                <Button variant="ghost" size="sm" className="h-7 w-7 p-0" onClick={() => startEdit(v)} title="Edit">
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  className="h-7 w-7 p-0"
+                  onClick={() => {
+                    if (guarded) {
+                      setContextError(guardMessage)
+                      return
+                    }
+                    startEdit(v)
+                  }}
+                  title={guarded ? guardMessage : 'Edit'}
+                  disabled={guarded}
+                >
                   <Pencil className="h-3 w-3" />
                 </Button>
-                <Button variant="ghost" size="sm" className="h-7 w-7 p-0" onClick={() => toggleView(v)} title="Toggle">
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  className="h-7 w-7 p-0"
+                  onClick={() => {
+                    if (guarded) {
+                      setContextError(guardMessage)
+                      return
+                    }
+                    toggleView(v)
+                  }}
+                  title={guarded ? guardMessage : 'Toggle'}
+                  disabled={guarded}
+                >
                   <Power className="h-3 w-3" />
                 </Button>
-                <Button variant="ghost" size="sm" className="h-7 w-7 p-0 text-destructive" onClick={() => deleteView(v.id)} title="Delete">
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  className="h-7 w-7 p-0 text-destructive"
+                  onClick={() => {
+                    if (guarded) {
+                      setContextError(guardMessage)
+                      return
+                    }
+                    deleteView(v.id)
+                  }}
+                  title={guarded ? guardMessage : 'Delete'}
+                  disabled={guarded}
+                >
                   <Trash2 className="h-3 w-3" />
                 </Button>
+                {guarded && (
+                  <div className="flex items-center gap-1 text-[11px] text-amber-600">
+                    <Lock className="h-3 w-3" /> Locked to another pack
+                  </div>
+                )}
               </CardContent>
             </Card>
-          ))
+          )})
         )}
       </div>
     </div>

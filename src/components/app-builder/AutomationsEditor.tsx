@@ -1,5 +1,7 @@
 import { useState } from 'react'
 import { apiPost, apiPatch, apiDelete } from '@/lib/api'
+import { useActiveApp } from '@/hooks/useActiveApp'
+import { withActiveAppScope, requireActiveAppScope, MissingActiveAppError } from '@/lib/activeApp'
 import { Input } from '@/components/ui/input'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
@@ -32,6 +34,9 @@ export function AutomationsEditor({ automationRules, onReload }: AutomationsEdit
   const [actionType, setActionType] = useState('emit_event')
   const [actionConfig, setActionConfig] = useState('{}')
   const [saving, setSaving] = useState(false)
+  const [contextError, setContextError] = useState<string | null>(null)
+
+  const { activeApp, isHydrated } = useActiveApp()
 
   function resetForm() {
     setName(''); setTriggerEvent(EVENT_TYPES[0]); setActionType('emit_event')
@@ -41,28 +46,51 @@ export function AutomationsEditor({ automationRules, onReload }: AutomationsEdit
   async function createRule() {
     if (!name.trim()) return
     setSaving(true)
+    setContextError(null)
     let parsedConfig = {}
     try { parsedConfig = JSON.parse(actionConfig) } catch {}
     try {
-      await apiPost('automation-rules', {
+      await apiPost('automation-rules', withActiveAppScope({
         name, trigger_event: triggerEvent,
         action_type: actionType, action_config: parsedConfig,
-      })
+      }, { required: true }))
       resetForm()
       onReload()
-    } catch {}
+    } catch (err) {
+      if (err instanceof MissingActiveAppError) {
+        setContextError(err.message)
+      }
+    }
     setSaving(false)
   }
 
   async function toggleRule(rule: any) {
-    await apiPatch('automation-rules', { enabled: !rule.enabled }, { id: rule.id })
-    onReload()
+    setContextError(null)
+    try {
+      requireActiveAppScope()
+      await apiPatch('automation-rules', { enabled: !rule.enabled }, { id: rule.id })
+      onReload()
+    } catch (err) {
+      if (err instanceof MissingActiveAppError) {
+        setContextError(err.message)
+      }
+    }
   }
 
   async function deleteRule(id: string) {
-    await apiDelete(`automation-rules?id=${id}`)
-    onReload()
+    setContextError(null)
+    try {
+      requireActiveAppScope()
+      await apiDelete(`automation-rules?id=${id}`)
+      onReload()
+    } catch (err) {
+      if (err instanceof MissingActiveAppError) {
+        setContextError(err.message)
+      }
+    }
   }
+
+  const contextReady = !isHydrated || !!activeApp
 
   return (
     <div className="space-y-4">
@@ -103,14 +131,14 @@ export function AutomationsEditor({ automationRules, onReload }: AutomationsEdit
             />
           </div>
           <div className="flex gap-2">
-            <Button size="sm" onClick={createRule} disabled={saving || !name.trim()}>
+            <Button size="sm" onClick={createRule} disabled={saving || !name.trim() || !contextReady} title={!contextReady ? 'Select an app to save automations' : undefined}>
               <Save className="mr-1 h-3 w-3" /> Create
             </Button>
             <Button size="sm" variant="ghost" onClick={resetForm}><X className="mr-1 h-3 w-3" /> Cancel</Button>
           </div>
         </div>
       ) : (
-        <Button variant="ghost" size="sm" className="h-7 text-xs" onClick={() => setShowForm(true)}>
+        <Button variant="ghost" size="sm" className="h-7 text-xs" onClick={() => setShowForm(true)} disabled={!contextReady} title={!contextReady ? 'Select an app to add automations' : undefined}>
           <Plus className="mr-1 h-3 w-3" /> New Rule
         </Button>
       )}
@@ -132,10 +160,10 @@ export function AutomationsEditor({ automationRules, onReload }: AutomationsEdit
               <Badge variant={rule.enabled ? 'default' : 'secondary'} className="text-[9px]">
                 {rule.enabled ? 'On' : 'Off'}
               </Badge>
-              <Button variant="ghost" size="sm" className="h-5 w-5 p-0" onClick={() => toggleRule(rule)}>
+              <Button variant="ghost" size="sm" className="h-5 w-5 p-0" onClick={() => toggleRule(rule)} disabled={!contextReady} title={!contextReady ? 'Select an app to toggle automations' : undefined}>
                 <Power className="h-2.5 w-2.5" />
               </Button>
-              <Button variant="ghost" size="sm" className="h-5 w-5 p-0 text-destructive" onClick={() => deleteRule(rule.id)}>
+              <Button variant="ghost" size="sm" className="h-5 w-5 p-0 text-destructive" onClick={() => deleteRule(rule.id)} disabled={!contextReady} title={!contextReady ? 'Select an app to delete automations' : undefined}>
                 <Trash2 className="h-2.5 w-2.5" />
               </Button>
             </CardContent>

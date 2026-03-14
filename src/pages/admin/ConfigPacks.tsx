@@ -1,12 +1,15 @@
 import { useEffect, useMemo, useState } from 'react'
 import { apiGet, apiPost } from '@/lib/api'
 import { useAuth } from '@/hooks/useAuth'
+import { useActiveApp } from '@/hooks/useActiveApp'
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
-import { Package, Briefcase, Headphones, Users, GraduationCap, Bug, LayoutGrid, ChevronDown, ChevronUp, Download, Check, Trash2, Loader2, Plus } from 'lucide-react'
+import { Package, Briefcase, Headphones, Users, GraduationCap, Bug, LayoutGrid, ChevronDown, ChevronUp, Download, Check, Trash2, Loader2, Plus, Lock } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Textarea } from '@/components/ui/textarea'
+import { ActiveAppContextBar } from '@/components/admin/ActiveAppContext'
+import { cn } from '@/lib/utils'
 import { createConfigPack, isTenantAuthoredPack } from '@/lib/packs'
 
 interface ConfigPack {
@@ -46,6 +49,7 @@ const CATEGORY_COLORS: Record<string, string> = {
 
 export function ConfigPacksPage() {
   const { currentAccountId } = useAuth()
+  const { activeApp } = useActiveApp()
   const [packs, setPacks] = useState<ConfigPack[]>([])
   const [loading, setLoading] = useState(true)
   const [working, setWorking] = useState<string | null>(null)
@@ -62,6 +66,11 @@ export function ConfigPacksPage() {
   const [newPackCategory, setNewPackCategory] = useState('')
   const [newPackIcon, setNewPackIcon] = useState('')
   const [newPackDescription, setNewPackDescription] = useState('')
+  const [contextError, setContextError] = useState<string | null>(null)
+
+  useEffect(() => {
+    setContextError(null)
+  }, [activeApp?.packId])
 
   async function loadPacks() {
     try {
@@ -180,8 +189,21 @@ export function ConfigPacksPage() {
     })
   }
 
-  function handleExport(packId: string) {
-    window.open(`/.netlify/functions/config-packs?id=${packId}&action=export`, '_blank')
+  const activePackId = activeApp?.packId ?? null
+  const packGuardMessage = 'Locked to another pack. Switch your Active App to edit.'
+  const isPackGuarded = (pack: ConfigPack) => {
+    if (!activePackId) return false
+    if (!isTenantAuthoredPack(pack, currentAccountId)) return false
+    return pack.id !== activePackId
+  }
+
+  function handleExport(pack: ConfigPack) {
+    setContextError(null)
+    if (isPackGuarded(pack)) {
+      setContextError(packGuardMessage)
+      return
+    }
+    window.open(`/.netlify/functions/config-packs?id=${pack.id}&action=export`, '_blank')
   }
 
   const sortedPacks = useMemo(() => {
@@ -207,6 +229,8 @@ export function ConfigPacksPage() {
           <Plus className="mr-1 h-4 w-4" /> {showCreate ? 'Hide form' : 'New Pack'}
         </Button>
       </div>
+
+      <ActiveAppContextBar />
 
       {showCreate && (
         <Card>
@@ -267,6 +291,15 @@ export function ConfigPacksPage() {
         </Card>
       )}
 
+      {contextError && (
+        <Card>
+          <CardContent className="flex items-center gap-2 py-3 text-sm text-amber-600">
+            <Lock className="h-4 w-4" />
+            <span>{contextError}</span>
+          </CardContent>
+        </Card>
+      )}
+
       {errorMessage && (
         <Card>
           <CardContent className="py-3 text-sm text-destructive">{errorMessage}</CardContent>
@@ -288,9 +321,17 @@ export function ConfigPacksPage() {
             const tenantOwned = isTenantAuthoredPack(pack, currentAccountId)
             const Icon = pack.icon && ICON_MAP[pack.icon] ? ICON_MAP[pack.icon] : <Package className="h-5 w-5" />
             const isExpanded = expanded.has(pack.id)
+            const packGuarded = isPackGuarded(pack)
 
             return (
-              <Card key={pack.id} className={pack.config_active ? 'ring-1 ring-primary/20' : ''}>
+              <Card
+                key={pack.id}
+                className={cn(
+                  pack.config_active ? 'ring-1 ring-primary/20' : '',
+                  packGuarded && 'cursor-not-allowed border-dashed border-muted/80 opacity-60'
+                )}
+                title={packGuarded ? packGuardMessage : undefined}
+              >
                 <CardHeader className="pb-3">
                   <div className="flex items-start justify-between">
                     <div className="flex items-center gap-2">
@@ -304,6 +345,16 @@ export function ConfigPacksPage() {
                       <Badge variant={pack.is_system ? 'secondary' : 'default'} className="text-[10px]">
                         {pack.is_system ? 'Template' : tenantOwned ? 'Your Pack' : 'Installed'}
                       </Badge>
+                      {activePackId === pack.id && (
+                        <Badge variant="outline" className="text-[10px]">
+                          Active App
+                        </Badge>
+                      )}
+                      {packGuarded && (
+                        <Badge variant="destructive" className="text-[10px]">
+                          Locked
+                        </Badge>
+                      )}
                       {pack.category && (
                         <Badge className={`text-[10px] ${CATEGORY_COLORS[pack.category] || ''}`}>{pack.category}</Badge>
                       )}
@@ -363,7 +414,14 @@ export function ConfigPacksPage() {
                       </Button>
                     )}
 
-                    <Button variant="outline" size="sm" className="h-8" onClick={() => handleExport(pack.id)}>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      className="h-8"
+                      onClick={() => handleExport(pack)}
+                      disabled={packGuarded}
+                      title={packGuarded ? packGuardMessage : undefined}
+                    >
                       <Download className="mr-1 h-3 w-3" /> Export
                     </Button>
 
@@ -374,6 +432,11 @@ export function ConfigPacksPage() {
                       </Button>
                     )}
                   </div>
+                  {packGuarded && (
+                    <div className="flex items-center gap-1 text-[11px] text-amber-600">
+                      <Lock className="h-3 w-3" /> Locked to another pack
+                    </div>
+                  )}
                 </CardContent>
               </Card>
             )

@@ -17,6 +17,8 @@ import '@xyflow/react/dist/style.css'
 
 import { apiGet, apiPost, apiPatch } from '@/lib/api'
 import { useAuth } from '@/hooks/useAuth'
+import { useActiveApp } from '@/hooks/useActiveApp'
+import { withActiveAppScope, MissingActiveAppError, requireActiveAppScope } from '@/lib/activeApp'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { ArrowLeft, Plus } from 'lucide-react'
@@ -31,6 +33,7 @@ export function WorkflowBuilderPage() {
   const { workflowId } = useParams<{ workflowId: string }>()
   const navigate = useNavigate()
   const { currentAccountId } = useAuth()
+  const { activeApp, isHydrated } = useActiveApp()
 
   const [workflow, setWorkflow] = useState<any>(null)
   const [stages, setStages] = useState<any[]>([])
@@ -43,6 +46,7 @@ export function WorkflowBuilderPage() {
 
   const [panelType, setPanelType] = useState<'stage' | 'transition' | null>(null)
   const [panelData, setPanelData] = useState<any>(null)
+  const [contextError, setContextError] = useState<string | null>(null)
 
   const [showNewStage, setShowNewStage] = useState(false)
   const [newStageName, setNewStageName] = useState('')
@@ -152,7 +156,8 @@ export function WorkflowBuilderPage() {
       if (!sourceStage || !targetStage) return
 
       try {
-        const newTransition = await apiPost<any>('transition-definitions', {
+        setContextError(null)
+        const newTransition = await apiPost<any>('transition-definitions', withActiveAppScope({
           workflow_definition_id: workflowId,
           name: `To ${targetStage.name}`,
           from_stage_id: sourceStage.id,
@@ -161,13 +166,17 @@ export function WorkflowBuilderPage() {
             sourceHandle: connection.sourceHandle,
             targetHandle: connection.targetHandle,
           },
-        })
+        }, { required: true }))
         // Add to local state to avoid full reload
         if (newTransition) {
           setTransitions((prev) => [...prev, newTransition])
         }
       } catch (err) {
-        console.error('Failed to create transition', err)
+        if (err instanceof MissingActiveAppError) {
+          setContextError(err.message)
+        } else {
+          console.error('Failed to create transition', err)
+        }
       }
     },
     [workflowId, stages],
@@ -182,6 +191,8 @@ export function WorkflowBuilderPage() {
       if (!transition) return
 
       try {
+        setContextError(null)
+        requireActiveAppScope()
         const config = {
           ...(transition.config || {}),
           sourceHandle: newConnection.sourceHandle,
@@ -207,8 +218,12 @@ export function WorkflowBuilderPage() {
           { id: transition.id }
         )
       } catch (err) {
-        console.error('Failed to reconnect transition', err)
-        await loadAll() // Revert on failure
+        if (err instanceof MissingActiveAppError) {
+          setContextError(err.message)
+        } else {
+          console.error('Failed to reconnect transition', err)
+          await loadAll() // Revert on failure
+        }
       }
     },
     [transitions, setEdges, loadAll],
@@ -219,7 +234,15 @@ export function WorkflowBuilderPage() {
       const stage = stages.find((s) => s.id === node.id)
       if (!stage) return
       const config = { ...(stage.config || {}), position_x: node.position.x, position_y: node.position.y }
-      await apiPatch('stage-definitions', { config }, { id: node.id }).catch(() => {})
+      try {
+        setContextError(null)
+        requireActiveAppScope()
+        await apiPatch('stage-definitions', { config }, { id: node.id })
+      } catch (err) {
+        if (err instanceof MissingActiveAppError) {
+          setContextError(err.message)
+        }
+      }
     },
     [stages],
   )
@@ -247,18 +270,29 @@ export function WorkflowBuilderPage() {
 
   async function addStage() {
     if (!newStageName.trim() || !workflowId) return
-    await apiPost('stage-definitions', {
-      workflow_definition_id: workflowId,
-      name: newStageName,
-      position: stages.length,
-      is_initial: stages.length === 0,
-      is_terminal: false,
-      config: { position_x: 100 + (stages.length % 4) * 220, position_y: 80 + Math.floor(stages.length / 4) * 160 },
-    })
-    setNewStageName('')
-    setShowNewStage(false)
-    await loadAll()
+    setContextError(null)
+    try {
+      await apiPost('stage-definitions', withActiveAppScope({
+        workflow_definition_id: workflowId,
+        name: newStageName,
+        position: stages.length,
+        is_initial: stages.length === 0,
+        is_terminal: false,
+        config: { position_x: 100 + (stages.length % 4) * 220, position_y: 80 + Math.floor(stages.length / 4) * 160 },
+      }, { required: true }))
+      setNewStageName('')
+      setShowNewStage(false)
+      await loadAll()
+    } catch (err) {
+      if (err instanceof MissingActiveAppError) {
+        setContextError(err.message)
+      } else {
+        console.error('Failed to add stage', err)
+      }
+    }
   }
+
+  const contextReady = !isHydrated || !!activeApp
 
   if (loading) {
     return (
@@ -287,16 +321,20 @@ export function WorkflowBuilderPage() {
                 onKeyDown={(e) => e.key === 'Enter' && addStage()}
                 autoFocus
               />
-              <Button size="sm" onClick={addStage} disabled={!newStageName.trim()}>Add</Button>
+              <Button size="sm" onClick={addStage} disabled={!newStageName.trim() || !contextReady} title={!contextReady ? 'Select an app to add stages' : undefined}>Add</Button>
               <Button size="sm" variant="ghost" onClick={() => { setShowNewStage(false); setNewStageName('') }}>Cancel</Button>
             </div>
           ) : (
-            <Button size="sm" variant="outline" onClick={() => setShowNewStage(true)}>
+            <Button size="sm" variant="outline" onClick={() => setShowNewStage(true)} disabled={!contextReady} title={!contextReady ? 'Select an app to edit workflow stages' : undefined}>
               <Plus className="mr-1 h-3 w-3" /> Add Stage
             </Button>
           )}
         </div>
       </div>
+
+      {contextError && (
+        <div className="px-4 py-2 text-sm text-destructive border-b bg-destructive/5">{contextError}</div>
+      )}
 
       {/* Canvas + Side Panel */}
       <div className="flex flex-1 overflow-hidden">

@@ -2,12 +2,14 @@ import { useEffect, useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import { apiGet, apiPost, apiPatch, apiDelete } from '@/lib/api'
 import { useAuth } from '@/hooks/useAuth'
+import { useActiveApp } from '@/hooks/useActiveApp'
+import { withActiveAppScope, MissingActiveAppError, requireActiveAppScope } from '@/lib/activeApp'
 import { EditableField } from '@/components/shared/EditableField'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { Input } from '@/components/ui/input'
-import { ArrowLeft, Pencil, Save, X, GitBranch, Plus, Trash2, GripVertical } from 'lucide-react'
+import { ArrowLeft, Pencil, Save, X, GitBranch, Plus, Trash2, GripVertical, Lock } from 'lucide-react'
 
 const WF_STATUSES = [
   { value: 'active', label: 'Active' },
@@ -28,6 +30,7 @@ export function WorkflowDetailPage() {
   const { workflowId } = useParams<{ workflowId: string }>()
   const navigate = useNavigate()
   const { currentAccountId, currentAccountNodeId } = useAuth()
+  const { activeApp, isHydrated } = useActiveApp()
   const isNew = workflowId === 'new'
 
   const [workflow, setWorkflow] = useState<any>(null)
@@ -36,6 +39,7 @@ export function WorkflowDetailPage() {
   const [loading, setLoading] = useState(!isNew)
   const [saving, setSaving] = useState(false)
   const [errorMessage, setErrorMessage] = useState<string | null>(null)
+  const [contextError, setContextError] = useState<string | null>(null)
 
   // Draft fields
   const [name, setName] = useState('')
@@ -134,35 +138,41 @@ export function WorkflowDetailPage() {
       setErrorMessage('Workflow name is required.')
       return
     }
+    if (!isNew && workflowGuarded) {
+      setContextError(guardMessage)
+      return
+    }
     setSaving(true)
     setErrorMessage(null)
+    setContextError(null)
     try {
       let wfId = workflowId
       const parsedCustomFieldKeys = customFieldKeys.split(',').map(s => s.trim()).filter(Boolean)
       if (isNew) {
-        const created = await apiPost<any>('workflow-definitions', {
+        const created = await apiPost<any>('workflow-definitions', withActiveAppScope({
           name,
           description: description || undefined,
           custom_field_keys: parsedCustomFieldKeys.length > 0 ? parsedCustomFieldKeys : null,
-        })
+        }, { required: true }))
         wfId = created.id
 
         // Create stages for new workflow
         const activeStages = stageDrafts.filter((s) => !s._deleted && s.name.trim())
         for (const stage of activeStages) {
-          await apiPost('stage-definitions', {
+          await apiPost('stage-definitions', withActiveAppScope({
             workflow_definition_id: wfId,
             name: stage.name,
             position: stage.position,
             is_initial: stage.is_initial,
             is_terminal: stage.is_terminal,
             allowed_transitions: [],
-          })
+          }, { required: true }))
         }
 
         navigate(`/admin/workflows/${wfId}`, { replace: true })
       } else {
         // Update workflow definition
+        requireActiveAppScope()
         await apiPatch('workflow-definitions', {
           name,
           description: description || undefined,
@@ -175,19 +185,21 @@ export function WorkflowDetailPage() {
         const deletedStages = stageDrafts.filter((s) => s._deleted && s.id)
 
         for (const stage of deletedStages) {
+          requireActiveAppScope()
           await apiDelete(`stage-definitions?id=${stage.id}`)
         }
         for (const stage of activeStages) {
           if (stage._isNew && stage.name.trim()) {
-            await apiPost('stage-definitions', {
+            await apiPost('stage-definitions', withActiveAppScope({
               workflow_definition_id: wfId,
               name: stage.name,
               position: stage.position,
               is_initial: stage.is_initial,
               is_terminal: stage.is_terminal,
               allowed_transitions: [],
-            })
+            }, { required: true }))
           } else if (stage.id) {
+            requireActiveAppScope()
             await apiPatch('stage-definitions', {
               name: stage.name,
               position: stage.position,
@@ -217,11 +229,29 @@ export function WorkflowDetailPage() {
         setEditing(false)
       }
     } catch (err: any) {
-      setErrorMessage(err?.message || 'Save failed')
+      if (err instanceof MissingActiveAppError) {
+        setContextError(err.message)
+      } else {
+        setErrorMessage(err?.message || 'Save failed')
+      }
     } finally {
       setSaving(false)
     }
   }
+
+  const contextReady = !isHydrated || !!activeApp
+  const activePackId = activeApp?.packId ?? null
+  const workflowPackId = workflow?.pack_id ?? null
+  const workflowOwnership = workflow?.ownership ?? null
+  const isWorkflowPackAsset = workflowOwnership === 'pack'
+  const workflowGuarded = !!workflow && !isNew && isWorkflowPackAsset && !!activePackId && workflowPackId !== activePackId
+  const guardMessage = 'Locked to another pack. Switch your Active App to edit.'
+
+  useEffect(() => {
+    if (!isNew && workflowGuarded && editing) {
+      setEditing(false)
+    }
+  }, [isNew, workflowGuarded, editing])
 
   if (loading) {
     return (
@@ -251,7 +281,19 @@ export function WorkflowDetailPage() {
           </h1>
         </div>
         {!isNew && !editing && (
-          <Button variant="outline" size="sm" onClick={() => setEditing(true)}>
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => {
+              if (workflowGuarded) {
+                setContextError(guardMessage)
+                return
+              }
+              setEditing(true)
+            }}
+            disabled={workflowGuarded}
+            title={workflowGuarded ? guardMessage : undefined}
+          >
             <Pencil className="mr-1 h-4 w-4" />Edit
           </Button>
         )}
@@ -259,6 +301,20 @@ export function WorkflowDetailPage() {
 
       {errorMessage && (
         <Card><CardContent className="py-3 text-sm text-destructive">{errorMessage}</CardContent></Card>
+      )}
+      {contextError && (
+        <Card><CardContent className="py-3 text-sm text-destructive">{contextError}</CardContent></Card>
+      )}
+      {workflowGuarded && (
+        <Card>
+          <CardContent className="flex items-center gap-3 text-sm text-amber-600">
+            <Lock className="h-4 w-4" />
+            <div>
+              <p className="font-medium">This workflow belongs to another pack.</p>
+              <p className="text-muted-foreground">Set your Active App to the originating pack to edit stages, metadata, or items.</p>
+            </div>
+          </CardContent>
+        </Card>
       )}
 
       {/* Workflow info card */}
@@ -274,9 +330,13 @@ export function WorkflowDetailPage() {
               ) : (
                 <>
                   <p className="text-lg font-semibold">{workflow?.name}</p>
-                  <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                  <div className="flex flex-wrap items-center gap-2 text-sm text-muted-foreground">
                     <Badge variant={workflow?.status === 'active' ? 'default' : 'secondary'}>{workflow?.status}</Badge>
                     <span>{items.length} items</span>
+                    {isWorkflowPackAsset && workflowPackId && (
+                      <Badge variant="outline" className="text-[11px] font-mono">{workflowPackId.slice(0, 8)}</Badge>
+                    )}
+                    {workflowGuarded && <Badge variant="destructive" className="text-[11px]">Locked</Badge>}
                   </div>
                 </>
               )}
@@ -319,7 +379,7 @@ export function WorkflowDetailPage() {
         <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
           <CardTitle className="text-lg">Stages</CardTitle>
           {editing && (
-            <Button variant="outline" size="sm" onClick={addStage}>
+            <Button variant="outline" size="sm" onClick={addStage} disabled={workflowGuarded} title={workflowGuarded ? guardMessage : undefined}>
               <Plus className="mr-1 h-4 w-4" />Add Stage
             </Button>
           )}
@@ -381,7 +441,7 @@ export function WorkflowDetailPage() {
 
       {editing && (
         <div className="flex items-center gap-3">
-          <Button onClick={handleSave} disabled={saving}>
+          <Button onClick={handleSave} disabled={saving || !contextReady || workflowGuarded} title={!contextReady ? 'Select an app to save changes' : workflowGuarded ? guardMessage : undefined}>
             <Save className="mr-1 h-4 w-4" />{saving ? 'Saving...' : 'Save'}
           </Button>
           {!isNew && (
@@ -405,15 +465,26 @@ export function WorkflowDetailPage() {
             {items.slice(0, 10).map((item: any) => (
               <div
                 key={item.id}
-                className="rounded-md border p-3 cursor-pointer transition-colors hover:bg-muted/50"
-                onClick={() => navigate(`/workflow-items/${item.id}`)}
+                className={`rounded-md border p-3 cursor-pointer transition-colors ${workflowGuarded ? 'opacity-60 cursor-not-allowed' : 'hover:bg-muted/50'}`}
+                onClick={() => {
+                  if (workflowGuarded) {
+                    setContextError(guardMessage)
+                    return
+                  }
+                  navigate(`/workflow-items/${item.id}`)
+                }}
+                title={workflowGuarded ? guardMessage : undefined}
               >
-                <p className="text-sm font-medium">{item.title}</p>
+                <div className="flex items-center justify-between">
+                  <p className="text-sm font-medium">{item.title}</p>
+                  {workflowGuarded && <Lock className="h-3 w-3 text-amber-600" />}
+                </div>
                 <p className="text-xs text-muted-foreground">
                   {item.stage_definitions?.name || 'No stage'} • {item.persons?.full_name || 'Unassigned'}
                 </p>
-                <div className="mt-2 flex flex-wrap gap-2">
+                <div className="mt-2 flex flex-wrap gap-2 text-xs text-muted-foreground">
                   <Badge variant="secondary" className="text-xs">{item.priority}</Badge>
+                  {item.pack_id && <code className="rounded bg-muted px-1.5 py-0.5 text-[10px]">{item.pack_id.slice(0, 8)}</code>}
                 </div>
               </div>
             ))}

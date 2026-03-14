@@ -41,6 +41,7 @@ import { useImpersonation } from '@/hooks/useImpersonation'
 import { AccountNodePanel } from '@/components/layout/AccountNodePanel'
 import { getCustomNavSections } from '@/lib/customRoutes'
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
+import { ActiveAppSwitcher } from '@/components/admin/ActiveAppContext'
 
 const ROLE_RANK: Record<string, number> = {
   portal: 0,
@@ -247,6 +248,10 @@ export function Sidebar() {
           <p className="text-sm font-medium">{currentAccount.display_name}</p>
         </div>
       )}
+
+      <div className="border-b px-4 py-3">
+        <ActiveAppSwitcher fullWidth />
+      </div>
 
       <nav className="flex-1 space-y-1 overflow-y-auto p-3">
         {useAppNav && (

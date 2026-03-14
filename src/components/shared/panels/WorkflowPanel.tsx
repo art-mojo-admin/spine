@@ -1,5 +1,7 @@
 import { useState } from 'react'
 import { apiPatch } from '@/lib/api'
+import { useActiveApp } from '@/hooks/useActiveApp'
+import { requireActiveAppScope, MissingActiveAppError } from '@/lib/activeApp'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { Card, CardContent } from '@/components/ui/card'
@@ -16,6 +18,8 @@ interface WorkflowPanelProps {
 export function WorkflowPanel({ item, stages, transitions, onUpdate }: WorkflowPanelProps) {
   const [transitioning, setTransitioning] = useState<string | null>(null)
   const [comment, setComment] = useState('')
+  const [contextError, setContextError] = useState<string | null>(null)
+  const { activeApp, isHydrated } = useActiveApp()
 
   const currentStage = stages.find((s: any) => s.id === item.stage_definition_id)
   const availableTransitions = transitions.filter(
@@ -29,6 +33,8 @@ export function WorkflowPanel({ item, stages, transitions, onUpdate }: WorkflowP
     }
 
     try {
+      setContextError(null)
+      requireActiveAppScope()
       const updated = await apiPatch<any>('workflow-items', {
         stage_definition_id: transition.to_stage_id,
         transition_id: transition.id,
@@ -38,15 +44,24 @@ export function WorkflowPanel({ item, stages, transitions, onUpdate }: WorkflowP
       setTransitioning(null)
       setComment('')
     } catch (err: any) {
-      console.error('Transition failed:', err.message)
+      if (err instanceof MissingActiveAppError) {
+        setContextError(err.message)
+      } else {
+        console.error('Transition failed:', err.message)
+      }
     }
   }
+
+  const contextReady = !isHydrated || !!activeApp
 
   if (!currentStage) return null
 
   return (
     <Card>
       <CardContent className="py-4">
+        {contextError && (
+          <p className="mb-3 text-xs text-destructive">{contextError}</p>
+        )}
         <div className="flex items-center justify-between mb-3">
           <p className="text-sm font-medium text-muted-foreground">Stage</p>
           <Badge variant={currentStage.is_terminal ? 'default' : 'secondary'}>
@@ -65,6 +80,8 @@ export function WorkflowPanel({ item, stages, transitions, onUpdate }: WorkflowP
                     key={t.id}
                     variant="outline"
                     size="sm"
+                    disabled={!contextReady}
+                    title={!contextReady ? 'Select an app to move items' : undefined}
                     onClick={() => handleTransition(t)}
                   >
                     {t.name}
@@ -92,7 +109,8 @@ export function WorkflowPanel({ item, stages, transitions, onUpdate }: WorkflowP
                       const t = transitions.find((t: any) => t.id === transitioning)
                       if (t) handleTransition(t)
                     }}
-                    disabled={!comment.trim()}
+                    disabled={!comment.trim() || !contextReady}
+                    title={!contextReady ? 'Select an app to move items' : undefined}
                   >
                     Confirm
                   </Button>
