@@ -1,9 +1,10 @@
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import { apiGet, apiPatch } from '@/lib/api'
 import { useAuth } from '@/hooks/useAuth'
 import { useActiveApp } from '@/hooks/useActiveApp'
 import { requireActiveAppScope, MissingActiveAppError } from '@/lib/activeApp'
+import { ConfigPack, listConfigPacks, isTenantAuthoredPack } from '@/lib/packs'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { ArrowLeft, Save, Power } from 'lucide-react'
@@ -24,6 +25,7 @@ export interface AppDef {
   is_active: boolean
   ownership: string | null
   created_at: string
+  pack_id: string | null
 }
 
 export interface NavItem {
@@ -59,6 +61,9 @@ export function AppBuilderPage() {
   const [viewDefs, setViewDefs] = useState<any[]>([])
   const [customFields, setCustomFields] = useState<any[]>([])
   const [automationRules, setAutomationRules] = useState<any[]>([])
+  const [packs, setPacks] = useState<ConfigPack[]>([])
+  const [packLoading, setPackLoading] = useState(false)
+  const [packError, setPackError] = useState<string | null>(null)
 
   const loadApp = useCallback(async () => {
     if (!appId || !currentAccountId) return
@@ -83,6 +88,22 @@ export function AppBuilderPage() {
   }, [appId, currentAccountId])
 
   useEffect(() => { loadApp() }, [loadApp])
+
+  const loadPacks = useCallback(async () => {
+    if (!currentAccountId) return
+    setPackLoading(true)
+    setPackError(null)
+    try {
+      const data = await listConfigPacks()
+      setPacks(data)
+    } catch (err: any) {
+      setPackError(err?.message || 'Failed to load packs')
+    } finally {
+      setPackLoading(false)
+    }
+  }, [currentAccountId])
+
+  useEffect(() => { loadPacks() }, [loadPacks])
 
   function updateApp(partial: Partial<AppDef>) {
     if (!app) return
@@ -141,6 +162,7 @@ export function AppBuilderPage() {
         default_view: app.default_view,
         min_role: app.min_role,
         integration_deps: app.integration_deps,
+        pack_id: app.pack_id,
       }, { id: app.id })
       setApp(updated)
       setDirty(false)
@@ -173,6 +195,7 @@ export function AppBuilderPage() {
         min_role: app.min_role,
         integration_deps: app.integration_deps,
         is_active: !app.is_active,
+        pack_id: app.pack_id,
       }, { id: app.id })
       setApp(updated)
       setDirty(false)
@@ -188,6 +211,14 @@ export function AppBuilderPage() {
   }
 
   const contextReady = !isHydrated || !!activeApp
+  const tenantPacks = packs.filter((pack) => isTenantAuthoredPack(pack, currentAccountId))
+  const selectedPack = app?.pack_id ? packs.find((p) => p.id === app.pack_id) ?? null : null
+  const inspectorPackOptions = useMemo(() => {
+    if (!app?.pack_id) return tenantPacks
+    if (tenantPacks.some((pack) => pack.id === app.pack_id)) return tenantPacks
+    const fallback = packs.find((pack) => pack.id === app.pack_id)
+    return fallback ? [...tenantPacks, fallback] : tenantPacks
+  }, [app?.pack_id, packs, tenantPacks])
 
   if (loading) {
     return (
@@ -276,6 +307,10 @@ export function AppBuilderPage() {
             onUpdateNavItem={updateNavItem}
             onRemoveNavItem={removeNavItem}
             onReloadData={loadApp}
+            packOptions={inspectorPackOptions}
+            packLoading={packLoading}
+            packError={packError}
+            selectedPack={selectedPack}
           />
         )}
       </div>
