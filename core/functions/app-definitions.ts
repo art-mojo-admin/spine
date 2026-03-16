@@ -164,6 +164,24 @@ export default createHandler({
 
     if (dbErr) return error(dbErr.message, 500)
 
+    if (body.pack_id !== undefined && existing.pack_id !== data.pack_id) {
+      if (existing.pack_id) {
+        await db
+          .from('config_packs')
+          .update({ primary_app_id: null })
+          .eq('id', existing.pack_id)
+          .eq('owner_account_id', ctx.accountId)
+          .eq('primary_app_id', existing.id)
+      }
+      if (data.pack_id) {
+        await db
+          .from('config_packs')
+          .update({ primary_app_id: data.id })
+          .eq('id', data.pack_id)
+          .eq('owner_account_id', ctx.accountId)
+      }
+    }
+
     if (data.pack_id) {
       await db
         .from('config_packs')
@@ -198,6 +216,7 @@ export default createHandler({
 
     const body = await parseBody<any>(req)
     const updates: Record<string, any> = {}
+    let newPackId: string | null | undefined
     if (body.name !== undefined) updates.name = body.name
     if (body.slug !== undefined) updates.slug = body.slug
     if (body.icon !== undefined) updates.icon = body.icon
@@ -207,10 +226,23 @@ export default createHandler({
     if (body.min_role !== undefined) updates.min_role = body.min_role
     if (body.integration_deps !== undefined) updates.integration_deps = body.integration_deps
     if (body.is_active !== undefined) updates.is_active = body.is_active
+    if (body.pack_id !== undefined) {
+      newPackId = body.pack_id ? String(body.pack_id) : null
+      if (newPackId) {
+        const ownedPack = await fetchOwnedPack(newPackId, ctx.accountId!)
+        if (isHandlerResult(ownedPack)) return ownedPack
+        if (ownedPack.primary_app_id && ownedPack.primary_app_id !== existing.id) {
+          return error('Pack already has an app. Remove it before reassigning.', 409)
+        }
+      }
+      updates.pack_id = newPackId
+    }
 
     if (Object.keys(updates).length === 0) return error('No fields to update')
 
-    updates.ownership = existing.pack_id ? 'pack' : 'tenant'
+    const resultingPackId =
+      updates.pack_id !== undefined ? updates.pack_id : existing.pack_id
+    updates.ownership = resultingPackId ? 'pack' : 'tenant'
 
     const { data, error: dbErr } = await db
       .from('app_definitions')
