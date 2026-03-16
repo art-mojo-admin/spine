@@ -164,24 +164,6 @@ export default createHandler({
 
     if (dbErr) return error(dbErr.message, 500)
 
-    if (body.pack_id !== undefined && existing.pack_id !== data.pack_id) {
-      if (existing.pack_id) {
-        await db
-          .from('config_packs')
-          .update({ primary_app_id: null })
-          .eq('id', existing.pack_id)
-          .eq('owner_account_id', ctx.accountId)
-          .eq('primary_app_id', existing.id)
-      }
-      if (data.pack_id) {
-        await db
-          .from('config_packs')
-          .update({ primary_app_id: data.id })
-          .eq('id', data.pack_id)
-          .eq('owner_account_id', ctx.accountId)
-      }
-    }
-
     if (data.pack_id) {
       await db
         .from('config_packs')
