@@ -5,7 +5,9 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
-    "assemble": "bash scripts/assemble-functions.sh",
+    "assemble": "bash scripts/assemble-functions.sh && bash scripts/assemble-frontend.sh",
+    "assemble:frontend": "bash scripts/assemble-frontend.sh",
+    "assemble:functions": "bash scripts/assemble-functions.sh",
     "manifest": "bash scripts/build-manifest.sh",
     "verify": "bash scripts/verify-integrity.sh",
     "prebuild": "npm run assemble && npm run verify",

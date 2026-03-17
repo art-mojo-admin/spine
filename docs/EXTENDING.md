@@ -39,8 +39,8 @@ Create a file in `custom/functions/`:
 ```typescript
 // custom/functions/my-endpoint.ts
 import { createHandler, requireAuth, requireTenant, json, error } from
-  '../../netlify/functions/_shared/middleware'
-import { db } from '../../netlify/functions/_shared/db'
+  '@core/functions/_shared/middleware'
+import { db } from '@core/functions/_shared/db'
 
 export default createHandler({
   async GET(req, ctx, params) {

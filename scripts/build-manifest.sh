@@ -10,7 +10,7 @@ SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 PROJECT_ROOT="$(dirname "$SCRIPT_DIR")"
 
 CORE_DIR="$PROJECT_ROOT/core"
-SRC_DIR="$PROJECT_ROOT/src"
+CORE_SRC_DIR="$PROJECT_ROOT/core/src"
 MANIFEST_FILE="$PROJECT_ROOT/.spine-manifest.json"
 
 INTEGRITY_MODE="${SPINE_INTEGRITY:-warn}"
@@ -35,7 +35,7 @@ done < <(find "$CORE_DIR" -type f -name '*.ts' -print0 | sort -z)
 
 # Core src components (shared, layout, hooks, lib)
 for SUBDIR in components/shared components/layout hooks lib; do
-  DIR="$SRC_DIR/$SUBDIR"
+  DIR="$CORE_SRC_DIR/$SUBDIR"
   if [ -d "$DIR" ]; then
     while IFS= read -r -d '' file; do
       REL_PATH="${file#$PROJECT_ROOT/}"

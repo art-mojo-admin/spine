@@ -102,20 +102,32 @@ npm run build
 ## Project Structure
 
 ```
-├── src/                          # React frontend
-│   ├── components/ui/            # shadcn/ui primitives
-│   ├── components/layout/        # Shell, Sidebar
-│   ├── pages/                    # Route pages (13 pages + admin)
-│   ├── lib/                      # api, auth, theme, utils
-│   └── hooks/                    # useAuth (session + auto-provision)
-├── netlify/functions/            # API layer (24 endpoints)
-│   ├── _shared/                  # db, middleware, audit, automation, embed
-│   └── *.ts                      # Endpoint functions
+├── core/                         # Canonical Spine runtime (DO NOT EDIT)
+│   ├── functions/               # 59 endpoint handlers
+│   │   ├── _shared/              # Shared utilities (middleware, db, audit, etc.)
+│   │   └── *.ts                  # Core API endpoints
+│   └── src/                     # Core React frontend
+│       ├── components/           # UI components (ui/, layout/, shared/, etc.)
+│       ├── pages/                # Route pages (admin, portal, public)
+│       ├── lib/                  # Utilities (api, auth, config, theme, etc.)
+│       └── hooks/                # React hooks (useAuth, useCustomFields, etc.)
+├── custom/                       # Your extensions (MODIFY FREELY)
+│   ├── functions/               # Custom serverless functions (override/extend core)
+│   └── src/                     # Custom frontend code
+│       └── manifest/routes.ts   # Custom route + nav registrations
+├── src/                         # Assembled frontend output (auto-generated, .gitignored)
+├── netlify/functions/            # Assembled API output (auto-generated, .gitignored)
 ├── supabase/
-│   └── migrations/               # 16 SQL migrations
+│   └── migrations/              # 33 SQL migrations
+├── scripts/
+│   ├── assemble-functions.sh     # Merge core/functions + custom/functions
+│   ├── assemble-frontend.sh     # Merge core/src + custom/src → src/
+│   ├── build-manifest.sh         # Generate integrity hashes
+│   └── verify-integrity.sh       # Verify core integrity
 ├── docs/
 │   ├── MANIFESTO.md              # Design philosophy
-│   ├── planning.md               # Architecture plan
+│   ├── FRONTEND.md               # Frontend architecture
+│   ├── EXTENDING.md              # Extension guide
 │   └── API.md                    # API reference
 ├── netlify.toml
 └── package.json

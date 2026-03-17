@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
-import { apiGet } from '@/lib/api'
-import type { CommunityBootstrapPayload } from '../types'
+import { apiGet } from '@core/lib/api'
+import type { CommunityBootstrapPayload } from '@custom/community/types'
 
 interface CommunityBootstrapState {
   data: CommunityBootstrapPayload | null

@@ -1,5 +1,5 @@
 import { Fragment } from 'react'
-import { useCommunityBootstrap } from '../hooks/useCommunityBootstrap'
+import { useCommunityBootstrap } from '@custom/community/hooks/useCommunityBootstrap'
 import type {
   CommunityChannelSummary,
   CommunityCohortSummary,
@@ -7,7 +7,7 @@ import type {
   CommunityLessonSummary,
   CommunityPersona,
   CommunityStats,
-} from '../types'
+} from '@custom/community/types'
 
 function SectionCard({ title, children }: { title: string; children: React.ReactNode }) {
   return (

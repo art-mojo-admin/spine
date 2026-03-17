@@ -1,5 +1,7 @@
 node_modules
 dist
+src/
+netlify/functions/
 .netlify
 .env
 .env.example
@@ -9,3 +11,14 @@ dist
 .DS_Store
 *.tsbuildinfo
 .vite
+.vscode/
+.windsurf/
+.tsserver-logs/
+test-*.js
+test-*.html
+test-*.tsx
+query-*.ts
+get-tiptap-docs.js
+deno.lock
+model-guide.md
+index.html

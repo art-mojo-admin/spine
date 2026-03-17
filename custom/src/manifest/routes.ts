@@ -1,4 +1,4 @@
-import type { CustomNavSection, CustomRouteDefinition } from '@/lib/customRouteTypes'
+import type { CustomNavSection, CustomRouteDefinition } from '@core/lib/customRouteTypes'
 
 export const customRoutes: CustomRouteDefinition[] = [
   {

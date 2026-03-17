@@ -16,6 +16,7 @@ TARGET_DIR="$PROJECT_ROOT/netlify/functions"
 echo "🔧 Assembling functions → $TARGET_DIR"
 
 # 1. Clean target (except .gitkeep)
+mkdir -p "$TARGET_DIR"
 find "$TARGET_DIR" -mindepth 1 -not -name '.gitkeep' -delete 2>/dev/null || true
 
 # 2. Copy core functions (base layer)

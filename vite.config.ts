@@ -6,8 +6,9 @@ export default defineConfig({
   plugins: [react()],
   resolve: {
     alias: {
-      '@': path.resolve(__dirname, './src'),
-      '@custom': path.resolve(__dirname, './custom/src'),
+      '@': path.resolve(__dirname, './src'),           // Assembled src
+      '@core': path.resolve(__dirname, './core/src'),  // Core source
+      '@custom': path.resolve(__dirname, './custom/src'), // Custom source
     },
   },
   server: {

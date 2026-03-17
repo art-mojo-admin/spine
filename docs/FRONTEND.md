@@ -27,39 +27,47 @@ The Spine frontend is a React 18 single-page application built with Vite, Tailwi
 ## Directory Structure
 
 ```
-src/
-├── App.tsx                    # Root component, routing, layouts
-├── main.tsx                   # Entry point
-├── index.css                  # Tailwind imports + base styles
+core/src/                    # Core Spine frontend (canonical)
+├── App.tsx                  # Root component, routing, layouts
+├── main.tsx                 # Entry point
+├── index.css                # Tailwind imports + base styles
 ├── vite-env.d.ts
 ├── components/
-│   ├── ui/                    # shadcn/ui primitives (button, card, badge, etc.)
-│   ├── layout/                # Shell, Sidebar, PortalShell, AccountNodePanel, ImpersonationBanner
-│   ├── shared/                # Reusable components (EditableField, CustomFieldsRenderer, etc.)
-│   ├── dashboard/             # Dashboard widgets
-│   ├── workflow/              # Workflow-specific components
-│   └── app-builder/           # App definition builder components
+│   ├── ui/                  # shadcn/ui primitives (button, card, badge, etc.)
+│   ├── layout/              # Shell, Sidebar, PortalShell, AccountNodePanel, ImpersonationBanner
+│   ├── shared/              # Reusable components (EditableField, CustomFieldsRenderer, etc.)
+│   ├── dashboard/           # Dashboard widgets
+│   ├── workflow/            # Workflow-specific components
+│   └── app-builder/         # App definition builder components
 ├── hooks/
-│   ├── useAuth.tsx            # Auth context + account management
-│   ├── useCustomFields.ts     # Custom field definitions loader
-│   ├── useImpersonation.tsx   # Impersonation session management
-│   └── useTenantSettings.tsx  # Per-tenant settings loader
+│   ├── useAuth.tsx          # Auth context + account management
+│   ├── useCustomFields.ts   # Custom field definitions loader
+│   ├── useImpersonation.tsx # Impersonation session management
+│   └── useTenantSettings.tsx# Per-tenant settings loader
 ├── lib/
-│   ├── api.ts                 # API client (apiGet, apiPost, apiPatch, apiDelete)
-│   ├── auth.ts                # Supabase client + signOut
-│   ├── config.ts              # APP_NAME, STORAGE_PREFIX, WEBHOOK_HEADER_PREFIX
-│   ├── accountContext.ts      # localStorage persistence for active account
+│   ├── api.ts               # API client (apiGet, apiPost, apiPatch, apiDelete)
+│   ├── auth.ts              # Supabase client + signOut
+│   ├── config.ts            # APP_NAME, STORAGE_PREFIX, WEBHOOK_HEADER_PREFIX
+│   ├── accountContext.ts    # localStorage persistence for active account
 │   ├── impersonationContext.ts# localStorage persistence for impersonation session
-│   ├── theme.ts               # Theme presets + token application
-│   ├── customRouteTypes.ts    # TypeScript interfaces for custom routes
-│   ├── customRoutes.ts        # Custom route/nav loader via import.meta.glob
-│   └── utils.ts               # Utility helpers (generateRequestId, cn)
+│   ├── theme.ts             # Theme presets + token application
+│   ├── customRouteTypes.ts  # TypeScript interfaces for custom routes
+│   ├── customRoutes.ts      # Custom route/nav loader via import.meta.glob
+│   └── utils.ts             # Utility helpers (generateRequestId, cn)
 └── pages/
-    ├── *.tsx                  # Top-level pages (Dashboard, Accounts, Persons, etc.)
-    ├── admin/                 # Admin pages (19 pages)
-    ├── portal/                # Portal pages (Dashboard, MyItems, Browse, Profile)
-    └── public/                # Public pages (Home, Listing, ItemDetail)
+    ├── *.tsx                # Top-level pages (Dashboard, Accounts, Persons, etc.)
+    ├── admin/               # Admin pages (19 pages)
+    ├── portal/              # Portal pages (Dashboard, MyItems, Browse, Profile)
+    └── public/              # Public pages (Home, Listing, ItemDetail)
+
+custom/src/                  # Custom frontend extensions
+└── manifest/
+    └── routes.ts            # Custom route + nav registrations
+
+src/                        # Assembled output (core + custom merged)
 ```
+
+**Note:** The `src/` directory is auto-generated at build time by running `npm run assemble:frontend`. It merges `core/src` (base layer) with `custom/src` (overrides + additions).
 
 ---
 

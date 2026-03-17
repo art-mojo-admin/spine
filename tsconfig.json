@@ -19,11 +19,12 @@
     "resolveJsonModule": true,
     "baseUrl": ".",
     "paths": {
-      "@/*": ["./src/*"],
-      "@custom/*": ["./custom/src/*"]
+      "@/*": ["./src/*"],              // Assembled frontend
+      "@core/*": ["./core/src/*"],     // Core source
+      "@custom/*": ["./custom/src/*"]  // Custom source
     }
   },
-  "include": ["src", "custom/src", "core/functions", "custom/functions"],
+  "include": ["src", "core/src", "custom/src", "core/functions", "custom/functions"],
   "exclude": [
     "node_modules",
     "dist",

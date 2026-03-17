@@ -40,27 +40,30 @@ Spine is a multi-tenant, event-driven operational OS built on React + Netlify Fu
 
 ```
 spine-ia/
-├── core/functions/              # Canonical Spine runtime (DO NOT EDIT directly)
-│   ├── _shared/                 # Shared utilities (middleware, db, audit, etc.)
-│   └── *.ts                     # 54 endpoint handlers
-├── custom/                      # Extension layer
-│   ├── functions/               # Custom serverless functions (override/extend core)
-│   └── src/                     # Custom frontend code
-│       └── manifest/routes.ts   # Custom route + nav registrations
-├── netlify/functions/           # Assembled output (core + custom merged at build)
-├── src/                         # React frontend
-│   ├── components/              # UI components (ui/, layout/, shared/, etc.)
-│   ├── hooks/                   # React hooks (useAuth, useCustomFields, etc.)
-│   ├── lib/                     # Utilities (api, auth, config, theme, etc.)
-│   └── pages/                   # Route pages (lazy-loaded)
+├── core/                       # Canonical Spine runtime (DO NOT EDIT directly)
+│   ├── functions/              # 59 endpoint handlers
+│   │   ├── _shared/           # Shared utilities (middleware, db, audit, etc.)
+│   │   └── *.ts               # Core API endpoints
+│   └── src/                   # Core React frontend
+│       ├── components/        # UI components (ui/, layout/, shared/, etc.)
+│       ├── hooks/             # React hooks (useAuth, useCustomFields, etc.)
+│       ├── lib/               # Utilities (api, auth, config, theme, etc.)
+│       └── pages/             # Route pages (lazy-loaded)
+├── custom/                     # Extension layer (MODIFY FREELY)
+│   ├── functions/             # Custom serverless functions (override/extend core)
+│   └── src/                   # Custom frontend code
+│       └── manifest/routes.ts # Custom route + nav registrations
+├── netlify/functions/          # Assembled API output (auto-generated, .gitignored)
+├── src/                       # Assembled frontend output (auto-generated, .gitignored)
 ├── supabase/
-│   ├── migrations/              # 24-file v2 chain (001_foundations → 028_allow_page_view_type)
-│   ├── migrations_legacy/       # Archived v1 migrations (unused)
-│   └── seed-config-packs.sql    # Template pack seed data
+│   ├── migrations/             # 33-file v2 chain (001_foundations → 033_app_package_context)
+│   ├── migrations_legacy/      # Archived v1 migrations (unused)
+│   └── seed-config-packs.sql   # Template pack seed data
 ├── scripts/
-│   ├── assemble-functions.sh    # Merge core + custom → netlify/functions/
-│   ├── verify-integrity.sh      # Check core files against manifest hashes
-│   └── build-manifest.sh        # Generate .spine-manifest.json
+│   ├── assemble-functions.sh   # Merge core/functions + custom/functions
+│   ├── assemble-frontend.sh   # Merge core/src + custom/src → src/
+│   ├── build-manifest.sh       # Generate integrity hashes
+│   └── verify-integrity.sh     # Verify core integrity
 ├── .spine-manifest.json         # SHA-256 hashes of all core files
 ├── netlify.toml                 # Build config, scheduled functions, redirects
 ├── vite.config.ts               # Vite config with path aliases
