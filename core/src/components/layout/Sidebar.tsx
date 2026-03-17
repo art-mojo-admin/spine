@@ -1,0 +1,463 @@
+import { useEffect, useMemo, useState } from 'react'
+import { NavLink } from 'react-router-dom'
+import { useAuth } from '@/hooks/useAuth'
+import { APP_NAME } from '@/lib/config'
+import { apiGet } from '@/lib/api'
+import {
+  LayoutDashboard,
+  Building2,
+  Users,
+  GitBranch,
+  FileText,
+  Activity,
+  Palette,
+  Webhook,
+  Settings,
+  Shield,
+  UserPlus,
+  Zap,
+  ArrowDownToLine,
+  SlidersHorizontal,
+  Clock,
+  Link2,
+  Package,
+  Search,
+  LogOut,
+  ChevronDown,
+  Blocks,
+  PlugZap,
+  ShieldAlert,
+  HeartPulse,
+  LayoutGrid,
+  BarChart3,
+  ShieldCheck,
+  Bot,
+  UserCheck,
+} from 'lucide-react'
+import { Button } from '@/components/ui/button'
+import { signOut } from '@/lib/auth'
+import { cn } from '@/lib/utils'
+import { useImpersonation } from '@/hooks/useImpersonation'
+import { AccountNodePanel } from '@/components/layout/AccountNodePanel'
+import { getCustomNavSections } from '@/lib/customRoutes'
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
+import { ActiveAppSwitcher } from '@/components/admin/ActiveAppContext'
+
+const ROLE_RANK: Record<string, number> = {
+  portal: 0,
+  member: 1,
+  operator: 2,
+  admin: 3,
+  system_admin: 4,
+  system_operator: 4,
+}
+
+const ICON_MAP: Record<string, React.ComponentType<{ className?: string }>> = {
+  LayoutDashboard,
+  Building2,
+  Users,
+  GitBranch,
+  FileText,
+  Activity,
+  Palette,
+  Webhook,
+  Settings,
+  Shield,
+  UserPlus,
+  Zap,
+  ArrowDownToLine,
+  SlidersHorizontal,
+  Clock,
+  Link2,
+  Package,
+  Search,
+  LogOut,
+  ChevronDown,
+  Blocks,
+  PlugZap,
+  ShieldAlert,
+  HeartPulse,
+  LayoutGrid,
+  BarChart3,
+  ShieldCheck,
+  Bot,
+  UserCheck,
+}
+
+interface AppNavItem {
+  app_slug: string
+  app_name: string
+  app_icon?: string
+  label: string
+  icon?: string
+  route_type: string
+  view_slug?: string
+  url?: string
+  position: number
+}
+
+const fallbackNavItems = [
+  { key: 'dashboard', to: '/', icon: LayoutDashboard, label: 'Dashboard', position: 0 },
+  { key: 'accounts', to: '/accounts', icon: Building2, label: 'Accounts', position: 1 },
+  { key: 'persons', to: '/persons', icon: Users, label: 'Persons', position: 2 },
+  { key: 'activity', to: '/activity', icon: Activity, label: 'Activity', position: 7 },
+  { key: 'search', to: '/search', icon: Search, label: 'Search', position: 8 },
+]
+
+const adminItems: { to: string; icon: any; label: string; countKey?: string }[] = [
+  { to: '/admin/account-browser', icon: ShieldAlert, label: 'Account Browser' },
+  { to: '/admin/apps', icon: LayoutGrid, label: 'Apps', countKey: 'apps' },
+  { to: '/admin/automations', icon: Zap, label: 'Automations', countKey: 'automations' },
+  { to: '/admin/custom-actions', icon: PlugZap, label: 'Custom Actions', countKey: 'custom_actions' },
+  { to: '/admin/custom-fields', icon: SlidersHorizontal, label: 'Custom Fields', countKey: 'custom_fields' },
+  { to: '/admin/inbound-webhooks', icon: ArrowDownToLine, label: 'Inbound Hooks', countKey: 'inbound_hooks' },
+  { to: '/admin/link-types', icon: Link2, label: 'Link Types', countKey: 'link_types' },
+  { to: '/admin/members', icon: UserPlus, label: 'Members', countKey: 'members' },
+  { to: '/admin/modules', icon: Blocks, label: 'Modules', countKey: 'modules' },
+  { to: '/admin/scopes', icon: Shield, label: 'Scope Library' },
+  { to: '/admin/account-scopes', icon: ShieldCheck, label: 'Account Scopes' },
+  { to: '/admin/machine-principals', icon: Bot, label: 'Machine Principals' },
+  { to: '/admin/principal-scopes', icon: UserCheck, label: 'Principal Scopes' },
+  { to: '/admin/packs', icon: Package, label: 'Templates', countKey: 'templates' },
+  { to: '/admin/reports', icon: BarChart3, label: 'Reports' },
+  { to: '/admin/roles', icon: Shield, label: 'Roles' },
+  { to: '/admin/schedules', icon: Clock, label: 'Schedules', countKey: 'schedules' },
+  { to: '/admin/settings', icon: Settings, label: 'Settings' },
+  { to: '/admin/theme', icon: Palette, label: 'Theme' },
+  { to: '/admin/views', icon: LayoutGrid, label: 'Views', countKey: 'views' },
+  { to: '/admin/webhooks', icon: Webhook, label: 'Webhooks', countKey: 'webhooks' },
+  { to: '/admin/workflows', icon: GitBranch, label: 'Workflows', countKey: 'workflows' },
+]
+
+const manifestNavSections = getCustomNavSections()
+
+export function Sidebar() {
+  const { profile, memberships, currentAccountId, setCurrentAccountId, currentRole } = useAuth()
+  const { active: isImpersonating } = useImpersonation()
+  const currentAccount = memberships.find(m => m.account_id === currentAccountId)?.account
+  const isAdmin = currentRole === 'admin' || profile?.system_role === 'system_admin'
+  const isSystemAdmin = profile?.system_role === 'system_admin' || profile?.system_role === 'system_operator'
+  const showTenantSwitcher = memberships.length > 1
+
+  const [appNavItems, setAppNavItems] = useState<AppNavItem[]>([])
+  const [navLoaded, setNavLoaded] = useState(false)
+  const [adminCounts, setAdminCounts] = useState<Record<string, number>>({})
+
+  useEffect(() => {
+    if (!currentAccountId) return
+    apiGet<{ nav_items: AppNavItem[] }>('compute-nav')
+      .then((res) => {
+        setAppNavItems(res.nav_items || [])
+        setNavLoaded(true)
+      })
+      .catch(() => setNavLoaded(true))
+  }, [currentAccountId])
+
+  useEffect(() => {
+    if (!currentAccountId || !isAdmin) return
+    apiGet<Record<string, number>>('admin-counts')
+      .then((counts) => setAdminCounts(counts || {}))
+      .catch(() => {})
+  }, [currentAccountId, isAdmin])
+
+  // Use app-driven nav if apps are published, otherwise fall back to defaults
+  const useAppNav = navLoaded && appNavItems.length > 0
+
+  const userRank = ROLE_RANK[currentRole ?? profile?.system_role ?? 'member'] ?? 1
+
+  const { primarySections, adminSections } = useMemo(() => {
+    const filtered = manifestNavSections
+      .map(section => ({
+        ...section,
+        scope: section.scope ?? 'primary',
+        items: section.items.filter(item => {
+          const itemRank = ROLE_RANK[item.minRole ?? 'member'] ?? 1
+          return userRank >= itemRank
+        }),
+      }))
+      .filter(section => section.items.length > 0)
+
+    const sortSections = (sections: typeof filtered) =>
+      sections.slice().sort((a, b) => (a.position ?? 0) - (b.position ?? 0))
+
+    return {
+      primarySections: sortSections(filtered.filter(section => section.scope === 'primary')),
+      adminSections: sortSections(filtered.filter(section => section.scope === 'admin')),
+    }
+  }, [userRank])
+
+  const renderCustomSections = (sections: typeof primarySections) =>
+    sections.map(section => (
+      <div key={section.key}>
+        <div className="pb-1 pt-3">
+          <p className="px-3 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground/60">
+            {section.title}
+          </p>
+        </div>
+        {section.items.map(item => {
+          const Icon = (item.icon && ICON_MAP[item.icon]) || LayoutDashboard
+          return (
+            <NavLink
+              key={`${section.key}-${item.key}`}
+              to={item.to}
+              className={({ isActive }) =>
+                cn(
+                  'flex items-center gap-3 rounded-md px-3 py-2 text-sm font-medium transition-colors',
+                  isActive
+                    ? 'bg-primary/10 text-primary'
+                    : 'text-muted-foreground hover:bg-accent hover:text-accent-foreground',
+                )
+              }
+            >
+              <Icon className="h-4 w-4" />
+              {item.label}
+            </NavLink>
+          )
+        })}
+      </div>
+    ))
+
+  return (
+    <aside className="flex h-full w-64 flex-col border-r bg-card">
+      <div className="flex h-14 items-center border-b px-4">
+        <span className="text-lg font-semibold tracking-tight">{APP_NAME}</span>
+      </div>
+
+      {showTenantSwitcher && (
+        <div className="border-b p-3">
+          <div className="relative">
+            <select
+              value={currentAccountId || ''}
+              onChange={(e) => setCurrentAccountId(e.target.value)}
+              className="w-full appearance-none rounded-md border bg-background px-3 py-2 pr-8 text-sm"
+            >
+              {memberships.map((m) => (
+                <option key={m.account_id} value={m.account_id}>
+                  {m.account.display_name}
+                </option>
+              ))}
+            </select>
+            <ChevronDown className="pointer-events-none absolute right-2 top-2.5 h-4 w-4 text-muted-foreground" />
+          </div>
+        </div>
+      )}
+
+      {!showTenantSwitcher && currentAccount && (
+        <div className="border-b px-4 py-3">
+          <p className="text-xs text-muted-foreground">Tenant</p>
+          <p className="text-sm font-medium">{currentAccount.display_name}</p>
+        </div>
+      )}
+
+      <div className="border-b px-4 py-3">
+        <ActiveAppSwitcher fullWidth />
+      </div>
+
+      <nav className="flex-1 space-y-1 overflow-y-auto p-3">
+        {useAppNav && (
+          <>
+            {/* Standard nav items when apps are active */}
+            {[
+              { to: '/accounts', icon: Building2, label: 'Accounts' },
+              { to: '/persons', icon: Users, label: 'Persons' },
+            ].map(({ to, icon: Icon, label }) => (
+              <NavLink
+                key={to}
+                to={to}
+                className={({ isActive }) =>
+                  cn(
+                    'flex items-center gap-3 rounded-md px-3 py-2 text-sm font-medium transition-colors',
+                    isActive
+                      ? 'bg-primary/10 text-primary'
+                      : 'text-muted-foreground hover:bg-accent hover:text-accent-foreground',
+                  )
+                }
+              >
+                <Icon className="h-4 w-4" />
+                {label}
+              </NavLink>
+            ))}
+
+            {/* App-driven nav grouped by app name */}
+            {(() => {
+              const groups: Record<string, typeof appNavItems> = {}
+              for (const item of appNavItems) {
+                if (!groups[item.app_name]) groups[item.app_name] = []
+                groups[item.app_name].push(item)
+              }
+              return Object.entries(groups).map(([appName, items]) => (
+                <div key={appName}>
+                  <div className="pb-1 pt-3">
+                    <p className="px-3 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground/60">
+                      {appName}
+                    </p>
+                  </div>
+                  {items.map((item, i) => {
+                    const to =
+                      item.route_type === 'view' && item.view_slug ? `/v/${item.view_slug}` :
+                      (item.route_type === 'path' || item.route_type === 'admin') && item.url ? item.url :
+                      item.url || '/'
+                    return (
+                      <NavLink
+                        key={`${item.app_slug}-${item.view_slug || item.url || i}`}
+                        to={to}
+                        className={({ isActive }) =>
+                          cn(
+                            'flex items-center gap-3 rounded-md px-3 py-2 text-sm font-medium transition-colors',
+                            isActive
+                              ? 'bg-primary/10 text-primary'
+                              : 'text-muted-foreground hover:bg-accent hover:text-accent-foreground',
+                          )
+                        }
+                      >
+                        <LayoutDashboard className="h-4 w-4" />
+                        {item.label}
+                      </NavLink>
+                    )
+                  })}
+                </div>
+              ))
+            })()}
+
+            {renderCustomSections(primarySections)}
+          </>
+        )}
+
+        {/* When no apps are installed, show nothing in user nav */}
+        {navLoaded && !useAppNav && (
+          <>
+            {fallbackNavItems
+              .sort((a, b) => a.position - b.position)
+              .map(({ key, to, icon: Icon, label }) => (
+                <NavLink
+                  key={key}
+                  to={to}
+                  className={({ isActive }) =>
+                    cn(
+                      'flex items-center gap-3 rounded-md px-3 py-2 text-sm font-medium transition-colors',
+                      isActive
+                        ? 'bg-primary/10 text-primary'
+                        : 'text-muted-foreground hover:bg-accent hover:text-accent-foreground',
+                    )
+                  }
+                >
+                  <Icon className="h-4 w-4" />
+                  {label}
+                </NavLink>
+              ))}
+
+            {renderCustomSections(primarySections)}
+          </>
+        )}
+
+        {isAdmin && (
+          <>
+            <div className="pb-1 pt-4">
+              <p className="px-3 text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+                Admin
+              </p>
+            </div>
+            {adminItems.map(({ to, icon: Icon, label, countKey }) => {
+              const count = countKey ? adminCounts[countKey] : undefined
+              return (
+                <NavLink
+                  key={to}
+                  to={to}
+                  className={({ isActive }) =>
+                    cn(
+                      'flex items-center gap-3 rounded-md px-3 py-2 text-sm font-medium transition-colors',
+                      isActive
+                        ? 'bg-primary/10 text-primary'
+                        : 'text-muted-foreground hover:bg-accent hover:text-accent-foreground',
+                    )
+                  }
+                >
+                  <Icon className="h-4 w-4" />
+                  {label}
+                  {typeof count === 'number' && (
+                    <span className="ml-auto text-xs text-muted-foreground">{count}</span>
+                  )}
+                </NavLink>
+              )
+            })}
+
+            {renderCustomSections(adminSections)}
+          </>
+        )}
+
+        {isSystemAdmin && !isImpersonating && (
+          <>
+            <div className="pb-1 pt-4">
+              <p className="px-3 text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+                System
+              </p>
+            </div>
+            <NavLink
+              to="/admin/account-browser"
+              className={({ isActive }) =>
+                cn(
+                  'flex items-center gap-3 rounded-md px-3 py-2 text-sm font-medium transition-colors',
+                  isActive
+                    ? 'bg-primary/10 text-primary'
+                    : 'text-muted-foreground hover:bg-accent hover:text-accent-foreground',
+                )
+              }
+            >
+              <ShieldAlert className="h-4 w-4" />
+              Account Browser
+            </NavLink>
+            <NavLink
+              to="/admin/system-health"
+              className={({ isActive }) =>
+                cn(
+                  'flex items-center gap-3 rounded-md px-3 py-2 text-sm font-medium transition-colors',
+                  isActive
+                    ? 'bg-primary/10 text-primary'
+                    : 'text-muted-foreground hover:bg-accent hover:text-accent-foreground',
+                )
+              }
+            >
+              <HeartPulse className="h-4 w-4" />
+              System Health
+            </NavLink>
+          </>
+        )}
+      </nav>
+
+      <div className="border-t p-3">
+        <Popover>
+          <PopoverTrigger asChild>
+            <Button
+              variant="ghost"
+              size="sm"
+              className="w-full justify-between px-3 py-2"
+            >
+              <div className="flex flex-col text-left">
+                <span className="text-sm font-medium">{profile?.display_name}</span>
+                <span className="text-xs text-muted-foreground">{currentRole}</span>
+              </div>
+              <div className="flex flex-col items-center gap-1 text-muted-foreground">
+                <span className="h-1 w-1 rounded-full bg-current" />
+                <span className="h-1 w-1 rounded-full bg-current" />
+                <span className="h-1 w-1 rounded-full bg-current" />
+              </div>
+            </Button>
+          </PopoverTrigger>
+          <PopoverContent align="end" className="w-64 p-0">
+            <div className="border-b px-4 py-3">
+              <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Account scope</p>
+              <AccountNodePanel className="mt-2" />
+            </div>
+            <button
+              onClick={() => signOut()}
+              className="flex w-full items-center gap-2 px-4 py-3 text-sm text-destructive hover:bg-muted"
+            >
+              <LogOut className="h-4 w-4" />
+              Sign out
+            </button>
+          </PopoverContent>
+        </Popover>
+      </div>
+    </aside>
+  )
+}

@@ -1,7 +1,7 @@
 node_modules
 dist
-src/
-netlify/functions/
+/src/
+/netlify/functions/
 .netlify
 .env
 .env.example
