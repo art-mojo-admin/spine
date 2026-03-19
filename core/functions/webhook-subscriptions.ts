@@ -1,7 +1,6 @@
 import { createHandler, requireAuth, requireTenant, requireRole, json, error, parseBody } from './_shared/middleware'
 import { db } from './_shared/db'
 import { emitAudit, emitActivity, emitOutboxEvent } from './_shared/audit'
-import { adjustCount } from './_shared/counts'
 import crypto from 'crypto'
 
 export default createHandler({
@@ -56,7 +55,6 @@ export default createHandler({
     await emitActivity(ctx, 'webhook.created', `Created webhook subscription`, 'webhook_subscription', data.id)
     await emitOutboxEvent(ctx.accountId!, 'webhook.created', 'webhook_subscription', data.id, data)
 
-    if (data.enabled !== false) await adjustCount(ctx.accountId!, 'webhooks', 1)
     return json(data, 201)
   },
 
@@ -88,9 +86,6 @@ export default createHandler({
     await emitActivity(ctx, 'webhook.updated', `Updated webhook subscription`, 'webhook_subscription', id)
     await emitOutboxEvent(ctx.accountId!, 'webhook.updated', 'webhook_subscription', id, { before, after: data })
 
-    if (body.enabled !== undefined && before.enabled !== data.enabled) {
-      await adjustCount(ctx.accountId!, 'webhooks', data.enabled ? 1 : -1)
-    }
     return json(data)
   },
 
@@ -113,7 +108,6 @@ export default createHandler({
     await emitActivity(ctx, 'webhook.deleted', `Deleted webhook subscription`, 'webhook_subscription', id)
     await emitOutboxEvent(ctx.accountId!, 'webhook.deleted', 'webhook_subscription', id, before)
 
-    if (before.enabled) await adjustCount(ctx.accountId!, 'webhooks', -1)
     return json({ success: true })
   },
 })

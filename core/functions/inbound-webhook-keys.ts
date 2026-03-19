@@ -1,7 +1,6 @@
 import { createHandler, requireAuth, requireTenant, requireRole, json, error, parseBody } from './_shared/middleware'
 import { db } from './_shared/db'
 import { emitAudit, emitActivity } from './_shared/audit'
-import { adjustCount } from './_shared/counts'
 import { maskApiKey } from './_shared/security'
 import crypto from 'crypto'
 
@@ -68,7 +67,6 @@ export default createHandler({
     await emitAudit(ctx, 'create', 'inbound_webhook_key', data.id, null, data)
     await emitActivity(ctx, 'inbound_webhook_key.created', `Created API key "${data.name}"`, 'inbound_webhook_key', data.id)
 
-    if (data.enabled !== false) await adjustCount(ctx.accountId!, 'inbound_hooks', 1)
     return json(data, 201)
   },
 
@@ -108,9 +106,6 @@ export default createHandler({
 
     await emitAudit(ctx, 'update', 'inbound_webhook_key', id, before, data)
 
-    if (body.enabled !== undefined && before.enabled !== data.enabled) {
-      await adjustCount(ctx.accountId!, 'inbound_hooks', data.enabled ? 1 : -1)
-    }
     return json(data)
   },
 
@@ -138,7 +133,6 @@ export default createHandler({
     await emitAudit(ctx, 'delete', 'inbound_webhook_key', id, before, null)
     await emitActivity(ctx, 'inbound_webhook_key.deleted', `Deleted API key "${before.name}"`, 'inbound_webhook_key', id)
 
-    if (before.enabled) await adjustCount(ctx.accountId!, 'inbound_hooks', -1)
     return json({ success: true })
   },
 })

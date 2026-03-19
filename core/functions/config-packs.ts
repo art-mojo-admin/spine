@@ -12,7 +12,6 @@ import {
 import type { RequestContext } from './_shared/middleware'
 import { db } from './_shared/db'
 import { emitActivity } from './_shared/audit'
-import { recalcAllCounts } from './_shared/counts'
 
 // Tables that have pack_id and is_active columns for toggling
 const PACK_TABLES = [
@@ -22,10 +21,9 @@ const PACK_TABLES = [
   'workflow_actions',
   'items',
   'automation_rules',
-  'custom_field_definitions',
+  'field_definitions',
   'link_type_definitions',
-  'entity_links',
-  'account_modules',
+  'item_links',
   'custom_action_types',
   'view_definitions',
   'app_definitions',
@@ -40,8 +38,8 @@ const TEMPLATE_ACCOUNT_ID = '00000000-0000-0000-0000-000000000001'
 // Tables that DO have an account_id column (for scoping to tenant)
 const TABLES_WITH_ACCOUNT_ID = new Set([
   'workflow_definitions', 'items', 'automation_rules',
-  'custom_field_definitions', 'link_type_definitions', 'entity_links',
-  'account_modules', 'custom_action_types', 'view_definitions', 'app_definitions',
+  'field_definitions', 'link_type_definitions', 'item_links',
+  'custom_action_types', 'view_definitions', 'app_definitions',
   'threads',
 ])
 // Tables WITHOUT account_id — children linked via parent FK
@@ -53,16 +51,15 @@ const CLONE_SEQUENCE: { table: typeof PACK_TABLES[number]; entityType: string }[
   { table: 'transition_definitions', entityType: 'transition_definition' },
   { table: 'workflow_actions', entityType: 'workflow_action' },
   { table: 'automation_rules', entityType: 'automation_rule' },
-  { table: 'custom_field_definitions', entityType: 'custom_field_definition' },
+  { table: 'field_definitions', entityType: 'field_definition' },
   { table: 'link_type_definitions', entityType: 'link_type_definition' },
   { table: 'view_definitions', entityType: 'view_definition' },
   { table: 'app_definitions', entityType: 'app_definition' },
-  { table: 'account_modules', entityType: 'account_module' },
   { table: 'custom_action_types', entityType: 'custom_action_type' },
   { table: 'threads', entityType: 'thread' },
   { table: 'messages', entityType: 'message' },
   { table: 'items', entityType: 'item' },
-  { table: 'entity_links', entityType: 'entity_link' },
+  { table: 'item_links', entityType: 'item_link' },
 ]
 
 function logPackAction(ctx: RequestContext, packId: string | undefined, step: string, meta: Record<string, unknown> = {}) {
@@ -381,7 +378,7 @@ export async function uninstallPack(accountId: string, packId: string) {
     await setSharedTestDataActive(false, accountId)
   }
 
-  await recalcAllCounts(accountId)
+  // Counts recalculations removed - admin_counts table dropped
 }
 
 // ── Shared test data helpers ──────────────────────────────────────────
@@ -479,7 +476,7 @@ export default createHandler({
         db.from('workflow_definitions').select('*').eq('pack_id', id).eq('is_test_data', false),
         db.from('stage_definitions').select('*').eq('pack_id', id).eq('is_test_data', false),
         db.from('transition_definitions').select('*').eq('pack_id', id).eq('is_test_data', false),
-        db.from('custom_field_definitions').select('*').eq('pack_id', id).eq('is_test_data', false),
+        db.from('field_definitions').select('*').eq('pack_id', id).eq('is_test_data', false),
         db.from('link_type_definitions').select('*').eq('pack_id', id).eq('is_test_data', false),
         db.from('automation_rules').select('*').eq('pack_id', id).eq('is_test_data', false),
         db.from('view_definitions').select('*').eq('pack_id', id).eq('is_test_data', false),
@@ -668,7 +665,7 @@ export default createHandler({
         })
 
         // Recalculate admin counts
-        await recalcAllCounts(accountId)
+        // Counts recalculations removed - admin_counts table dropped
         logPackAction(ctx, packId, 'install.recalc_complete')
 
         await emitActivity(ctx, 'config_pack.installed', `Installed pack "${pack.name}"${includeTestData ? ' with test data' : ''}`, 'config_pack', packId)
@@ -724,7 +721,7 @@ export default createHandler({
         activated_at: activation.activated_at ?? new Date().toISOString(),
       }, { onConflict: 'account_id,pack_id' })
 
-      await recalcAllCounts(accountId)
+      // Counts recalculations removed - admin_counts table dropped
       await emitActivity(ctx, 'config_pack.test_data_installed', `Installed test data for pack "${pack.name}"`, 'config_pack', packId)
       return json({ success: true, action: 'test_data_installed' })
     }
@@ -775,7 +772,7 @@ export default createHandler({
         await setSharedTestDataActive(false, accountId)
       }
 
-      await recalcAllCounts(accountId)
+      // Counts recalculations removed - admin_counts table dropped
       await emitActivity(ctx, 'config_pack.test_data_uninstalled', `Removed test data for pack "${pack.name}"`, 'config_pack', packId)
       return json({ success: true, action: 'test_data_uninstalled' })
     }

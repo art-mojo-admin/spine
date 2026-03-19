@@ -1,38 +1,35 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useMemo } from 'react'
 import { NavLink } from 'react-router-dom'
 import { useAuth } from '@/hooks/useAuth'
 import { APP_NAME } from '@/lib/config'
-import { apiGet } from '@/lib/api'
 import {
-  LayoutDashboard,
   Building2,
   Users,
-  GitBranch,
-  FileText,
   Activity,
-  Palette,
   Webhook,
   Settings,
   Shield,
   UserPlus,
-  Zap,
   ArrowDownToLine,
   SlidersHorizontal,
-  Clock,
   Link2,
   Package,
   Search,
   LogOut,
   ChevronDown,
-  Blocks,
-  PlugZap,
   ShieldAlert,
   HeartPulse,
-  LayoutGrid,
-  BarChart3,
   ShieldCheck,
   Bot,
   UserCheck,
+  LayoutDashboard,
+  Grid3x3,
+  Zap,
+  Clock,
+  PlugZap,
+  Send,
+  Activity as ActivityIcon,
+  Puzzle,
 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { signOut } from '@/lib/auth'
@@ -41,7 +38,6 @@ import { useImpersonation } from '@/hooks/useImpersonation'
 import { AccountNodePanel } from '@/components/layout/AccountNodePanel'
 import { getCustomNavSections } from '@/lib/customRoutes'
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
-import { ActiveAppSwitcher } from '@/components/admin/ActiveAppContext'
 
 const ROLE_RANK: Record<string, number> = {
   portal: 0,
@@ -53,80 +49,57 @@ const ROLE_RANK: Record<string, number> = {
 }
 
 const ICON_MAP: Record<string, React.ComponentType<{ className?: string }>> = {
-  LayoutDashboard,
   Building2,
   Users,
-  GitBranch,
-  FileText,
   Activity,
-  Palette,
   Webhook,
   Settings,
   Shield,
   UserPlus,
-  Zap,
   ArrowDownToLine,
   SlidersHorizontal,
-  Clock,
   Link2,
   Package,
   Search,
   LogOut,
   ChevronDown,
-  Blocks,
-  PlugZap,
   ShieldAlert,
   HeartPulse,
-  LayoutGrid,
-  BarChart3,
   ShieldCheck,
   Bot,
   UserCheck,
+  LayoutDashboard,
+  Grid3x3,
 }
 
-interface AppNavItem {
-  app_slug: string
-  app_name: string
-  app_icon?: string
-  label: string
-  icon?: string
-  route_type: string
-  view_slug?: string
-  url?: string
-  position: number
-}
-
-const fallbackNavItems = [
-  { key: 'dashboard', to: '/', icon: LayoutDashboard, label: 'Dashboard', position: 0 },
-  { key: 'accounts', to: '/accounts', icon: Building2, label: 'Accounts', position: 1 },
-  { key: 'persons', to: '/persons', icon: Users, label: 'Persons', position: 2 },
-  { key: 'activity', to: '/activity', icon: Activity, label: 'Activity', position: 7 },
-  { key: 'search', to: '/search', icon: Search, label: 'Search', position: 8 },
+const coreNavItems = [
+  { key: 'accounts', to: '/accounts', icon: Building2, label: 'Accounts' },
+  { key: 'persons', to: '/persons', icon: Users, label: 'Persons' },
+  { key: 'activity', to: '/activity', icon: Activity, label: 'Activity' },
+  { key: 'search', to: '/search', icon: Search, label: 'Search' },
 ]
 
-const adminItems: { to: string; icon: any; label: string; countKey?: string }[] = [
-  { to: '/admin/account-browser', icon: ShieldAlert, label: 'Account Browser' },
-  { to: '/admin/apps', icon: LayoutGrid, label: 'Apps', countKey: 'apps' },
-  { to: '/admin/automations', icon: Zap, label: 'Automations', countKey: 'automations' },
-  { to: '/admin/custom-actions', icon: PlugZap, label: 'Custom Actions', countKey: 'custom_actions' },
-  { to: '/admin/custom-fields', icon: SlidersHorizontal, label: 'Custom Fields', countKey: 'custom_fields' },
-  { to: '/admin/inbound-webhooks', icon: ArrowDownToLine, label: 'Inbound Hooks', countKey: 'inbound_hooks' },
-  { to: '/admin/link-types', icon: Link2, label: 'Link Types', countKey: 'link_types' },
-  { to: '/admin/members', icon: UserPlus, label: 'Members', countKey: 'members' },
-  { to: '/admin/modules', icon: Blocks, label: 'Modules', countKey: 'modules' },
+const adminItems: { to: string; icon: any; label: string }[] = [
+  { to: '/admin/members', icon: UserPlus, label: 'Members' },
+  { to: '/admin/roles', icon: Shield, label: 'Roles' },
+  { to: '/admin/role-matrix', icon: Grid3x3, label: 'Role Matrix' },
+  { to: '/admin/machine-principals', icon: Bot, label: 'Machine Principals' },
   { to: '/admin/scopes', icon: Shield, label: 'Scope Library' },
   { to: '/admin/account-scopes', icon: ShieldCheck, label: 'Account Scopes' },
-  { to: '/admin/machine-principals', icon: Bot, label: 'Machine Principals' },
   { to: '/admin/principal-scopes', icon: UserCheck, label: 'Principal Scopes' },
-  { to: '/admin/packs', icon: Package, label: 'Templates', countKey: 'templates' },
-  { to: '/admin/reports', icon: BarChart3, label: 'Reports' },
-  { to: '/admin/roles', icon: Shield, label: 'Roles' },
-  { to: '/admin/schedules', icon: Clock, label: 'Schedules', countKey: 'schedules' },
+  { to: '/admin/field-definitions', icon: SlidersHorizontal, label: 'Field Definitions' },
+  { to: '/admin/link-types', icon: Link2, label: 'Link Types' },
+  { to: '/admin/packs', icon: Package, label: 'Packs' },
+  { to: '/admin/webhooks', icon: Webhook, label: 'Webhooks' },
+  { to: '/admin/inbound-webhooks', icon: ArrowDownToLine, label: 'Inbound Hooks' },
+  { to: '/admin/automations', icon: Zap, label: 'Automations' },
+  { to: '/admin/schedules', icon: Clock, label: 'Schedules' },
+  { to: '/admin/custom-actions', icon: PlugZap, label: 'Custom Actions' },
+  { to: '/admin/webhook-deliveries', icon: Send, label: 'Webhook Deliveries' },
+  { to: '/admin/scheduler-health', icon: HeartPulse, label: 'Scheduler Health' },
+  { to: '/admin/automation-log', icon: ActivityIcon, label: 'Automation Log' },
+  { to: '/admin/integrations', icon: Puzzle, label: 'Integrations' },
   { to: '/admin/settings', icon: Settings, label: 'Settings' },
-  { to: '/admin/theme', icon: Palette, label: 'Theme' },
-  { to: '/admin/views', icon: LayoutGrid, label: 'Views', countKey: 'views' },
-  { to: '/admin/webhooks', icon: Webhook, label: 'Webhooks', countKey: 'webhooks' },
-  { to: '/admin/workflows', icon: GitBranch, label: 'Workflows', countKey: 'workflows' },
 ]
 
 const manifestNavSections = getCustomNavSections()
@@ -138,30 +111,6 @@ export function Sidebar() {
   const isAdmin = currentRole === 'admin' || profile?.system_role === 'system_admin'
   const isSystemAdmin = profile?.system_role === 'system_admin' || profile?.system_role === 'system_operator'
   const showTenantSwitcher = memberships.length > 1
-
-  const [appNavItems, setAppNavItems] = useState<AppNavItem[]>([])
-  const [navLoaded, setNavLoaded] = useState(false)
-  const [adminCounts, setAdminCounts] = useState<Record<string, number>>({})
-
-  useEffect(() => {
-    if (!currentAccountId) return
-    apiGet<{ nav_items: AppNavItem[] }>('compute-nav')
-      .then((res) => {
-        setAppNavItems(res.nav_items || [])
-        setNavLoaded(true)
-      })
-      .catch(() => setNavLoaded(true))
-  }, [currentAccountId])
-
-  useEffect(() => {
-    if (!currentAccountId || !isAdmin) return
-    apiGet<Record<string, number>>('admin-counts')
-      .then((counts) => setAdminCounts(counts || {}))
-      .catch(() => {})
-  }, [currentAccountId, isAdmin])
-
-  // Use app-driven nav if apps are published, otherwise fall back to defaults
-  const useAppNav = navLoaded && appNavItems.length > 0
 
   const userRank = ROLE_RANK[currentRole ?? profile?.system_role ?? 'member'] ?? 1
 
@@ -249,18 +198,37 @@ export function Sidebar() {
         </div>
       )}
 
-      <div className="border-b px-4 py-3">
-        <ActiveAppSwitcher fullWidth />
-      </div>
-
       <nav className="flex-1 space-y-1 overflow-y-auto p-3">
-        {useAppNav && (
+        {/* Core primitive nav */}
+        {coreNavItems.map(({ key, to, icon: Icon, label }) => (
+          <NavLink
+            key={key}
+            to={to}
+            className={({ isActive }) =>
+              cn(
+                'flex items-center gap-3 rounded-md px-3 py-2 text-sm font-medium transition-colors',
+                isActive
+                  ? 'bg-primary/10 text-primary'
+                  : 'text-muted-foreground hover:bg-accent hover:text-accent-foreground',
+              )
+            }
+          >
+            <Icon className="h-4 w-4" />
+            {label}
+          </NavLink>
+        ))}
+
+        {/* Custom nav sections injected by custom code */}
+        {renderCustomSections(primarySections)}
+
+        {isAdmin && (
           <>
-            {/* Standard nav items when apps are active */}
-            {[
-              { to: '/accounts', icon: Building2, label: 'Accounts' },
-              { to: '/persons', icon: Users, label: 'Persons' },
-            ].map(({ to, icon: Icon, label }) => (
+            <div className="pb-1 pt-4">
+              <p className="px-3 text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+                Admin
+              </p>
+            </div>
+            {adminItems.map(({ to, icon: Icon, label }) => (
               <NavLink
                 key={to}
                 to={to}
@@ -277,109 +245,6 @@ export function Sidebar() {
                 {label}
               </NavLink>
             ))}
-
-            {/* App-driven nav grouped by app name */}
-            {(() => {
-              const groups: Record<string, typeof appNavItems> = {}
-              for (const item of appNavItems) {
-                if (!groups[item.app_name]) groups[item.app_name] = []
-                groups[item.app_name].push(item)
-              }
-              return Object.entries(groups).map(([appName, items]) => (
-                <div key={appName}>
-                  <div className="pb-1 pt-3">
-                    <p className="px-3 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground/60">
-                      {appName}
-                    </p>
-                  </div>
-                  {items.map((item, i) => {
-                    const to =
-                      item.route_type === 'view' && item.view_slug ? `/v/${item.view_slug}` :
-                      (item.route_type === 'path' || item.route_type === 'admin') && item.url ? item.url :
-                      item.url || '/'
-                    return (
-                      <NavLink
-                        key={`${item.app_slug}-${item.view_slug || item.url || i}`}
-                        to={to}
-                        className={({ isActive }) =>
-                          cn(
-                            'flex items-center gap-3 rounded-md px-3 py-2 text-sm font-medium transition-colors',
-                            isActive
-                              ? 'bg-primary/10 text-primary'
-                              : 'text-muted-foreground hover:bg-accent hover:text-accent-foreground',
-                          )
-                        }
-                      >
-                        <LayoutDashboard className="h-4 w-4" />
-                        {item.label}
-                      </NavLink>
-                    )
-                  })}
-                </div>
-              ))
-            })()}
-
-            {renderCustomSections(primarySections)}
-          </>
-        )}
-
-        {/* When no apps are installed, show nothing in user nav */}
-        {navLoaded && !useAppNav && (
-          <>
-            {fallbackNavItems
-              .sort((a, b) => a.position - b.position)
-              .map(({ key, to, icon: Icon, label }) => (
-                <NavLink
-                  key={key}
-                  to={to}
-                  className={({ isActive }) =>
-                    cn(
-                      'flex items-center gap-3 rounded-md px-3 py-2 text-sm font-medium transition-colors',
-                      isActive
-                        ? 'bg-primary/10 text-primary'
-                        : 'text-muted-foreground hover:bg-accent hover:text-accent-foreground',
-                    )
-                  }
-                >
-                  <Icon className="h-4 w-4" />
-                  {label}
-                </NavLink>
-              ))}
-
-            {renderCustomSections(primarySections)}
-          </>
-        )}
-
-        {isAdmin && (
-          <>
-            <div className="pb-1 pt-4">
-              <p className="px-3 text-xs font-semibold uppercase tracking-wider text-muted-foreground">
-                Admin
-              </p>
-            </div>
-            {adminItems.map(({ to, icon: Icon, label, countKey }) => {
-              const count = countKey ? adminCounts[countKey] : undefined
-              return (
-                <NavLink
-                  key={to}
-                  to={to}
-                  className={({ isActive }) =>
-                    cn(
-                      'flex items-center gap-3 rounded-md px-3 py-2 text-sm font-medium transition-colors',
-                      isActive
-                        ? 'bg-primary/10 text-primary'
-                        : 'text-muted-foreground hover:bg-accent hover:text-accent-foreground',
-                    )
-                  }
-                >
-                  <Icon className="h-4 w-4" />
-                  {label}
-                  {typeof count === 'number' && (
-                    <span className="ml-auto text-xs text-muted-foreground">{count}</span>
-                  )}
-                </NavLink>
-              )
-            })}
 
             {renderCustomSections(adminSections)}
           </>

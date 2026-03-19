@@ -1,7 +1,6 @@
 import { createHandler, requireAuth, requireTenant, requireRole, json, error, parseBody, clampLimit, type HandlerResult } from './_shared/middleware'
 import { db } from './_shared/db'
 import { emitActivity } from './_shared/audit'
-import { adjustCount } from './_shared/counts'
 
 type OwnedPack = {
   id: string
@@ -173,7 +172,6 @@ export default createHandler({
     }
 
     await emitActivity(ctx, 'app_definition.created', `Created app "${data.name}"`, 'app', data.id)
-    if (data.is_active) await adjustCount(ctx.accountId!, 'apps', 1)
     return json(data, 201)
   },
 
@@ -235,11 +233,6 @@ export default createHandler({
 
     if (dbErr) return error(dbErr.message, 500)
 
-    // Adjust count if is_active changed
-    if (body.is_active !== undefined && existing.is_active !== data.is_active) {
-      await adjustCount(ctx.accountId!, 'apps', data.is_active ? 1 : -1)
-    }
-
     return json(data)
   },
 
@@ -277,7 +270,6 @@ export default createHandler({
         .eq('owner_account_id', ctx.accountId)
         .eq('primary_app_id', id)
     }
-    if (before?.is_active) await adjustCount(ctx.accountId!, 'apps', -1)
     return json({ success: true })
   },
 })

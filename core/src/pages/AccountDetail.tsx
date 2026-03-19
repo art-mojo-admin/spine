@@ -4,7 +4,6 @@ import { apiGet, apiPost, apiPatch } from '@/lib/api'
 import { useAuth } from '@/hooks/useAuth'
 import { EditableField } from '@/components/shared/EditableField'
 import { CustomFieldsRenderer } from '@/components/shared/CustomFieldsRenderer'
-import { EntityLinksPanel } from '@/components/shared/EntityLinksPanel'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
@@ -230,9 +229,6 @@ export function AccountDetailPage() {
             />
           )}
 
-          {!isNew && !editing && accountId && accountId !== 'new' && (
-            <EntityLinksPanel entityType="account" entityId={accountId} />
-          )}
 
           {editing && (
             <div className="flex items-center gap-3">

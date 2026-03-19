@@ -1,7 +1,6 @@
 import { createHandler, requireAuth, requireTenant, requireRole, json, error, parseBody } from './_shared/middleware'
 import { db } from './_shared/db'
 import { emitAudit, emitActivity } from './_shared/audit'
-import { adjustCount } from './_shared/counts'
 
 export default createHandler({
   async GET(req, ctx) {
@@ -61,7 +60,6 @@ export default createHandler({
     await emitAudit(ctx, 'create', 'custom_action_type', data.id, null, data)
     await emitActivity(ctx, 'custom_action_type.created', `Created custom action "${body.name}"`, 'custom_action_type', data.id)
 
-    await adjustCount(ctx.accountId!, 'custom_actions', 1)
     return json(data, 201)
   },
 
@@ -147,7 +145,6 @@ export default createHandler({
     await emitAudit(ctx, 'delete', 'custom_action_type', id, before, null)
     await emitActivity(ctx, 'custom_action_type.deleted', `Deleted custom action "${before.name}"`, 'custom_action_type', id)
 
-    await adjustCount(ctx.accountId!, 'custom_actions', -1)
     return json({ success: true })
   },
 })

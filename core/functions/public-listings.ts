@@ -145,14 +145,12 @@ async function getPublicItems(accountId: string, workflowId: string, params: URL
     return jsonResponse({ workflow: { id: workflow.id, name: workflow.public_config?.listing_title || workflow.name }, items: [] })
   }
 
-  // Get public custom fields for this entity type
+  // Get field definitions for this item type
   const { data: publicFields } = await db
-    .from('custom_field_definitions')
-    .select('field_key, name, field_type')
+    .from('field_definitions')
+    .select('field_key, field_label, field_type')
     .eq('account_id', accountId)
-    .eq('entity_type', 'item')
-    .eq('is_public', true)
-    .eq('enabled', true)
+    .eq('item_type', 'item')
 
   // Fetch items in public stages
   const limit = Math.min(parseInt(params.get('limit') || '50', 10), 100)
@@ -188,7 +186,7 @@ async function getPublicItems(accountId: string, workflowId: string, params: URL
       for (const field of publicFields) {
         if (item.metadata[field.field_key] !== undefined) {
           result.custom_fields[field.field_key] = {
-            label: field.name,
+            label: field.field_label,
             value: item.metadata[field.field_key],
           }
         }
@@ -230,14 +228,12 @@ async function getPublicItem(accountId: string, itemId: string) {
 
   const visibleFields = item.workflow_definitions.public_config?.visible_fields || ['title', 'description']
 
-  // Get public custom fields
+  // Get field definitions for this item type
   const { data: publicFields } = await db
-    .from('custom_field_definitions')
-    .select('field_key, name, field_type')
+    .from('field_definitions')
+    .select('field_key, field_label, field_type')
     .eq('account_id', accountId)
-    .eq('entity_type', 'item')
-    .eq('is_public', true)
-    .eq('enabled', true)
+    .eq('item_type', 'item')
 
   const result: Record<string, any> = {
     id: item.id,
@@ -256,7 +252,7 @@ async function getPublicItem(accountId: string, itemId: string) {
     for (const field of publicFields) {
       if (item.metadata[field.field_key] !== undefined) {
         result.custom_fields[field.field_key] = {
-          label: field.name,
+          label: field.field_label,
           value: item.metadata[field.field_key],
         }
       }

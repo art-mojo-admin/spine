@@ -60,6 +60,14 @@ export default createHandler({
         system_role: null,
       })
 
+      // Create principal for the person
+      await db.from('principals').insert({
+        principal_type: 'human',
+        person_id: person.id,
+        display_name: fullName,
+        status: 'active',
+      })
+
       // Create membership as portal user
       await db.from('memberships').insert({
         person_id: person.id,
@@ -124,6 +132,14 @@ export default createHandler({
         system_role: null,
       })
 
+      // Create principal for the person
+      await db.from('principals').insert({
+        principal_type: 'human',
+        person_id: person.id,
+        display_name: fullName,
+        status: 'active',
+      })
+
       // Create membership to the inviter's account
       await db.from('memberships').insert({
         person_id: person.id,
@@ -173,6 +189,14 @@ export default createHandler({
         person_id: person.id,
         display_name: fullName,
         system_role: null,
+      })
+
+      // Create principal for the person
+      await db.from('principals').insert({
+        principal_type: 'human',
+        person_id: person.id,
+        display_name: fullName,
+        status: 'active',
       })
 
       // Create individual account

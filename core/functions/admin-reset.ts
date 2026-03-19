@@ -9,7 +9,6 @@ import {
 } from './_shared/middleware'
 import { db } from './_shared/db'
 import { emitActivity, emitAudit } from './_shared/audit'
-import { recalcAllCounts } from './_shared/counts'
 import { uninstallPack } from './config-packs'
 
 interface ResetBody {
@@ -21,16 +20,16 @@ const SYSTEM_ROLES = new Set(['system_admin', 'system_operator'])
 
 const ACCOUNT_TABLES: { table: string; column?: string }[] = [
   { table: 'items' },
-  { table: 'entity_links' },
+  { table: 'item_links' },
+  { table: 'item_events' },
   { table: 'threads' },
-  { table: 'scheduled_trigger_instances' },
-  { table: 'scheduled_triggers' },
-  { table: 'automation_rules' },
-  { table: 'custom_field_definitions' },
+  { table: 'messages' },
+  { table: 'embeddings' },
+  { table: 'field_definitions' },
   { table: 'link_type_definitions' },
+  { table: 'item_type_registry' },
   { table: 'view_definitions' },
   { table: 'app_definitions' },
-  { table: 'account_modules' },
   { table: 'custom_action_types' },
   { table: 'integration_instances' },
   { table: 'inbound_webhook_mappings' },
@@ -41,12 +40,34 @@ const ACCOUNT_TABLES: { table: string; column?: string }[] = [
   { table: 'machine_principals' },
   { table: 'principal_scopes' },
   { table: 'account_scopes' },
-  { table: 'activity_events' },
   { table: 'audit_log' },
   { table: 'error_events' },
-  { table: 'metrics_snapshots' },
-  { table: 'admin_counts' },
+  { table: 'scheduled_trigger_instances' },
+  { table: 'scheduled_triggers' },
+  { table: 'automation_rules' },
+  // Phase D tables
+  { table: 'agent_contracts' },
+  { table: 'agent_executions' },
+  { table: 'agent_capabilities' },
+  { table: 'agent_contract_capabilities' },
+  { table: 'extension_surfaces' },
+  { table: 'helper_utilities' },
+  // Phase E tables
+  { table: 'admin_audit_views' },
+  { table: 'admin_alerts' },
+  { table: 'admin_dashboard_widgets' },
+  { table: 'admin_health_snapshots' },
+  // Phase C tables
+  { table: 'installed_packs' },
+  { table: 'pack_install_history' },
+  { table: 'pack_dependencies' },
+  { table: 'pack_rollback_snapshots' },
+  { table: 'local_pack_manifests' },
+  // Legacy workflow tables (deferred removal)
   { table: 'workflow_definitions' },
+  { table: 'stage_definitions' },
+  { table: 'transition_definitions' },
+  { table: 'workflow_actions' },
 ]
 
 function requireSystemAdmin(ctx: RequestContext) {
@@ -75,19 +96,18 @@ export default createHandler({
     const accountId = ctx.accountId!
 
     const { data: installedPacks } = await db
-      .from('pack_activations')
-      .select('pack_id')
+      .from('installed_packs')
+      .select('pack_name')
       .eq('account_id', accountId)
 
     if (installedPacks) {
-      for (const activation of installedPacks) {
-        if (!activation?.pack_id) continue
-        await uninstallPack(accountId, activation.pack_id)
+      for (const installed of installedPacks) {
+        if (!installed?.pack_name) continue
+        await uninstallPack(accountId, installed.pack_name)
       }
     }
 
-    await db.from('pack_activations').delete().eq('account_id', accountId)
-    await db.from('pack_entity_mappings').delete().eq('account_id', accountId)
+    await db.from('installed_packs').delete().eq('account_id', accountId)
 
     for (const { table, column = 'account_id' } of ACCOUNT_TABLES) {
       try {
@@ -128,7 +148,7 @@ export default createHandler({
         })
     }
 
-    await recalcAllCounts(accountId)
+    // Counts recalculations removed - admin_counts table dropped
 
     await emitAudit(ctx, 'tenant_workspace.purged', 'account', accountId, null, {
       notes: body.notes ?? null,

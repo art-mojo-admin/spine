@@ -4,7 +4,6 @@ import { apiGet, apiPost, apiPatch, apiDelete } from '@/lib/api'
 import { useAuth } from '@/hooks/useAuth'
 import { EditableField } from '@/components/shared/EditableField'
 import { CustomFieldsRenderer } from '@/components/shared/CustomFieldsRenderer'
-import { EntityLinksPanel } from '@/components/shared/EntityLinksPanel'
 import { ThreadPanel } from '@/components/shared/ThreadPanel'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
@@ -263,9 +262,6 @@ export function PersonDetailPage() {
             />
           )}
 
-          {!isNew && !editing && personId && personId !== 'new' && (
-            <EntityLinksPanel entityType="person" entityId={personId} />
-          )}
 
           {!isNew && !editing && personId && personId !== 'new' && (
             <ThreadPanel targetType="person" targetId={personId} />

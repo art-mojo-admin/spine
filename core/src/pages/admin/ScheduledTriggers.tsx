@@ -2,19 +2,46 @@ import { useEffect, useState } from 'react'
 import { apiGet, apiPost, apiPatch, apiDelete } from '@/lib/api'
 import { useAuth } from '@/hooks/useAuth'
 import { Button } from '@/components/ui/button'
+import { Input } from '@/components/ui/input'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
-import { Input } from '@/components/ui/input'
-import { Textarea } from '@/components/ui/textarea'
-import { Plus, Trash2, Clock, Repeat, Timer, X, Play, Ban } from 'lucide-react'
+import { Plus, Trash2, Pencil, Clock, Play, Pause, Calendar, Repeat, Timer } from 'lucide-react'
+import { cn } from '@/lib/utils'
 
-type Tab = 'triggers' | 'instances'
+interface ScheduledTrigger {
+  id: string
+  account_id: string
+  name: string
+  trigger_type: 'one_time' | 'recurring' | 'countdown'
+  action_type: string
+  action_config: Record<string, any>
+  conditions: any[]
+  enabled: boolean
+  fire_at?: string
+  cron_expression?: string
+  next_fire_at?: string
+  delay_seconds?: number
+  delay_event?: string
+  fire_count: number
+  last_fired_at?: string
+  created_by: string
+  created_at: string
+  updated_at: string
+}
 
-const TRIGGER_TYPES = [
-  { value: 'one_time', label: 'One-Time', icon: Clock },
-  { value: 'recurring', label: 'Recurring', icon: Repeat },
-  { value: 'countdown', label: 'Countdown', icon: Timer },
-]
+interface ScheduledTriggerInstance {
+  id: string
+  account_id: string
+  trigger_id?: string
+  action_type: string
+  action_config: Record<string, any>
+  context?: Record<string, any>
+  status: 'pending' | 'fired' | 'failed' | 'cancelled'
+  fire_at: string
+  fired_at?: string
+  result?: Record<string, any>
+  created_at: string
+}
 
 const ACTION_TYPES = [
   { value: 'webhook', label: 'Webhook' },
@@ -25,414 +52,441 @@ const ACTION_TYPES = [
 ]
 
 const COMMON_EVENTS = [
-  'item.created', 'item.updated', 'item.stage_changed',
-  'kb.created', 'kb.updated',
-  'user.signed_up',
+  'item.created',
+  'item.updated',
+  'item.stage_changed',
+  'thread.created',
 ]
+
+function formatCron(cron: string): string {
+  // Simple cron formatter - could be enhanced with a library
+  const parts = cron.split(' ')
+  if (parts.length !== 5) return cron
+  const [minute, hour, day, month, weekday] = parts
+  if (cron === '0 9 * * 1-5') return 'Weekdays at 9:00 AM'
+  if (cron === '0 0 * * *') return 'Daily at midnight'
+  if (cron === '0 */6 * * *') return 'Every 6 hours'
+  if (cron === '*/5 * * * *') return 'Every 5 minutes'
+  return `At ${hour}:${minute} on day ${day} of month ${month}`
+}
+
+function getNextFireDate(trigger: ScheduledTrigger): string | null {
+  if (trigger.trigger_type === 'one_time') {
+    return trigger.fire_at ? new Date(trigger.fire_at).toLocaleString() : null
+  }
+  if (trigger.trigger_type === 'recurring') {
+    return trigger.next_fire_at ? new Date(trigger.next_fire_at).toLocaleString() : null
+  }
+  return null
+}
 
 export function ScheduledTriggersPage() {
   const { currentAccountId } = useAuth()
-  const [tab, setTab] = useState<Tab>('triggers')
-  const [triggers, setTriggers] = useState<any[]>([])
-  const [instances, setInstances] = useState<any[]>([])
+  const [triggers, setTriggers] = useState<ScheduledTrigger[]>([])
+  const [instances, setInstances] = useState<ScheduledTriggerInstance[]>([])
   const [loading, setLoading] = useState(true)
   const [showForm, setShowForm] = useState(false)
-  const [editingTrigger, setEditingTrigger] = useState<any | null>(null)
+  const [editingId, setEditingId] = useState<string | null>(null)
+  const [selectedTriggerId, setSelectedTriggerId] = useState<string | null>(null)
+  const [saving, setSaving] = useState(false)
 
-  // Form state
-  const [name, setName] = useState('')
-  const [triggerType, setTriggerType] = useState('one_time')
-  const [fireAt, setFireAt] = useState('')
-  const [cronExpression, setCronExpression] = useState('')
-  const [delaySeconds, setDelaySeconds] = useState(900)
-  const [delayEvent, setDelayEvent] = useState('')
-  const [actionType, setActionType] = useState('webhook')
-  const [actionConfigJson, setActionConfigJson] = useState('{}')
-  const [enabled, setEnabled] = useState(true)
+  const [form, setForm] = useState({
+    name: '',
+    trigger_type: 'one_time' as 'one_time' | 'recurring' | 'countdown',
+    action_type: 'webhook',
+    action_config: {},
+    fire_at: '',
+    cron_expression: '',
+    delay_seconds: '',
+    delay_event: '',
+    enabled: true,
+  })
 
-  useEffect(() => {
-    if (!currentAccountId) return
-    loadData()
-  }, [currentAccountId])
-
-  async function loadData() {
+  async function load() {
     setLoading(true)
     try {
-      const [t, i] = await Promise.all([
-        apiGet<any[]>('scheduled-triggers'),
-        apiGet<any[]>('scheduled-trigger-instances'),
+      const [triggersRes] = await Promise.all([
+        apiGet<ScheduledTrigger[]>('scheduled-triggers'),
       ])
-      setTriggers(t || [])
-      setInstances(i || [])
-    } catch {
-    } finally {
-      setLoading(false)
-    }
+      setTriggers(triggersRes || [])
+    } catch { setTriggers([]) }
+    setLoading(false)
   }
 
+  async function loadInstances(triggerId: string) {
+    try {
+      const instancesRes = await apiGet<ScheduledTriggerInstance[]>('scheduled-trigger-instances', { trigger_id: triggerId })
+      setInstances(instancesRes || [])
+    } catch { setInstances([]) }
+  }
+
+  useEffect(() => {
+    if (currentAccountId) load()
+  }, [currentAccountId])
+
+  useEffect(() => {
+    if (selectedTriggerId) loadInstances(selectedTriggerId)
+  }, [selectedTriggerId])
+
   function resetForm() {
-    setName('')
-    setTriggerType('one_time')
-    setFireAt('')
-    setCronExpression('')
-    setDelaySeconds(900)
-    setDelayEvent('')
-    setActionType('webhook')
-    setActionConfigJson('{}')
-    setEnabled(true)
-    setEditingTrigger(null)
+    setForm({
+      name: '',
+      trigger_type: 'one_time',
+      action_type: 'webhook',
+      action_config: {},
+      fire_at: '',
+      cron_expression: '',
+      delay_seconds: '',
+      delay_event: '',
+      enabled: true,
+    })
+    setEditingId(null)
     setShowForm(false)
   }
 
-  function openEdit(trigger: any) {
-    setName(trigger.name)
-    setTriggerType(trigger.trigger_type)
-    setFireAt(trigger.fire_at ? trigger.fire_at.slice(0, 16) : '')
-    setCronExpression(trigger.cron_expression || '')
-    setDelaySeconds(trigger.delay_seconds || 900)
-    setDelayEvent(trigger.delay_event || '')
-    setActionType(trigger.action_type)
-    setActionConfigJson(JSON.stringify(trigger.action_config || {}, null, 2))
-    setEnabled(trigger.enabled)
-    setEditingTrigger(trigger)
-    setShowForm(true)
-  }
-
   async function handleSave() {
-    if (!name.trim()) return
-
-    let actionConfig: any = {}
-    try { actionConfig = JSON.parse(actionConfigJson) } catch { return }
-
-    const payload: any = {
-      name,
-      trigger_type: triggerType,
-      action_type: actionType,
-      action_config: actionConfig,
-      enabled,
+    if (!form.name || !form.trigger_type || !form.action_type) return
+    if (form.trigger_type === 'one_time' && !form.fire_at) {
+      alert('Fire date is required for one-time triggers')
+      return
+    }
+    if (form.trigger_type === 'recurring' && !form.cron_expression) {
+      alert('Cron expression is required for recurring triggers')
+      return
+    }
+    if (form.trigger_type === 'countdown' && (!form.delay_seconds || !form.delay_event)) {
+      alert('Delay seconds and delay event are required for countdown triggers')
+      return
     }
 
-    if (triggerType === 'one_time') {
-      if (!fireAt) return
-      payload.fire_at = new Date(fireAt).toISOString()
-    } else if (triggerType === 'recurring') {
-      if (!cronExpression.trim()) return
-      payload.cron_expression = cronExpression
-    } else if (triggerType === 'countdown') {
-      if (!delaySeconds || !delayEvent) return
-      payload.delay_seconds = delaySeconds
-      payload.delay_event = delayEvent
-    }
-
+    setSaving(true)
     try {
-      if (editingTrigger) {
-        await apiPatch('scheduled-triggers', payload, { id: editingTrigger.id })
+      const payload: Record<string, any> = {
+        ...form,
+        delay_seconds: form.delay_seconds ? parseInt(form.delay_seconds) : undefined,
+      }
+      if (editingId) {
+        await apiPatch('scheduled-triggers', payload, { id: editingId })
       } else {
         await apiPost('scheduled-triggers', payload)
       }
       resetForm()
-      await loadData()
+      load()
     } catch (err: any) {
-      console.error('Save failed:', err)
+      alert(err.message || 'Save failed')
     }
+    setSaving(false)
   }
 
   async function handleDelete(id: string) {
-    await apiDelete('scheduled-triggers', { id })
-    await loadData()
-  }
-
-  async function handleToggle(trigger: any) {
-    await apiPatch('scheduled-triggers', { enabled: !trigger.enabled }, { id: trigger.id })
-    await loadData()
-  }
-
-  async function handleCancelInstance(id: string) {
-    await apiPatch('scheduled-trigger-instances', { status: 'cancelled' }, { id })
-    await loadData()
-  }
-
-  function formatDate(d: string | null) {
-    if (!d) return '—'
-    return new Date(d).toLocaleString()
-  }
-
-  const typeBadge = (t: string) => {
-    const colors: Record<string, string> = {
-      one_time: 'bg-blue-100 text-blue-800',
-      recurring: 'bg-purple-100 text-purple-800',
-      countdown: 'bg-amber-100 text-amber-800',
+    if (!confirm('Delete this scheduled trigger?')) return
+    try {
+      await apiDelete('scheduled-triggers', { id })
+      load()
+    } catch (err: any) {
+      alert(err.message || 'Delete failed')
     }
-    return <span className={`inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-medium ${colors[t] || ''}`}>{t.replace('_', '-')}</span>
   }
 
-  const statusBadge = (s: string) => {
-    const variant = s === 'fired' ? 'default' : s === 'pending' ? 'secondary' : s === 'cancelled' ? 'outline' : 'destructive'
-    return <Badge variant={variant} className="text-[10px]">{s}</Badge>
+  async function toggleEnabled(id: string, enabled: boolean) {
+    try {
+      await apiPatch('scheduled-triggers', { enabled }, { id })
+      load()
+    } catch (err: any) {
+      alert(err.message || 'Toggle failed')
+    }
   }
+
+  function startEdit(trigger: ScheduledTrigger) {
+    setForm({
+      name: trigger.name,
+      trigger_type: trigger.trigger_type,
+      action_type: trigger.action_type,
+      action_config: trigger.action_config || {},
+      fire_at: trigger.fire_at ? new Date(trigger.fire_at).toISOString().slice(0, 16) : '',
+      cron_expression: trigger.cron_expression || '',
+      delay_seconds: trigger.delay_seconds?.toString() || '',
+      delay_event: trigger.delay_event || '',
+      enabled: trigger.enabled,
+    })
+    setEditingId(trigger.id)
+    setShowForm(true)
+  }
+
+  const selectedTrigger = triggers.find(t => t.id === selectedTriggerId)
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-6 p-6">
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-3xl font-bold tracking-tight">Scheduled Triggers</h1>
-          <p className="mt-1 text-muted-foreground">Timed, recurring, and countdown triggers</p>
+          <h1 className="text-2xl font-semibold">Scheduled Triggers</h1>
+          <p className="text-sm text-muted-foreground mt-1">
+            Configure one-time, recurring, and countdown timers that execute actions.
+          </p>
         </div>
-        {!showForm && (
-          <Button size="sm" onClick={() => setShowForm(true)}>
-            <Plus className="mr-2 h-4 w-4" /> New Trigger
-          </Button>
-        )}
+        <Button onClick={() => setShowForm(true)}>
+          <Plus className="mr-2 h-4 w-4" />
+          Add Trigger
+        </Button>
       </div>
 
-      {/* Tabs */}
-      <div className="flex border-b">
-        {(['triggers', 'instances'] as Tab[]).map((t) => (
-          <button
-            key={t}
-            onClick={() => setTab(t)}
-            className={`px-4 py-2 text-sm font-medium transition-colors ${
-              tab === t ? 'border-b-2 border-primary text-primary' : 'text-muted-foreground hover:text-foreground'
-            }`}
-          >
-            {t === 'triggers' ? 'Triggers' : 'Execution Log'}
-          </button>
-        ))}
-      </div>
-
-      {/* Create/Edit Form */}
       {showForm && (
         <Card>
           <CardHeader>
-            <CardTitle className="text-lg">{editingTrigger ? 'Edit Trigger' : 'New Trigger'}</CardTitle>
+            <CardTitle className="text-base">
+              {editingId ? 'Edit Scheduled Trigger' : 'New Scheduled Trigger'}
+            </CardTitle>
           </CardHeader>
           <CardContent className="space-y-4">
-            <div className="grid gap-4 sm:grid-cols-2">
-              <div className="space-y-1">
-                <label className="text-sm font-medium">Name</label>
-                <Input value={name} onChange={(e) => setName(e.target.value)} placeholder="e.g. Weekly Export" />
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <label className="text-xs font-medium text-muted-foreground mb-1 block">Trigger Name *</label>
+                <Input
+                  placeholder="e.g. Daily health check"
+                  value={form.name}
+                  onChange={e => setForm(p => ({ ...p, name: e.target.value }))}
+                />
               </div>
-              <div className="space-y-1">
-                <label className="text-sm font-medium">Trigger Type</label>
+              <div>
+                <label className="text-xs font-medium text-muted-foreground mb-1 block">Trigger Type *</label>
                 <select
                   className="w-full rounded-md border bg-background px-3 py-2 text-sm"
-                  value={triggerType}
-                  onChange={(e) => setTriggerType(e.target.value)}
-                  disabled={!!editingTrigger}
+                  value={form.trigger_type}
+                  onChange={e => setForm(p => ({ ...p, trigger_type: e.target.value as any }))}
                 >
-                  {TRIGGER_TYPES.map((t) => (
-                    <option key={t.value} value={t.value}>{t.label}</option>
+                  <option value="one_time">One-time</option>
+                  <option value="recurring">Recurring</option>
+                  <option value="countdown">Countdown</option>
+                </select>
+              </div>
+              <div>
+                <label className="text-xs font-medium text-muted-foreground mb-1 block">Action Type *</label>
+                <select
+                  className="w-full rounded-md border bg-background px-3 py-2 text-sm"
+                  value={form.action_type}
+                  onChange={e => setForm(p => ({ ...p, action_type: e.target.value }))}
+                >
+                  {ACTION_TYPES.map(type => (
+                    <option key={type.value} value={type.value}>{type.label}</option>
                   ))}
                 </select>
               </div>
-            </div>
-
-            {/* Type-specific fields */}
-            {triggerType === 'one_time' && (
-              <div className="space-y-1">
-                <label className="text-sm font-medium">Fire At (UTC)</label>
-                <Input type="datetime-local" value={fireAt} onChange={(e) => setFireAt(e.target.value)} />
-              </div>
-            )}
-
-            {triggerType === 'recurring' && (
-              <div className="space-y-1">
-                <label className="text-sm font-medium">Cron Expression</label>
-                <Input
-                  value={cronExpression}
-                  onChange={(e) => setCronExpression(e.target.value)}
-                  placeholder="*/15 * * * *  or  0 0 * * 1"
-                />
-                <p className="text-xs text-muted-foreground">
-                  Format: minute hour day month weekday (UTC). Examples: <code>*/15 * * * *</code> = every 15 min, <code>0 0 * * 1</code> = every Monday midnight
-                </p>
-              </div>
-            )}
-
-            {triggerType === 'countdown' && (
-              <div className="grid gap-4 sm:grid-cols-2">
-                <div className="space-y-1">
-                  <label className="text-sm font-medium">Delay (seconds)</label>
+              {form.trigger_type === 'one_time' && (
+                <div>
+                  <label className="text-xs font-medium text-muted-foreground mb-1 block">Fire Date *</label>
                   <Input
-                    type="number"
-                    min={1}
-                    value={delaySeconds}
-                    onChange={(e) => setDelaySeconds(parseInt(e.target.value, 10) || 0)}
+                    type="datetime-local"
+                    value={form.fire_at}
+                    onChange={e => setForm(p => ({ ...p, fire_at: e.target.value }))}
                   />
-                  <p className="text-xs text-muted-foreground">
-                    {delaySeconds >= 86400
-                      ? `${(delaySeconds / 86400).toFixed(1)} days`
-                      : delaySeconds >= 3600
-                      ? `${(delaySeconds / 3600).toFixed(1)} hours`
-                      : `${(delaySeconds / 60).toFixed(0)} minutes`}
+                </div>
+              )}
+              {form.trigger_type === 'recurring' && (
+                <div>
+                  <label className="text-xs font-medium text-muted-foreground mb-1 block">Cron Expression *</label>
+                  <Input
+                    placeholder="0 9 * * 1-5"
+                    value={form.cron_expression}
+                    onChange={e => setForm(p => ({ ...p, cron_expression: e.target.value }))}
+                  />
+                  <p className="text-xs text-muted-foreground mt-1">
+                    Examples: 0 9 * * 1-5 (weekdays 9am), 0 */6 * * * (every 6h)
                   </p>
                 </div>
-                <div className="space-y-1">
-                  <label className="text-sm font-medium">Trigger Event</label>
-                  <Input
-                    value={delayEvent}
-                    onChange={(e) => setDelayEvent(e.target.value)}
-                    placeholder="e.g. ticket.created"
-                    list="common-events"
-                  />
-                  <datalist id="common-events">
-                    {COMMON_EVENTS.map((e) => <option key={e} value={e} />)}
-                  </datalist>
-                </div>
-              </div>
-            )}
-
-            {/* Action config */}
-            <div className="border-t pt-4 space-y-4">
-              <div className="grid gap-4 sm:grid-cols-2">
-                <div className="space-y-1">
-                  <label className="text-sm font-medium">Action Type</label>
-                  <select
-                    className="w-full rounded-md border bg-background px-3 py-2 text-sm"
-                    value={actionType}
-                    onChange={(e) => setActionType(e.target.value)}
-                  >
-                    {ACTION_TYPES.map((t) => (
-                      <option key={t.value} value={t.value}>{t.label}</option>
-                    ))}
-                  </select>
-                </div>
-                <div className="flex items-end">
-                  <label className="flex items-center gap-2 text-sm">
-                    <input type="checkbox" checked={enabled} onChange={(e) => setEnabled(e.target.checked)} />
-                    Enabled
-                  </label>
-                </div>
-              </div>
-              <div className="space-y-1">
-                <label className="text-sm font-medium">Action Config (JSON)</label>
-                <Textarea
-                  rows={4}
-                  className="font-mono text-xs"
-                  value={actionConfigJson}
-                  onChange={(e) => setActionConfigJson(e.target.value)}
-                  placeholder='{"url": "https://hook.make.com/..."}'
-                />
-              </div>
+              )}
+              {form.trigger_type === 'countdown' && (
+                <>
+                  <div>
+                    <label className="text-xs font-medium text-muted-foreground mb-1 block">Delay Seconds *</label>
+                    <Input
+                      type="number"
+                      placeholder="86400"
+                      value={form.delay_seconds}
+                      onChange={e => setForm(p => ({ ...p, delay_seconds: e.target.value }))}
+                    />
+                  </div>
+                  <div>
+                    <label className="text-xs font-medium text-muted-foreground mb-1 block">Delay Event *</label>
+                    <select
+                      className="w-full rounded-md border bg-background px-3 py-2 text-sm"
+                      value={form.delay_event}
+                      onChange={e => setForm(p => ({ ...p, delay_event: e.target.value }))}
+                    >
+                      <option value="">Select event...</option>
+                      {COMMON_EVENTS.map(event => (
+                        <option key={event} value={event}>{event}</option>
+                      ))}
+                    </select>
+                  </div>
+                </>
+              )}
             </div>
-
-            <div className="flex items-center gap-2">
-              <Button size="sm" onClick={handleSave} disabled={!name.trim()}>
-                {editingTrigger ? 'Update Trigger' : 'Create Trigger'}
+            <label className="flex items-center gap-2 text-sm">
+              <input
+                type="checkbox"
+                checked={form.enabled}
+                onChange={e => setForm(p => ({ ...p, enabled: e.target.checked }))}
+              />
+              Enable trigger
+            </label>
+            <div className="flex gap-2">
+              <Button onClick={handleSave} disabled={saving || !form.name || !form.trigger_type || !form.action_type}>
+                {saving ? 'Saving...' : editingId ? 'Update' : 'Create'}
               </Button>
-              <Button size="sm" variant="ghost" onClick={resetForm}>
-                <X className="mr-1 h-3 w-3" /> Cancel
-              </Button>
+              <Button variant="ghost" onClick={resetForm}>Cancel</Button>
             </div>
           </CardContent>
         </Card>
       )}
 
-      {/* Triggers List */}
-      {tab === 'triggers' && (
-        <div className="space-y-3">
-          {loading ? (
-            <p className="text-sm text-muted-foreground">Loading...</p>
-          ) : triggers.length === 0 ? (
-            <p className="text-sm text-muted-foreground">No triggers configured</p>
-          ) : (
-            triggers.map((t) => {
-              const TypeIcon = TRIGGER_TYPES.find((tt) => tt.value === t.trigger_type)?.icon || Clock
-              return (
-                <Card key={t.id} className={!t.enabled ? 'opacity-60' : ''}>
-                  <CardContent className="flex items-center gap-4 py-4">
-                    <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-primary/10">
-                      <TypeIcon className="h-5 w-5 text-primary" />
-                    </div>
-                    <div className="flex-1 min-w-0">
-                      <p className="font-medium">{t.name}</p>
-                      <div className="flex items-center gap-2 text-xs text-muted-foreground mt-0.5">
-                        {typeBadge(t.trigger_type)}
-                        <span>{t.action_type}</span>
-                        {t.trigger_type === 'recurring' && <span className="font-mono">{t.cron_expression}</span>}
-                        {t.trigger_type === 'countdown' && <span>{t.delay_seconds}s after {t.delay_event}</span>}
-                        {t.trigger_type === 'one_time' && <span>at {formatDate(t.fire_at)}</span>}
+      {loading ? (
+        <div className="text-sm text-muted-foreground">Loading...</div>
+      ) : triggers.length === 0 ? (
+        <Card>
+          <CardContent className="py-12 text-center">
+            <Clock className="mx-auto h-8 w-8 text-muted-foreground mb-3" />
+            <p className="text-sm text-muted-foreground">No scheduled triggers yet.</p>
+            <p className="text-xs text-muted-foreground mt-1">
+              Create timers to run actions at specific times or in response to events.
+            </p>
+          </CardContent>
+        </Card>
+      ) : (
+        <div className="grid gap-6 lg:grid-cols-3">
+          <div className="lg:col-span-2 space-y-4">
+            {triggers.map(trigger => (
+              <Card 
+                key={trigger.id} 
+                className={cn("cursor-pointer transition-colors", selectedTriggerId === trigger.id && "ring-2 ring-primary")}
+                onClick={() => setSelectedTriggerId(trigger.id)}
+              >
+                <CardContent className="p-4">
+                  <div className="flex items-start justify-between">
+                    <div className="flex-1">
+                      <div className="flex items-center gap-2 mb-2">
+                        <h3 className="font-medium">{trigger.name}</h3>
+                        <Badge variant={trigger.enabled ? 'default' : 'secondary'}>
+                          {trigger.enabled ? 'Enabled' : 'Disabled'}
+                        </Badge>
+                        <Badge variant="outline" className="gap-1">
+                          {trigger.trigger_type === 'one_time' && <Calendar className="h-3 w-3" />}
+                          {trigger.trigger_type === 'recurring' && <Repeat className="h-3 w-3" />}
+                          {trigger.trigger_type === 'countdown' && <Timer className="h-3 w-3" />}
+                          {trigger.trigger_type}
+                        </Badge>
                       </div>
-                      <div className="flex items-center gap-3 text-[10px] text-muted-foreground mt-1">
-                        {t.next_fire_at && <span>Next: {formatDate(t.next_fire_at)}</span>}
-                        {t.last_fired_at && <span>Last: {formatDate(t.last_fired_at)}</span>}
-                        <span>Runs: {t.fire_count}</span>
+                      <div className="space-y-1 text-sm text-muted-foreground">
+                        {trigger.trigger_type === 'one_time' && trigger.fire_at && (
+                          <p>Fires: {new Date(trigger.fire_at).toLocaleString()}</p>
+                        )}
+                        {trigger.trigger_type === 'recurring' && trigger.cron_expression && (
+                          <p>Schedule: {formatCron(trigger.cron_expression)}</p>
+                        )}
+                        {trigger.trigger_type === 'countdown' && (
+                          <p>Delay: {trigger.delay_seconds}s after {trigger.delay_event}</p>
+                        )}
+                        <p>Action: {ACTION_TYPES.find(t => t.value === trigger.action_type)?.label || trigger.action_type}</p>
+                        {trigger.fire_count > 0 && (
+                          <p>Fired {trigger.fire_count} times{trigger.last_fired_at && `, last: ${new Date(trigger.last_fired_at).toLocaleDateString()}`}</p>
+                        )}
+                        {trigger.next_fire_at && trigger.trigger_type === 'recurring' && (
+                          <p>Next: {new Date(trigger.next_fire_at).toLocaleString()}</p>
+                        )}
                       </div>
                     </div>
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      className="h-8 text-xs"
-                      onClick={() => handleToggle(t)}
-                    >
-                      {t.enabled ? 'Disable' : 'Enable'}
-                    </Button>
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      className="h-8 text-xs"
-                      onClick={() => openEdit(t)}
-                    >
-                      Edit
-                    </Button>
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      className="h-8 w-8 p-0 text-destructive"
-                      onClick={() => handleDelete(t.id)}
-                    >
-                      <Trash2 className="h-4 w-4" />
-                    </Button>
-                  </CardContent>
-                </Card>
-              )
-            })
-          )}
-        </div>
-      )}
-
-      {/* Execution Log / Instances */}
-      {tab === 'instances' && (
-        <div className="space-y-3">
-          {loading ? (
-            <p className="text-sm text-muted-foreground">Loading...</p>
-          ) : instances.length === 0 ? (
-            <p className="text-sm text-muted-foreground">No execution history</p>
-          ) : (
-            instances.map((inst) => (
-              <Card key={inst.id}>
-                <CardContent className="flex items-center gap-4 py-3">
-                  <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-muted">
-                    {inst.status === 'fired' ? <Play className="h-4 w-4 text-green-600" /> :
-                     inst.status === 'pending' ? <Clock className="h-4 w-4 text-amber-600" /> :
-                     inst.status === 'cancelled' ? <Ban className="h-4 w-4 text-muted-foreground" /> :
-                     <X className="h-4 w-4 text-destructive" />}
-                  </div>
-                  <div className="flex-1 min-w-0">
-                    <p className="text-sm font-medium">
-                      {inst.trigger?.name || inst.action_type || 'Timer'}
-                    </p>
-                    <div className="flex items-center gap-2 text-[10px] text-muted-foreground mt-0.5">
-                      <span>Fire at: {formatDate(inst.fire_at)}</span>
-                      {inst.fired_at && <span>Fired: {formatDate(inst.fired_at)}</span>}
-                      {inst.result?.detail && <span>{inst.result.detail}</span>}
+                    <div className="flex items-center gap-1 ml-4">
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        className="h-8 w-8"
+                        onClick={(e) => {
+                          e.stopPropagation()
+                          toggleEnabled(trigger.id, !trigger.enabled)
+                        }}
+                      >
+                        {trigger.enabled ? <Pause className="h-3.5 w-3.5" /> : <Play className="h-3.5 w-3.5" />}
+                      </Button>
+                      <Button 
+                        variant="ghost" 
+                        size="icon" 
+                        className="h-8 w-8"
+                        onClick={(e) => {
+                          e.stopPropagation()
+                          startEdit(trigger)
+                        }}
+                      >
+                        <Pencil className="h-3.5 w-3.5" />
+                      </Button>
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        className="h-8 w-8 text-destructive hover:text-destructive"
+                        onClick={(e) => {
+                          e.stopPropagation()
+                          handleDelete(trigger.id)
+                        }}
+                      >
+                        <Trash2 className="h-3.5 w-3.5" />
+                      </Button>
                     </div>
                   </div>
-                  {statusBadge(inst.status)}
-                  {inst.status === 'pending' && (
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      className="h-7 text-xs text-destructive"
-                      onClick={() => handleCancelInstance(inst.id)}
-                    >
-                      Cancel
-                    </Button>
-                  )}
                 </CardContent>
               </Card>
-            ))
-          )}
+            ))}
+          </div>
+          
+          <div className="space-y-4">
+            {selectedTrigger ? (
+              <>
+                <Card>
+                  <CardHeader>
+                    <CardTitle className="text-base">Execution History</CardTitle>
+                    <p className="text-sm text-muted-foreground">
+                      Recent instances for "{selectedTrigger.name}"
+                    </p>
+                  </CardHeader>
+                  <CardContent>
+                    {instances.length === 0 ? (
+                      <p className="text-sm text-muted-foreground">No execution history yet</p>
+                    ) : (
+                      <div className="space-y-2">
+                        {instances.map(instance => (
+                          <div key={instance.id} className="flex items-center justify-between p-2 rounded border">
+                            <div className="text-sm">
+                              <div className="flex items-center gap-2">
+                                <Badge variant={
+                                  instance.status === 'fired' ? 'default' :
+                                  instance.status === 'failed' ? 'destructive' :
+                                  instance.status === 'pending' ? 'secondary' : 'outline'
+                                }>
+                                  {instance.status}
+                                </Badge>
+                                <span className="text-muted-foreground">
+                                  {new Date(instance.fire_at).toLocaleString()}
+                                </span>
+                              </div>
+                              {instance.fired_at && (
+                                <p className="text-xs text-muted-foreground mt-1">
+                                  Fired: {new Date(instance.fired_at).toLocaleString()}
+                                </p>
+                              )}
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </CardContent>
+                </Card>
+              </>
+            ) : (
+              <Card>
+                <CardContent className="py-12 text-center">
+                  <Clock className="mx-auto h-8 w-8 text-muted-foreground mb-3" />
+                  <p className="text-sm text-muted-foreground">Select a trigger to view history</p>
+                </CardContent>
+              </Card>
+            )}
+          </div>
         </div>
       )}
     </div>

@@ -159,16 +159,16 @@ export default createHandler({
       const nextPackId = body.active_pack_id || null
       if (nextPackId) {
         const { data: activation } = await db
-          .from('pack_activations')
-          .select('pack_id')
+          .from('installed_packs')
+          .select('id')
           .eq('account_id', ctx.accountId)
-          .eq('pack_id', nextPackId)
-          .eq('config_active', true)
+          .eq('pack_name', nextPackId)
+          .eq('status', 'active')
           .maybeSingle()
         if (!activation) {
           return error('Pack must be installed and active before selecting it as the workspace context.', 422)
         }
-        updates.active_pack_id = activation.pack_id
+        updates.active_pack_id = activation.id
       } else {
         updates.active_pack_id = null
       }

@@ -288,12 +288,10 @@ export async function executeAction(
         }
 
         const linkMeta = config.metadata || {}
-        const { error: linkErr } = await db.from('entity_links').insert({
+        const { error: linkErr } = await db.from('item_links').insert({
           account_id: accountId,
-          source_type: config.source_type,
-          source_id: sourceId,
-          target_type: config.target_type,
-          target_id: targetId,
+          source_item_id: sourceId,
+          target_item_id: targetId,
           link_type: config.link_type,
           metadata: linkMeta,
         })

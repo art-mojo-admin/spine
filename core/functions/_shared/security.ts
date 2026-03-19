@@ -71,7 +71,7 @@ export function validateOutboundUrl(rawUrl: string): string {
 const ALLOWED_ENTITY_TABLES = new Set([
   'items',
   'threads',
-  'entity_links',
+  'item_links',
 ])
 
 const BLOCKED_FIELDS = new Set([

@@ -128,7 +128,7 @@ function buildInspectorState(policy: RolePolicy): InspectorState {
   }
 }
 
-export default function RoleMatrixPage() {
+export function RoleMatrixPage() {
   const { currentAccountId, profile } = useAuth()
   const [accountIdInput, setAccountIdInput] = useState('')
   const [packIdInput, setPackIdInput] = useState('')
