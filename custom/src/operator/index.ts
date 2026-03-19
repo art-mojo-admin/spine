@@ -1,0 +1,6 @@
+export { default as SupportQueuePage } from './pages/SupportQueuePage'
+export { default as CaseWorkspacePage } from './pages/CaseWorkspacePage'
+export { default as KnowledgeEditorPage } from './pages/KnowledgeEditorPage'
+export { default as KnowledgeListPage } from './pages/KnowledgeListPage'
+export { default as CommunityModerationPage } from './pages/CommunityModerationPage'
+export { default as AnalyticsPage } from './pages/AnalyticsPage'
