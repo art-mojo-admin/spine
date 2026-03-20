@@ -1,6 +1,10 @@
-import { createHandler, requireAuth, requireTenant, json, error, parseBody } from '../../core/functions/_shared/middleware'
+import { createHandler, requireAuth, requireTenant, json, error, parseBody, type RequestContext } from '../../core/functions/_shared/middleware'
 import { db } from '../../core/functions/_shared/db'
 import { emitAudit, emitActivity } from '../../core/functions/_shared/audit'
+
+function makeCtx(accountId: string, personId: string): RequestContext {
+  return { requestId: '', personId, accountId, accountNodeId: null, accountRole: null, systemRole: null, authUid: null, impersonating: false, realPersonId: null, impersonationSessionId: null }
+}
 
 export default createHandler({
   async GET(req, ctx, params) {
@@ -156,7 +160,7 @@ async function listPosts(accountId: string, filters: { postKind?: string, modera
       description: item.description,
       metadata,
       status: item.status,
-      stage: item.stage_definitions?.name,
+      stage: (item.stage_definitions as any)?.name,
       created_at: item.created_at,
       updated_at: item.updated_at,
       created_by: item.created_by,
@@ -250,7 +254,7 @@ async function getPost(accountId: string, personId: string, itemId: string) {
     description: data.description,
     metadata,
     status: data.status,
-    stage: data.stage_definitions?.name,
+    stage: (data.stage_definitions as any)?.name,
     created_at: data.created_at,
     updated_at: data.updated_at,
     created_by: data.created_by,
@@ -301,7 +305,7 @@ async function getMyPosts(accountId: string, personId: string) {
       description: item.description,
       metadata,
       status: item.status,
-      stage: item.stage_definitions?.name,
+      stage: (item.stage_definitions as any)?.name,
       created_at: item.created_at,
       updated_at: item.updated_at,
     }
@@ -364,7 +368,7 @@ async function getModerationQueue(accountId: string, personId: string) {
       description: item.description,
       metadata,
       status: item.status,
-      stage: item.stage_definitions?.name,
+      stage: (item.stage_definitions as any)?.name,
       created_at: item.created_at,
       updated_at: item.updated_at,
       created_by: item.created_by,
@@ -460,8 +464,8 @@ async function createPost(accountId: string, personId: string, body: any) {
       created_by: personId,
     })
 
-  await emitAudit({ accountId, personId }, 'create', 'item', data.id, null, data)
-  await emitActivity({ accountId, personId }, 'community.created', `Created ${body.post_kind}: ${body.title}`, 'item', data.id)
+  await emitAudit(makeCtx(accountId, personId), 'create', 'item', data.id, null, data)
+  await emitActivity(makeCtx(accountId, personId), 'community.created', `Created ${body.post_kind}: ${body.title}`, 'item', data.id)
 
   return json(data, 201)
 }
@@ -560,13 +564,13 @@ async function updatePost(accountId: string, personId: string, itemId: string, b
 
   // Log moderation actions
   if (body.moderation_status || body.moderation_action) {
-    await emitAudit({ accountId, personId }, 'moderate', 'item', itemId, current, data)
-    await emitActivity({ accountId, personId }, 'community.moderated', 
+    await emitAudit(makeCtx(accountId, personId), 'moderate', 'item', itemId, current, data)
+    await emitActivity(makeCtx(accountId, personId), 'community.moderated', 
       `Moderated post: ${data.title} (${body.moderation_status || body.moderation_action})`, 
       'item', itemId)
   } else {
-    await emitAudit({ accountId, personId }, 'update', 'item', itemId, current, data)
-    await emitActivity({ accountId, personId }, 'community.updated', `Updated post: ${data.title}`, 'item', itemId)
+    await emitAudit(makeCtx(accountId, personId), 'update', 'item', itemId, current, data)
+    await emitActivity(makeCtx(accountId, personId), 'community.updated', `Updated post: ${data.title}`, 'item', itemId)
   }
 
   return json(data)
@@ -603,8 +607,8 @@ async function deletePost(accountId: string, personId: string, itemId: string) {
 
   if (dbErr) throw dbErr
 
-  await emitAudit({ accountId, personId }, 'delete', 'item', itemId, current, null)
-  await emitActivity({ accountId, personId }, 'community.deleted', `Deleted post: ${current.title}`, 'item', itemId)
+  await emitAudit(makeCtx(accountId, personId), 'delete', 'item', itemId, current, null)
+  await emitActivity(makeCtx(accountId, personId), 'community.deleted', `Deleted post: ${current.title}`, 'item', itemId)
 
   return json({ success: true })
 }

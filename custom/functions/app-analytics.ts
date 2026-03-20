@@ -57,7 +57,7 @@ async function getEscalationReasons(accountId: string, timeRange: string) {
   if (dbErr) throw dbErr
 
   // Count by escalation reason
-  const reasonCounts = {}
+  const reasonCounts: Record<string, number> = {}
   ;(data || []).forEach(row => {
     const reason = row.value || 'unknown'
     reasonCounts[reason] = (reasonCounts[reason] || 0) + 1
@@ -104,10 +104,10 @@ async function getKBGaps(accountId: string, timeRange: string) {
   if (confidenceErr) throw confidenceErr
 
   // Extract common themes from low confidence cases
-  const themes = {}
-  ;(lowConfidenceCases || []).forEach(row => {
-    const title = row.items.title.toLowerCase()
-    const description = row.items.description?.toLowerCase() || ''
+  const themes: Record<string, number> = {}
+  ;((lowConfidenceCases || []) as any[]).forEach(row => {
+    const title = row.items?.title?.toLowerCase() || ''
+    const description = row.items?.description?.toLowerCase() || ''
     const text = `${title} ${description}`
     
     // Simple keyword extraction
@@ -180,7 +180,7 @@ async function getAIResolutionRate(accountId: string, timeRange: string) {
   const escalated = attempts?.filter(exec => exec.output_data?.escalated === true).length || 0
 
   // Calculate trend over time
-  const dailyStats = {}
+  const dailyStats: Record<string, {total: number; resolved: number; escalated: number; escalalated: number}> = {}
   ;(attempts || []).forEach(exec => {
     const day = exec.created_at.split('T')[0]
     if (!dailyStats[day]) {
@@ -321,8 +321,8 @@ async function getKnowledgeCreation(accountId: string, timeRange: string) {
   if (kbErr) throw kbErr
 
   // Group by week
-  const weeklyStats = {}
-  ;(kbFromCases || []).forEach(link => {
+  const weeklyStats: Record<string, {articles_created: number; cases_resolved: number}> = {}
+  ;((kbFromCases || []) as any[]).forEach(link => {
     const week = getWeek(link.created_at)
     if (!weeklyStats[week]) {
       weeklyStats[week] = { articles_created: 0, cases_resolved: 0 }
@@ -340,7 +340,7 @@ async function getKnowledgeCreation(accountId: string, timeRange: string) {
   })).sort((a, b) => a.week.localeCompare(b.week))
 
   // Get article types
-  const articleTypes = {}
+  const articleTypes: Record<string, number> = {}
   ;(kbFromCases || []).forEach(link => {
     const metadata = link.source_items?.metadata || {}
     const articleKind = metadata.resolution_kind || 'unknown'
@@ -391,15 +391,15 @@ async function getCommunitySupportCorrelation(accountId: string, timeRange: stri
   if (corrErr) throw corrErr
 
   // Analyze patterns
-  const patterns = {
+  const patterns: {by_post_kind: Record<string, number>; by_time_to_case: Record<string, number>; by_case_outcome: Record<string, number>} = {
     by_post_kind: {},
     by_time_to_case: {},
     by_case_outcome: {}
   }
 
-  ;(correlations || []).forEach(correlation => {
+  ;((correlations || []) as any[]).forEach(correlation => {
     // Extract post metadata
-    const postMetadata = { ...correlation.source_items?.metadata || {} }
+    const postMetadata: Record<string, any> = { ...(correlation.source_items?.metadata || {}) }
     const postFieldValues = correlation.source_items?.field_values || []
     postFieldValues.forEach((fv: any) => {
       postMetadata[fv.field_key] = fv.value

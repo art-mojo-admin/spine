@@ -1,6 +1,10 @@
-import { createHandler, requireAuth, requireTenant, json, error, parseBody } from '../../core/functions/_shared/middleware'
+import { createHandler, requireAuth, requireTenant, json, error, parseBody, type RequestContext } from '../../core/functions/_shared/middleware'
 import { db } from '../../core/functions/_shared/db'
 import { emitAudit, emitActivity } from '../../core/functions/_shared/audit'
+
+function makeCtx(accountId: string, personId: string): RequestContext {
+  return { requestId: '', personId, accountId, accountNodeId: null, accountRole: null, systemRole: null, authUid: null, impersonating: false, realPersonId: null, impersonationSessionId: null }
+}
 import { callAI } from '../../core/functions/_shared/workflow-engine'
 
 export default createHandler({
@@ -64,15 +68,16 @@ async function processAISupport(accountId: string, personId: string, body: any) 
 
   if (caseErr) throw caseErr
   if (!supportCase) return error('Support case not found', 404)
+  const sc = supportCase as any
 
   // Check if user owns this case
-  if (supportCase.created_by !== personId) {
+  if (sc.created_by !== personId) {
     return error('Access denied', 403)
   }
 
   // Extract field values
-  const metadata = { ...supportCase.metadata }
-  const fieldValues = supportCase.field_values || []
+  const metadata = { ...sc.metadata }
+  const fieldValues = sc.field_values || []
   fieldValues.forEach((fv: any) => {
     metadata[fv.field_key] = fv.value
   })
@@ -115,22 +120,19 @@ Provide a helpful response based on the knowledge above.`
   const shouldEscalate = confidenceScore < 0.7
 
   // STEP 5: Update support case with AI results
-  const updateData = {
+  const escalationReason = shouldEscalate ? determineEscalationReason(aiResponse, searchResults) : null
+  const updateData: Record<string, any> = {
     ai_confidence_score: confidenceScore,
     ai_summary: aiResponse.substring(0, 500), // Truncate for storage
-    stage: shouldEscalate ? 'Escalated' : 'Open'
-  }
-
-  const escalationReason = shouldEscalate ? determineEscalationReason(aiResponse, searchResults) : null
-  if (escalationReason) {
-    updateData.escalation_reason = escalationReason
+    stage: shouldEscalate ? 'Escalated' : 'Open',
+    ...(escalationReason ? { escalation_reason: escalationReason } : {})
   }
 
   // Update the case
   await db
     .from('items')
     .update({
-      stage_definition_id: (await db.from('stage_definitions').select('id').eq('name', shouldEscalate ? 'Escalated' : 'Open').eq('workflow_definition_id', supportCase.workflow_definition_id).single()).data?.id,
+      stage_definition_id: (await db.from('stage_definitions').select('id').eq('name', shouldEscalate ? 'Escalated' : 'Open').eq('workflow_definition_id', sc.workflow_definition_id).single()).data?.id,
       metadata: { ...metadata, ...updateData },
       updated_at: new Date().toISOString(),
     })
@@ -214,14 +216,14 @@ Provide a helpful response based on the knowledge above.`
   }
 
   // STEP 7: Log activity
-  await emitAudit({ accountId, personId }, 'ai_support', 'item', body.case_id, null, {
+  await emitAudit(makeCtx(accountId, personId), 'ai_support', 'item', body.case_id, null, {
     confidence_score: confidenceScore,
     escalated: shouldEscalate,
     escalation_reason: escalationReason,
     articles_used: searchResults.length
   })
 
-  await emitActivity({ accountId, personId }, 'support.ai_processed', 
+  await emitActivity(makeCtx(accountId, personId), 'support.ai_processed', 
     shouldEscalate ? 'AI could not resolve case, escalated to human' : 'AI resolved case successfully', 
     'item', body.case_id)
 

@@ -1,6 +1,10 @@
-import { createHandler, requireAuth, requireTenant, json, error, parseBody } from '../../core/functions/_shared/middleware'
+import { createHandler, requireAuth, requireTenant, json, error, parseBody, type RequestContext } from '../../core/functions/_shared/middleware'
 import { db } from '../../core/functions/_shared/db'
 import { emitAudit, emitActivity } from '../../core/functions/_shared/audit'
+
+function makeCtx(accountId: string, personId: string): RequestContext {
+  return { requestId: '', personId, accountId, accountNodeId: null, accountRole: null, systemRole: null, authUid: null, impersonating: false, realPersonId: null, impersonationSessionId: null }
+}
 
 export default createHandler({
   async POST(req, ctx) {
@@ -152,7 +156,7 @@ async function createKnowledgeDraft(accountId: string, personId: string, support
       title,
       description: summary,
       metadata: {
-        article_kind,
+        article_kind: articleKind,
         visibility: 'member', // Default to member visibility
         audience,
         tags,
@@ -215,9 +219,9 @@ async function createKnowledgeDraft(accountId: string, personId: string, support
     .eq('field_key', 'resolution_kind')
 
   // Audit and activity
-  await emitAudit({ accountId, personId }, 'create', 'item', article.id, null, article)
-  await emitActivity({ accountId, personId }, 'knowledge.draft_created', `Created knowledge draft from case: ${title}`, 'item', article.id)
-  await emitActivity({ accountId, personId }, 'support.resolution_linked', `Linked case resolution to new knowledge article`, 'item', supportCase.id)
+  await emitAudit(makeCtx(accountId, personId), 'create', 'item', article.id, null, article)
+  await emitActivity(makeCtx(accountId, personId), 'knowledge.draft_created', `Created knowledge draft from case: ${title}`, 'item', article.id)
+  await emitActivity(makeCtx(accountId, personId), 'support.resolution_linked', `Linked case resolution to new knowledge article`, 'item', supportCase.id)
 
   return {
     action: 'draft_created',
@@ -359,9 +363,9 @@ async function updateExistingArticle(accountId: string, personId: string, suppor
     .eq('field_key', 'resolution_kind')
 
   // Audit and activity
-  await emitAudit({ accountId, personId }, 'update', 'item', body.target_article_id, article, updatedArticle)
-  await emitActivity({ accountId, personId }, 'knowledge.updated_from_case', `Updated article from case: ${supportCase.title}`, 'item', body.target_article_id)
-  await emitActivity({ accountId, personId }, 'support.resolution_linked', `Linked case resolution to updated knowledge article`, 'item', supportCase.id)
+  await emitAudit(makeCtx(accountId, personId), 'update', 'item', body.target_article_id, article, updatedArticle)
+  await emitActivity(makeCtx(accountId, personId), 'knowledge.updated_from_case', `Updated article from case: ${supportCase.title}`, 'item', body.target_article_id)
+  await emitActivity(makeCtx(accountId, personId), 'support.resolution_linked', `Linked case resolution to updated knowledge article`, 'item', supportCase.id)
 
   return {
     action: 'article_updated',
@@ -380,6 +384,7 @@ async function getKBImprovementSuggestions(accountId: string, caseId: string) {
       title,
       description,
       metadata,
+      stage_definition_id,
       field_values!inner(field_key, value)
     `)
     .eq('account_id', accountId)
@@ -554,7 +559,7 @@ function determineAudience(metadata: any): string[] {
     audience.push('operator')
   }
   
-  if (supportCase.title.toLowerCase().includes('api') || supportCase.title.toLowerCase().includes('integration')) {
+  if (metadata.title?.toLowerCase().includes('api') || metadata.title?.toLowerCase().includes('integration')) {
     audience.push('developer')
   }
   

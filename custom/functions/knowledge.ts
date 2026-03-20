@@ -1,6 +1,10 @@
-import { createHandler, requireAuth, requireTenant, json, error, parseBody } from '../../core/functions/_shared/middleware'
+import { createHandler, requireAuth, requireTenant, json, error, parseBody, type RequestContext } from '../../core/functions/_shared/middleware'
 import { db } from '../../core/functions/_shared/db'
 import { emitAudit, emitActivity } from '../../core/functions/_shared/audit'
+
+function makeCtx(accountId: string, personId: string): RequestContext {
+  return { requestId: '', personId, accountId, accountNodeId: null, accountRole: null, systemRole: null, authUid: null, impersonating: false, realPersonId: null, impersonationSessionId: null }
+}
 
 export default createHandler({
   async GET(req, ctx, params) {
@@ -16,7 +20,7 @@ export default createHandler({
     try {
       switch (mode) {
         case 'list':
-          return await listArticles(ctx.accountId!, visibility)
+          return await listArticles(ctx.accountId!, ctx.personId!, visibility)
         case 'detail':
           if (!itemId) return error('item_id required')
           return await getArticle(ctx.accountId!, itemId, ctx.personId!)
@@ -101,13 +105,13 @@ export default createHandler({
   },
 })
 
-async function listArticles(accountId: string, visibility: string) {
+async function listArticles(accountId: string, personId: string, visibility: string) {
   // Get the caller's role to enforce visibility
   const { data: caller } = await db
     .from('memberships')
     .select('account_role')
     .eq('account_id', accountId)
-    .eq('person_id', db.raw('CURRENT_USER'))
+    .eq('person_id', personId)
     .single()
 
   const callerRole = caller?.account_role || 'member'
@@ -160,7 +164,7 @@ async function listArticles(accountId: string, visibility: string) {
       description: item.description,
       metadata,
       status: item.status,
-      stage: item.stage_definitions?.name,
+      stage: (item.stage_definitions as any)?.name,
       created_at: item.created_at,
       updated_at: item.updated_at,
       created_by: item.created_by,
@@ -249,7 +253,7 @@ async function getArticle(accountId: string, itemId: string, personId: string) {
     description: data.description,
     metadata,
     status: data.status,
-    stage: data.stage_definitions?.name,
+    stage: (data.stage_definitions as any)?.name,
     created_at: data.created_at,
     updated_at: data.updated_at,
     created_by: data.created_by,
@@ -338,7 +342,7 @@ async function searchArticles(accountId: string, params: URLSearchParams) {
       description: item.description,
       metadata,
       status: item.status,
-      stage: item.stage_definitions?.name,
+      stage: (item.stage_definitions as any)?.name,
       created_at: item.created_at,
       updated_at: item.updated_at,
     }
@@ -407,8 +411,8 @@ async function createArticle(accountId: string, personId: string, body: any) {
     })
   }
 
-  await emitAudit({ accountId, personId }, 'create', 'item', data.id, null, data)
-  await emitActivity({ accountId, personId }, 'knowledge.created', `Created knowledge article: ${body.title}`, 'item', data.id)
+  await emitAudit(makeCtx(accountId, personId), 'create', 'item', data.id, null, data)
+  await emitActivity(makeCtx(accountId, personId), 'knowledge.created', `Created knowledge article: ${body.title}`, 'item', data.id)
 
   return json(data, 201)
 }
@@ -482,8 +486,8 @@ async function updateArticle(accountId: string, personId: string, itemId: string
     }
   }
 
-  await emitAudit({ accountId, personId }, 'update', 'item', itemId, current, data)
-  await emitActivity({ accountId, personId }, 'knowledge.updated', `Updated knowledge article: ${data.title}`, 'item', itemId)
+  await emitAudit(makeCtx(accountId, personId), 'update', 'item', itemId, current, data)
+  await emitActivity(makeCtx(accountId, personId), 'knowledge.updated', `Updated knowledge article: ${data.title}`, 'item', itemId)
 
   return json(data)
 }
@@ -506,8 +510,8 @@ async function deleteArticle(accountId: string, personId: string, itemId: string
 
   if (dbErr) throw dbErr
 
-  await emitAudit({ accountId, personId }, 'delete', 'item', itemId, current, null)
-  await emitActivity({ accountId, personId }, 'knowledge.deleted', `Deleted knowledge article: ${current.title}`, 'item', itemId)
+  await emitAudit(makeCtx(accountId, personId), 'delete', 'item', itemId, current, null)
+  await emitActivity(makeCtx(accountId, personId), 'knowledge.deleted', `Deleted knowledge article: ${current.title}`, 'item', itemId)
 
   return json({ success: true })
 }

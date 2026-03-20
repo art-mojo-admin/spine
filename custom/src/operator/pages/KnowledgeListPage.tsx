@@ -7,7 +7,7 @@ import { Input } from '@/components/ui/input'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/button'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
-import { FileText, Search, Eye, Edit, Send, Archive, Plus } from 'lucide-react'
+import { FileText, MessageCircle, BookOpen, Users, Zap, Search, Eye, Edit, Send, Archive, Plus } from 'lucide-react'
 import { cn } from '@/lib/utils'
 
 interface KnowledgeArticle {

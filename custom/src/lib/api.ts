@@ -4,12 +4,26 @@ const API_BASE = process.env.NODE_ENV === 'development'
   ? 'http://localhost:9999' 
   : process.env.API_URL || ''
 
-export async function apiGet(endpoint: string) {
-  const response = await fetch(`${API_BASE}/.netlify/functions${endpoint}`, {
-    method: 'GET',
-    headers: {
-      'Content-Type': 'application/json',
-    },
+interface ApiOptions {
+  method?: string
+  body?: unknown
+  params?: Record<string, string>
+  tokenOverride?: string | null
+}
+
+export async function api<T = unknown>(endpoint: string, options: ApiOptions = {}): Promise<T> {
+  const { method = 'GET', body, params } = options
+
+  let url = `${API_BASE}/.netlify/functions${endpoint}`
+  if (params) {
+    const qs = new URLSearchParams(params).toString()
+    url += `?${qs}`
+  }
+
+  const response = await fetch(url, {
+    method,
+    headers: { 'Content-Type': 'application/json' },
+    body: body ? JSON.stringify(body) : undefined,
     credentials: 'include',
   })
 
@@ -20,52 +34,26 @@ export async function apiGet(endpoint: string) {
   return response.json()
 }
 
-export async function apiPost(endpoint: string, data: any) {
-  const response = await fetch(`${API_BASE}/.netlify/functions${endpoint}`, {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-    },
-    body: JSON.stringify(data),
-    credentials: 'include',
-  })
-
-  if (!response.ok) {
-    throw new Error(`API error: ${response.status} ${response.statusText}`)
+export class ApiError extends Error {
+  constructor(
+    public status: number,
+    message: string,
+  ) {
+    super(message)
+    this.name = 'ApiError'
   }
-
-  return response.json()
 }
 
-export async function apiPatch(endpoint: string, data: any) {
-  const response = await fetch(`${API_BASE}/.netlify/functions${endpoint}`, {
-    method: 'PATCH',
-    headers: {
-      'Content-Type': 'application/json',
-    },
-    body: JSON.stringify(data),
-    credentials: 'include',
-  })
+export const apiGet = <T = unknown>(endpoint: string, params?: Record<string, string>) =>
+  api<T>(endpoint, { params })
 
-  if (!response.ok) {
-    throw new Error(`API error: ${response.status} ${response.statusText}`)
-  }
+type ApiPostOptions = Pick<ApiOptions, 'params' | 'tokenOverride'>
 
-  return response.json()
-}
+export const apiPost = <T = unknown>(endpoint: string, body: unknown, options?: ApiPostOptions) =>
+  api<T>(endpoint, { method: 'POST', body, ...(options || {}) })
 
-export async function apiDelete(endpoint: string) {
-  const response = await fetch(`${API_BASE}/.netlify/functions${endpoint}`, {
-    method: 'DELETE',
-    headers: {
-      'Content-Type': 'application/json',
-    },
-    credentials: 'include',
-  })
+export const apiPatch = <T = unknown>(endpoint: string, body: unknown, params?: Record<string, string>) =>
+  api<T>(endpoint, { method: 'PATCH', body, params })
 
-  if (!response.ok) {
-    throw new Error(`API error: ${response.status} ${response.statusText}`)
-  }
-
-  return response.json()
-}
+export const apiDelete = <T = unknown>(endpoint: string, params?: Record<string, string>) =>
+  api<T>(endpoint, { method: 'DELETE', params })

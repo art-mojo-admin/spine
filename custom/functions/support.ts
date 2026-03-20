@@ -1,6 +1,10 @@
-import { createHandler, requireAuth, requireTenant, json, error, parseBody } from '../../core/functions/_shared/middleware'
+import { createHandler, requireAuth, requireTenant, json, error, parseBody, type RequestContext } from '../../core/functions/_shared/middleware'
 import { db } from '../../core/functions/_shared/db'
 import { emitAudit, emitActivity } from '../../core/functions/_shared/audit'
+
+function makeCtx(accountId: string, personId: string): RequestContext {
+  return { requestId: '', personId, accountId, accountNodeId: null, accountRole: null, systemRole: null, authUid: null, impersonating: false, realPersonId: null, impersonationSessionId: null }
+}
 
 export default createHandler({
   async GET(req, ctx, params) {
@@ -151,7 +155,7 @@ async function listCases(accountId: string, personId: string, filters: { status?
       description: item.description,
       metadata,
       status: item.status,
-      stage: item.stage_definitions?.name,
+      stage: (item.stage_definitions as any)?.name,
       created_at: item.created_at,
       updated_at: item.updated_at,
       created_by: item.created_by,
@@ -248,7 +252,7 @@ async function getCase(accountId: string, personId: string, itemId: string) {
     description: data.description,
     metadata,
     status: data.status,
-    stage: data.stage_definitions?.name,
+    stage: (data.stage_definitions as any)?.name,
     created_at: data.created_at,
     updated_at: data.updated_at,
     created_by: data.created_by,
@@ -313,7 +317,7 @@ async function getSupportQueue(accountId: string, personId: string) {
       description: item.description,
       metadata,
       status: item.status,
-      stage: item.stage_definitions?.name,
+      stage: (item.stage_definitions as any)?.name,
       created_at: item.created_at,
       updated_at: item.updated_at,
       created_by: item.created_by,
@@ -362,7 +366,7 @@ async function getMyCases(accountId: string, personId: string) {
       description: item.description,
       metadata,
       status: item.status,
-      stage: item.stage_definitions?.name,
+      stage: (item.stage_definitions as any)?.name,
       created_at: item.created_at,
       updated_at: item.updated_at,
     }
@@ -453,8 +457,8 @@ async function createCase(accountId: string, personId: string, body: any) {
       created_by: personId,
     })
 
-  await emitAudit({ accountId, personId }, 'create', 'item', data.id, null, data)
-  await emitActivity({ accountId, personId }, 'support.created', `Created support case: ${body.title}`, 'item', data.id)
+  await emitAudit(makeCtx(accountId, personId), 'create', 'item', data.id, null, data)
+  await emitActivity(makeCtx(accountId, personId), 'support.created', `Created support case: ${body.title}`, 'item', data.id)
 
   return json(data, 201)
 }
@@ -541,8 +545,8 @@ async function updateCase(accountId: string, personId: string, itemId: string, b
       })
   }
 
-  await emitAudit({ accountId, personId }, 'update', 'item', itemId, current, data)
-  await emitActivity({ accountId, personId }, 'support.updated', `Updated support case: ${data.title}`, 'item', itemId)
+  await emitAudit(makeCtx(accountId, personId), 'update', 'item', itemId, current, data)
+  await emitActivity(makeCtx(accountId, personId), 'support.updated', `Updated support case: ${data.title}`, 'item', itemId)
 
   return json(data)
 }

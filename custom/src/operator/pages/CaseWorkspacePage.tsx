@@ -81,8 +81,10 @@ export default function CaseWorkspacePage() {
     content: '',
     summary: '',
     article_kind: 'faq',
-    tags: [],
-    audience: ['customer']
+    tags: [] as string[],
+    audience: ['customer'] as string[],
+    resolution_kind: 'internal_followup',
+    resolution_notes: ''
   })
 
   useEffect(() => {

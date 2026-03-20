@@ -5,7 +5,7 @@ import { useAuth } from '@/hooks/useAuth'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
-import { ArrowLeft, BookOpen, FileText, MessageSquare, Users } from 'lucide-react'
+import { ArrowLeft, BookOpen, FileText, MessageSquare, MessageCircle, Users, Zap } from 'lucide-react'
 
 interface KnowledgeArticle {
   id: string
