@@ -14,7 +14,7 @@ interface ApiOptions {
 export async function api<T = any>(endpoint: string, options: ApiOptions = {}): Promise<T> {
   const { method = 'GET', body, params } = options
 
-  let url = `${API_BASE}${endpoint}`
+  let url = `${API_BASE}/${endpoint.replace(/^\//, '')}`
   if (params) {
     const qs = new URLSearchParams(params).toString()
     url += `?${qs}`
