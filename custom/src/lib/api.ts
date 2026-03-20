@@ -11,7 +11,7 @@ interface ApiOptions {
   tokenOverride?: string | null
 }
 
-export async function api<T = unknown>(endpoint: string, options: ApiOptions = {}): Promise<T> {
+export async function api<T = any>(endpoint: string, options: ApiOptions = {}): Promise<T> {
   const { method = 'GET', body, params } = options
 
   let url = `${API_BASE}/.netlify/functions${endpoint}`
@@ -44,16 +44,16 @@ export class ApiError extends Error {
   }
 }
 
-export const apiGet = <T = unknown>(endpoint: string, params?: Record<string, string>) =>
+export const apiGet = <T = any>(endpoint: string, params?: Record<string, string>) =>
   api<T>(endpoint, { params })
 
 type ApiPostOptions = Pick<ApiOptions, 'params' | 'tokenOverride'>
 
-export const apiPost = <T = unknown>(endpoint: string, body: unknown, options?: ApiPostOptions) =>
+export const apiPost = <T = any>(endpoint: string, body: unknown, options?: ApiPostOptions) =>
   api<T>(endpoint, { method: 'POST', body, ...(options || {}) })
 
-export const apiPatch = <T = unknown>(endpoint: string, body: unknown, params?: Record<string, string>) =>
+export const apiPatch = <T = any>(endpoint: string, body: unknown, params?: Record<string, string>) =>
   api<T>(endpoint, { method: 'PATCH', body, params })
 
-export const apiDelete = <T = unknown>(endpoint: string, params?: Record<string, string>) =>
+export const apiDelete = <T = any>(endpoint: string, params?: Record<string, string>) =>
   api<T>(endpoint, { method: 'DELETE', params })

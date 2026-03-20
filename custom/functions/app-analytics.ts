@@ -133,7 +133,7 @@ async function getKBGaps(accountId: string, timeRange: string) {
 
   if (searchErr) throw searchErr
 
-  const searchTerms = {}
+  const searchTerms: Record<string, number> = {}
   ;(searchFailures || []).forEach(execution => {
     const query = execution.trigger_data?.user_message || ''
     if (query.length > 0) {
@@ -180,7 +180,7 @@ async function getAIResolutionRate(accountId: string, timeRange: string) {
   const escalated = attempts?.filter(exec => exec.output_data?.escalated === true).length || 0
 
   // Calculate trend over time
-  const dailyStats: Record<string, {total: number; resolved: number; escalated: number; escalalated: number}> = {}
+  const dailyStats: Record<string, any> = {}
   ;(attempts || []).forEach(exec => {
     const day = exec.created_at.split('T')[0]
     if (!dailyStats[day]) {
@@ -341,8 +341,8 @@ async function getKnowledgeCreation(accountId: string, timeRange: string) {
 
   // Get article types
   const articleTypes: Record<string, number> = {}
-  ;(kbFromCases || []).forEach(link => {
-    const metadata = link.source_items?.metadata || {}
+  ;((kbFromCases || []) as any[]).forEach(link => {
+    const metadata = (link.source_items as any)?.metadata || {}
     const articleKind = metadata.resolution_kind || 'unknown'
     articleTypes[articleKind] = (articleTypes[articleKind] || 0) + 1
   })
@@ -352,7 +352,7 @@ async function getKnowledgeCreation(accountId: string, timeRange: string) {
     time_range: timeRange,
     summary: {
       total_articles_created: kbFromCases?.length || 0,
-      cases_with_kb_outcome: kbFromCases?.filter(link => link.source_items?.stage_definitions?.name === 'Resolved').length || 0
+      cases_with_kb_outcome: ((kbFromCases || []) as any[]).filter(link => (link.source_items as any)?.stage_definitions?.name === 'Resolved').length
     },
     trend,
     article_types: Object.entries(articleTypes).map(([type, count]) => ({ type, count }))

@@ -25,7 +25,7 @@ export default createHandler({
           if (!itemId) return error('item_id required')
           return await getArticle(ctx.accountId!, itemId, ctx.personId!)
         case 'search':
-          return await searchArticles(ctx.accountId!, params)
+          return await searchArticles(ctx.accountId!, ctx.personId!, params)
         default:
           return error('Invalid mode')
       }
@@ -264,7 +264,7 @@ async function getArticle(accountId: string, itemId: string, personId: string) {
   return json(article)
 }
 
-async function searchArticles(accountId: string, params: URLSearchParams) {
+async function searchArticles(accountId: string, personId: string, params: URLSearchParams) {
   const query = params.get('q')
   const articleKind = params.get('article_kind')
   const audience = params.get('audience')
@@ -277,7 +277,7 @@ async function searchArticles(accountId: string, params: URLSearchParams) {
     .from('memberships')
     .select('account_role')
     .eq('account_id', accountId)
-    .eq('person_id', db.raw('CURRENT_USER'))
+    .eq('person_id', personId)
     .single()
 
   const callerRole = caller?.account_role || 'member'
