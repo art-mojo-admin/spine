@@ -5,7 +5,7 @@ import { Badge } from '@/components/ui/badge'
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
 import { useActiveApp } from '@/hooks/useActiveApp'
 import { useAuth } from '@/hooks/useAuth'
-import { apiGet } from '@/lib/api'
+import { apiGet } from '@core/lib/api'
 import { listConfigPacks, type ConfigPack } from '@/lib/packs'
 import { cn } from '@/lib/utils'
 

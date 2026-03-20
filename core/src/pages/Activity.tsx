@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { apiGet } from '@/lib/api'
+import { apiGet } from '@core/lib/api'
 import { useAuth } from '@/hooks/useAuth'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'

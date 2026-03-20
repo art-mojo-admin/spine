@@ -50,13 +50,13 @@ interface CommunityPost {
   can_edit: boolean
 }
 
-const POST_KIND_ICONS = {
+const POST_KIND_ICONS: Record<string, React.ComponentType<any>> = {
   announcement: Megaphone,
   discussion: Users,
   question: HelpCircle
 }
 
-const POST_KIND_LABELS = {
+const POST_KIND_LABELS: Record<string, string> = {
   announcement: 'Announcement',
   discussion: 'Discussion',
   question: 'Question'

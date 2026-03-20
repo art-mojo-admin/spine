@@ -36,16 +36,16 @@ interface KnowledgeArticle {
   }>
 }
 
-const ARTICLE_KIND_ICONS = {
+const ARTICLE_KIND_ICONS: Record<string, React.ComponentType<any>> = {
   docs: FileText,
-  faq: MessageSquare,
-  troubleshooting: FileText,
+  faq: MessageCircle,
+  troubleshooting: Zap,
   implementation: BookOpen,
   release_note: FileText,
   announcement: Users
 }
 
-const ARTICLE_KIND_LABELS = {
+const ARTICLE_KIND_LABELS: Record<string, string> = {
   docs: 'Documentation',
   faq: 'FAQ',
   troubleshooting: 'Troubleshooting',

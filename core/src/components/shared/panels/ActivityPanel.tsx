@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { apiGet } from '@/lib/api'
+import { apiGet } from '@core/lib/api'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Activity } from 'lucide-react'
 

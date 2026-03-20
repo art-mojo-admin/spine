@@ -36,7 +36,10 @@ import { signOut } from '@/lib/auth'
 import { cn } from '@/lib/utils'
 import { useImpersonation } from '@/hooks/useImpersonation'
 import { AccountNodePanel } from '@/components/layout/AccountNodePanel'
-import { getCustomNavSections } from '@/lib/customRoutes'
+// Core navigation sections
+function getCustomNavSections() {
+  return []
+}
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
 
 const ROLE_RANK: Record<string, number> = {

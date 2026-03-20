@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback } from 'react'
 import { useAuth } from '@/hooks/useAuth'
 import { useImpersonation } from '@/hooks/useImpersonation'
-import { apiGet } from '@/lib/api'
+import { apiGet } from '@core/lib/api'
 import { Building2, Users, ShieldCheck, UserCog, ChevronRight, Play, Search, ArrowLeft } from 'lucide-react'
 
 interface Account {

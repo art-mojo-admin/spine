@@ -1,6 +1,6 @@
 import { useEffect, useState, type ReactNode } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
-import { apiGet, apiPost, apiPatch } from '@/lib/api'
+import { apiGet, apiPost, apiPatch } from '@core/lib/api'
 import { useAuth } from '@/hooks/useAuth'
 import { EditableField } from '@/components/shared/EditableField'
 import { CustomFieldsRenderer } from '@/components/shared/CustomFieldsRenderer'
