@@ -2,7 +2,7 @@
 
 const API_BASE = process.env.NODE_ENV === 'development' 
   ? 'http://localhost:9999' 
-  : process.env.API_URL || ''
+  : '/.netlify/functions'
 
 interface ApiOptions {
   method?: string
@@ -14,7 +14,7 @@ interface ApiOptions {
 export async function api<T = any>(endpoint: string, options: ApiOptions = {}): Promise<T> {
   const { method = 'GET', body, params } = options
 
-  let url = `${API_BASE}/.netlify/functions${endpoint}`
+  let url = `${API_BASE}${endpoint}`
   if (params) {
     const qs = new URLSearchParams(params).toString()
     url += `?${qs}`
