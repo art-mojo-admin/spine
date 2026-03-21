@@ -1,7 +1,10 @@
-// API client for custom functions
+import { getAccessToken } from '@/lib/auth'
+import { generateRequestId } from '@/lib/utils'
+import { getActiveAccountId, getActiveAccountNodeId } from '@/lib/accountContext'
+import { getImpersonationSessionId } from '@/lib/impersonationContext'
 
-const API_BASE = process.env.NODE_ENV === 'development' 
-  ? 'http://localhost:9999' 
+const API_BASE = process.env.NODE_ENV === 'development'
+  ? 'http://localhost:9999/.netlify/functions'
   : '/.netlify/functions'
 
 interface ApiOptions {
@@ -12,7 +15,9 @@ interface ApiOptions {
 }
 
 export async function api<T = any>(endpoint: string, options: ApiOptions = {}): Promise<T> {
-  const { method = 'GET', body, params } = options
+  const { method = 'GET', body, params, tokenOverride } = options
+  const token = tokenOverride ?? (await getAccessToken())
+  const requestId = generateRequestId()
 
   let url = `${API_BASE}/${endpoint.replace(/^\//, '')}`
   if (params) {
@@ -20,24 +25,45 @@ export async function api<T = any>(endpoint: string, options: ApiOptions = {}): 
     url += `?${qs}`
   }
 
-  const response = await fetch(url, {
-    method,
-    headers: { 'Content-Type': 'application/json' },
-    body: body ? JSON.stringify(body) : undefined,
-    credentials: 'include',
-  })
-
-  if (!response.ok) {
-    throw new Error(`API error: ${response.status} ${response.statusText}`)
+  const headers: Record<string, string> = {
+    'Content-Type': 'application/json',
+    'X-Request-Id': requestId,
+  }
+  if (token) {
+    headers['Authorization'] = `Bearer ${token}`
+  }
+  const activeAccountId = getActiveAccountId()
+  if (activeAccountId) {
+    headers['X-Account-Id'] = activeAccountId
+  }
+  const activeAccountNodeId = getActiveAccountNodeId()
+  if (activeAccountNodeId) {
+    headers['X-Account-Node-Id'] = activeAccountNodeId
+  }
+  const impersonationSessionId = getImpersonationSessionId()
+  if (impersonationSessionId) {
+    headers['X-Impersonate-Session-Id'] = impersonationSessionId
   }
 
-  return response.json()
+  const res = await fetch(url, {
+    method,
+    headers,
+    body: body ? JSON.stringify(body) : undefined,
+  })
+
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({ error: res.statusText }))
+    throw new ApiError(res.status, err.error || res.statusText, requestId)
+  }
+
+  return res.json()
 }
 
 export class ApiError extends Error {
   constructor(
     public status: number,
     message: string,
+    public requestId: string,
   ) {
     super(message)
     this.name = 'ApiError'
