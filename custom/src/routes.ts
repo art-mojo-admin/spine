@@ -3,6 +3,11 @@ import { RouteConfig } from '@/lib/customRoutes'
 // Member routes (all require authentication)
 export const memberRoutes: RouteConfig[] = [
   {
+    path: '/member',
+    loader: () => import('./member/pages/MemberDashboardPage').then(m => ({ default: m.default })),
+    minRole: 'member'
+  },
+  {
     path: '/member/knowledge',
     loader: () => import('./member/pages/KnowledgePage').then(m => ({ default: m.default })),
     minRole: 'member'
@@ -36,6 +41,11 @@ export const memberRoutes: RouteConfig[] = [
 
 // Operator routes (require operator or admin role)
 export const operatorRoutes: RouteConfig[] = [
+  {
+    path: '/operator',
+    loader: () => import('./operator/pages/OperatorDashboardPage').then(m => ({ default: m.default })),
+    minRole: 'operator'
+  },
   {
     path: '/operator/queue',
     loader: () => import('./operator/pages/SupportQueuePage').then(m => ({ default: m.default })),
