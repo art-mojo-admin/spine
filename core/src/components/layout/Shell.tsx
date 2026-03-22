@@ -8,6 +8,7 @@ export function Shell() {
   const { active: isImpersonating } = useImpersonation()
   const location = useLocation()
   const showAdminNotice = location.pathname.startsWith('/admin')
+  const showActiveAppSwitcher = showAdminNotice || (!location.pathname.startsWith('/operator') && !location.pathname.startsWith('/member'))
 
   return (
     <ActiveAppProvider>
@@ -17,11 +18,11 @@ export function Shell() {
           <div className="mx-auto max-w-6xl p-6 lg:p-8">
             {showAdminNotice ? (
               <ActiveAppNotice className="mb-6" />
-            ) : (
+            ) : showActiveAppSwitcher ? (
               <div className="mb-6 flex justify-end">
                 <ActiveAppSwitcher mode="pill" size="sm" />
               </div>
-            )}
+            ) : null}
             <Outlet />
           </div>
         </main>

@@ -1,5 +1,5 @@
 import { useMemo } from 'react'
-import { NavLink } from 'react-router-dom'
+import { NavLink, useLocation } from 'react-router-dom'
 import { useAuth } from '@/hooks/useAuth'
 import { APP_NAME } from '@/lib/config'
 import {
@@ -110,10 +110,16 @@ const manifestNavSections = getCustomNavSections()
 export function Sidebar() {
   const { profile, memberships, currentAccountId, setCurrentAccountId, currentRole } = useAuth()
   const { active: isImpersonating } = useImpersonation()
+  const location = useLocation()
   const currentAccount = memberships.find(m => m.account_id === currentAccountId)?.account
   const isAdmin = currentRole === 'admin' || profile?.system_role === 'system_admin'
   const isSystemAdmin = profile?.system_role === 'system_admin' || profile?.system_role === 'system_operator'
   const showTenantSwitcher = memberships.length > 1
+  
+  // Hide admin navigation and tenant references for operator/member routes
+  const isOperatorOrMemberRoute = location.pathname.startsWith('/operator') || location.pathname.startsWith('/member')
+  const showAdminNav = isAdmin && !isOperatorOrMemberRoute
+  const showTenantInfo = !isOperatorOrMemberRoute
 
   const userRank = ROLE_RANK[currentRole ?? profile?.system_role ?? 'member'] ?? 1
 
@@ -175,7 +181,7 @@ export function Sidebar() {
         <span className="text-lg font-semibold tracking-tight">{APP_NAME}</span>
       </div>
 
-      {showTenantSwitcher && (
+      {showTenantInfo && showTenantSwitcher && (
         <div className="border-b p-3">
           <div className="relative">
             <select
@@ -194,7 +200,7 @@ export function Sidebar() {
         </div>
       )}
 
-      {!showTenantSwitcher && currentAccount && (
+      {showTenantInfo && !showTenantSwitcher && currentAccount && (
         <div className="border-b px-4 py-3">
           <p className="text-xs text-muted-foreground">Tenant</p>
           <p className="text-sm font-medium">{currentAccount.display_name}</p>
@@ -202,8 +208,8 @@ export function Sidebar() {
       )}
 
       <nav className="flex-1 space-y-1 overflow-y-auto p-3">
-        {/* Core primitive nav */}
-        {coreNavItems.map(({ key, to, icon: Icon, label }) => (
+        {/* Core primitive nav - only show for non-operator/member routes */}
+        {showTenantInfo && coreNavItems.map(({ key, to, icon: Icon, label }) => (
           <NavLink
             key={key}
             to={to}
@@ -224,7 +230,7 @@ export function Sidebar() {
         {/* Custom nav sections injected by custom code */}
         {renderCustomSections(primarySections)}
 
-        {isAdmin && (
+        {showAdminNav && (
           <>
             <div className="pb-1 pt-4">
               <p className="px-3 text-xs font-semibold uppercase tracking-wider text-muted-foreground">
@@ -253,7 +259,7 @@ export function Sidebar() {
           </>
         )}
 
-        {isSystemAdmin && !isImpersonating && (
+        {isSystemAdmin && !isImpersonating && showTenantInfo && (
           <>
             <div className="pb-1 pt-4">
               <p className="px-3 text-xs font-semibold uppercase tracking-wider text-muted-foreground">
@@ -312,10 +318,12 @@ export function Sidebar() {
             </Button>
           </PopoverTrigger>
           <PopoverContent align="end" className="w-64 p-0">
-            <div className="border-b px-4 py-3">
-              <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Account scope</p>
-              <AccountNodePanel className="mt-2" />
-            </div>
+            {showTenantInfo && (
+              <div className="border-b px-4 py-3">
+                <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Account scope</p>
+                <AccountNodePanel className="mt-2" />
+              </div>
+            )}
             <button
               onClick={() => signOut()}
               className="flex w-full items-center gap-2 px-4 py-3 text-sm text-destructive hover:bg-muted"

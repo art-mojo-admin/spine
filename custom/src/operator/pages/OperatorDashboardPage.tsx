@@ -1,6 +1,6 @@
 import React from 'react'
 import { Link } from 'react-router-dom'
-import { BookOpen, LifeBuoy, Users, Home, TrendingUp, MessageSquare, BarChart3, UserCheck, FileText, Settings } from 'lucide-react'
+import { BookOpen, LifeBuoy, Users, BarChart3, UserCheck, FileText } from 'lucide-react'
 
 export default function OperatorDashboardPage() {
   const cards = [
@@ -9,35 +9,35 @@ export default function OperatorDashboardPage() {
       description: 'Manage and respond to support cases',
       icon: LifeBuoy,
       to: '/operator/queue',
-      color: 'bg-red-500'
+      color: 'bg-blue-600'
     },
     {
       title: 'Knowledge Management',
       description: 'Create and edit knowledge articles',
       icon: BookOpen,
       to: '/operator/knowledge',
-      color: 'bg-blue-500'
+      color: 'bg-blue-600'
     },
     {
       title: 'Community Moderation',
       description: 'Moderate community discussions',
       icon: Users,
       to: '/operator/community',
-      color: 'bg-purple-500'
+      color: 'bg-blue-600'
     },
     {
       title: 'Analytics',
       description: 'View system metrics and reports',
       icon: BarChart3,
       to: '/operator/analytics',
-      color: 'bg-green-500'
+      color: 'bg-blue-600'
     },
     {
       title: 'User Management',
       description: 'Manage user accounts and permissions',
       icon: UserCheck,
       to: '/operator/users',
-      color: 'bg-orange-500'
+      color: 'bg-blue-600'
     }
   ]
 
@@ -75,7 +75,7 @@ export default function OperatorDashboardPage() {
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
           <Link
             to="/operator/queue"
-            className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md text-white bg-red-600 hover:bg-red-700"
+            className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md text-white bg-blue-600 hover:bg-blue-700"
           >
             <LifeBuoy className="h-4 w-4 mr-2" />
             View Support Queue
@@ -102,7 +102,7 @@ export default function OperatorDashboardPage() {
           <h3 className="text-lg font-medium text-gray-900 mb-4">Recent Activity</h3>
           <div className="space-y-3">
             <div className="flex items-center text-sm">
-              <div className="flex-shrink-0 w-2 h-2 bg-green-400 rounded-full"></div>
+              <div className="flex-shrink-0 w-2 h-2 bg-blue-400 rounded-full"></div>
               <span className="ml-2 text-gray-600">New support case #1234 opened</span>
             </div>
             <div className="flex items-center text-sm">
@@ -110,7 +110,7 @@ export default function OperatorDashboardPage() {
               <span className="ml-2 text-gray-600">Knowledge article "Getting Started" updated</span>
             </div>
             <div className="flex items-center text-sm">
-              <div className="flex-shrink-0 w-2 h-2 bg-purple-400 rounded-full"></div>
+              <div className="flex-shrink-0 w-2 h-2 bg-blue-400 rounded-full"></div>
               <span className="ml-2 text-gray-600">New community post requires moderation</span>
             </div>
           </div>
@@ -121,7 +121,7 @@ export default function OperatorDashboardPage() {
           <div className="space-y-3">
             <div className="flex items-center justify-between">
               <span className="text-sm text-gray-600">Support Queue</span>
-              <span className="text-sm font-medium text-green-600">8 active cases</span>
+              <span className="text-sm font-medium text-blue-600">8 active cases</span>
             </div>
             <div className="flex items-center justify-between">
               <span className="text-sm text-gray-600">Knowledge Base</span>
@@ -129,7 +129,7 @@ export default function OperatorDashboardPage() {
             </div>
             <div className="flex items-center justify-between">
               <span className="text-sm text-gray-600">Community Posts</span>
-              <span className="text-sm font-medium text-purple-600">3 pending review</span>
+              <span className="text-sm font-medium text-blue-600">3 pending review</span>
             </div>
           </div>
         </div>

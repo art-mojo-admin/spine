@@ -1,6 +1,6 @@
 import React from 'react'
 import { Link } from 'react-router-dom'
-import { BookOpen, LifeBuoy, Users, Home, TrendingUp, MessageSquare, BarChart3, UserCheck } from 'lucide-react'
+import { BookOpen, LifeBuoy, Users, MessageSquare } from 'lucide-react'
 
 export default function MemberDashboardPage() {
   const cards = [
@@ -9,21 +9,21 @@ export default function MemberDashboardPage() {
       description: 'Browse articles and documentation',
       icon: BookOpen,
       to: '/member/knowledge',
-      color: 'bg-blue-500'
+      color: 'bg-blue-600'
     },
     {
       title: 'Support',
       description: 'Submit and track support cases',
       icon: LifeBuoy,
       to: '/member/support',
-      color: 'bg-green-500'
+      color: 'bg-blue-600'
     },
     {
       title: 'Community',
       description: 'Join discussions and connect with others',
       icon: Users,
       to: '/member/community',
-      color: 'bg-purple-500'
+      color: 'bg-blue-600'
     }
   ]
 
@@ -61,7 +61,7 @@ export default function MemberDashboardPage() {
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
           <Link
             to="/member/support"
-            className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md text-white bg-green-600 hover:bg-green-700"
+            className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md text-white bg-blue-600 hover:bg-blue-700"
           >
             <LifeBuoy className="h-4 w-4 mr-2" />
             New Support Case

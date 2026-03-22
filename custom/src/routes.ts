@@ -80,6 +80,11 @@ export const operatorRoutes: RouteConfig[] = [
     path: '/operator/analytics',
     loader: () => import('./operator/pages/AnalyticsPage').then(m => ({ default: m.default })),
     minRole: 'operator'
+  },
+  {
+    path: '/operator/users',
+    loader: () => import('./operator/pages/UsersPage').then(m => ({ default: m.default })),
+    minRole: 'operator'
   }
 ]
 
