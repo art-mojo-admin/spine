@@ -4,6 +4,8 @@ import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { Input } from '@/components/ui/input'
+import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '@/components/ui/accordion'
+import { UserCheck, Info } from 'lucide-react'
 
 interface ScopeOption {
   id: string
@@ -224,6 +226,38 @@ export function PrincipalScopesPage() {
           <h1 className="text-3xl font-bold tracking-tight">Principal Scopes</h1>
           <p className="text-muted-foreground">Grant or revoke granular capabilities for humans, machines, or system actors.</p>
         </div>
+      </div>
+
+      <Accordion type="single" collapsible className="w-full">
+        <AccordionItem value="principal-scopes">
+          <AccordionTrigger className="text-left">
+            <div className="flex items-center gap-2">
+              <Info className="h-4 w-4" />
+              <span className="font-medium">Understanding Principal Scopes</span>
+            </div>
+          </AccordionTrigger>
+          <AccordionContent>
+            <div className="space-y-3 text-sm">
+              <div>
+                <h4 className="font-semibold">Purpose</h4>
+                <p className="text-muted-foreground">Principal scopes grant specific capabilities to individual users, machine principals, or system actors, providing fine-grained access control beyond account-level scopes.</p>
+              </div>
+              <div>
+                <h4 className="font-semibold">Configuration</h4>
+                <ul className="list-disc pl-5 space-y-1 text-muted-foreground">
+                  <li><strong>Principal Type:</strong> Human (users), Machine (automations), or System (internal processes)</li>
+                  <li><strong>Assignment Type:</strong> Direct (explicit), Role Bundle (from role), Justification (temporary), or System Default</li>
+                  <li><strong>Expiration:</strong> Optional expiration date for temporary access</li>
+                  <li><strong>Reason:</strong> Documentation for why this scope was granted</li>
+                  <li><strong>Notes:</strong> Additional context about the scope assignment</li>
+                </ul>
+                <p className="text-muted-foreground mt-2">Use principal scopes when specific users or services need access beyond what their role or account provides.</p>
+              </div>
+            </div>
+          </AccordionContent>
+        </AccordionItem>
+      </Accordion>
+      <div className="flex flex-col gap-2 md:flex-row md:items-center md:justify-between">
         <div className="flex flex-wrap gap-2">
           <select
             className="rounded-md border bg-background px-3 py-2 text-sm"

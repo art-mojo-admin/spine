@@ -4,6 +4,8 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
+import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '@/components/ui/accordion'
+import { Shield, Info } from 'lucide-react'
 
 interface ScopeRecord {
   id: string
@@ -79,19 +81,49 @@ export function ScopeLibraryPage() {
           <h1 className="text-3xl font-bold tracking-tight">Scope Library</h1>
           <p className="text-muted-foreground">System-wide registry of available scopes and their capabilities.</p>
         </div>
-        <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
-          <label className="flex items-center gap-2 text-sm text-muted-foreground">
-            <input
-              type="checkbox"
-              checked={includeInactive}
-              onChange={(e) => setIncludeInactive(e.target.checked)}
-            />
-            Show inactive scopes
-          </label>
-          <Button size="sm" onClick={() => setShowForm((prev) => !prev)}>
-            {showForm ? 'Close' : 'New Scope'}
-          </Button>
-        </div>
+      </div>
+
+      <Accordion type="single" collapsible className="w-full">
+        <AccordionItem value="scope-library">
+          <AccordionTrigger className="text-left">
+            <div className="flex items-center gap-2">
+              <Info className="h-4 w-4" />
+              <span className="font-medium">Understanding Scope Library</span>
+            </div>
+          </AccordionTrigger>
+          <AccordionContent>
+            <div className="space-y-3 text-sm">
+              <div>
+                <h4 className="font-semibold">Purpose</h4>
+                <p className="text-muted-foreground">The Scope Library defines reusable permission bundles that can be assigned to principals and accounts. Scopes group related capabilities together for easier management.</p>
+              </div>
+              <div>
+                <h4 className="font-semibold">Configuration</h4>
+                <ul className="list-disc pl-5 space-y-1 text-muted-foreground">
+                  <li><strong>Slug:</strong> Unique identifier (e.g., "support.inbox", "automation.workflows")</li>
+                  <li><strong>Category:</strong> Group related scopes (general, support, crm, automation, etc.)</li>
+                  <li><strong>Capabilities:</strong> Specific permissions included in this scope</li>
+                  <li><strong>Default Role:</strong> Suggested minimum role for this scope</li>
+                  <li><strong>Status:</strong> Active scopes can be assigned, inactive ones cannot</li>
+                </ul>
+                <p className="text-muted-foreground mt-2">System operators create scopes here, then assign them to accounts in Account Scopes or to principals in Principal Scopes.</p>
+              </div>
+            </div>
+          </AccordionContent>
+        </AccordionItem>
+      </Accordion>
+      <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
+        <label className="flex items-center gap-2 text-sm text-muted-foreground">
+          <input
+            type="checkbox"
+            checked={includeInactive}
+            onChange={(e) => setIncludeInactive(e.target.checked)}
+          />
+          Show inactive scopes
+        </label>
+        <Button size="sm" onClick={() => setShowForm((prev) => !prev)}>
+          {showForm ? 'Close' : 'New Scope'}
+        </Button>
       </div>
 
       {showForm && (

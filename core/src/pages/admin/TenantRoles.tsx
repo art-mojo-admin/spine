@@ -3,8 +3,9 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Textarea } from '@/components/ui/textarea'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
-import { Shield, Plus, Trash2, Edit2 } from 'lucide-react'
+import { Shield, Plus, Trash2, Edit2, Info } from 'lucide-react'
 import { useAuth } from '@/hooks/useAuth'
+import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '@/components/ui/accordion'
 
 interface TenantRole {
   id: string
@@ -94,6 +95,35 @@ export function TenantRolesPage() {
         </h1>
         <p className="mt-1 text-muted-foreground">Manage custom roles for your tenant</p>
       </div>
+      
+      <Accordion type="single" collapsible className="w-full">
+        <AccordionItem value="tenant-roles">
+          <AccordionTrigger className="text-left">
+            <div className="flex items-center gap-2">
+              <Info className="h-4 w-4" />
+              <span className="font-medium">Understanding Tenant Roles</span>
+            </div>
+          </AccordionTrigger>
+          <AccordionContent>
+            <div className="space-y-3 text-sm">
+              <div>
+                <h4 className="font-semibold">Purpose</h4>
+                <p className="text-muted-foreground">Tenant roles allow you to create custom roles beyond the default admin/operator/member roles, providing more granular control over user permissions within your tenant.</p>
+              </div>
+              <div>
+                <h4 className="font-semibold">Configuration</h4>
+                <ul className="list-disc pl-5 space-y-1 text-muted-foreground">
+                  <li>Create custom roles like "Content Editor", "Viewer", "Support Agent" etc.</li>
+                  <li>Assign roles to users through the Members page</li>
+                  <li>Roles work with Item Types to define field-level permissions</li>
+                  <li>Custom roles can have specific permissions for different item types</li>
+                </ul>
+                <p className="text-muted-foreground mt-2">Use these roles in Item Types schema to define who can create, read, update, or delete specific types of items and fields.</p>
+              </div>
+            </div>
+          </AccordionContent>
+        </AccordionItem>
+      </Accordion>
       
       <div className="grid gap-6 md:grid-cols-3">
         <div className="md:col-span-1">

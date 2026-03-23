@@ -4,6 +4,8 @@ import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { Input } from '@/components/ui/input'
+import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '@/components/ui/accordion'
+import { ShieldCheck, Info } from 'lucide-react'
 
 interface ScopeSummary {
   id: string
@@ -147,6 +149,37 @@ export function AccountScopesPage() {
           <h1 className="text-3xl font-bold tracking-tight">Account Scopes</h1>
           <p className="text-muted-foreground">Enable or configure capability bundles for this tenant.</p>
         </div>
+      </div>
+
+      <Accordion type="single" collapsible className="w-full">
+        <AccordionItem value="account-scopes">
+          <AccordionTrigger className="text-left">
+            <div className="flex items-center gap-2">
+              <Info className="h-4 w-4" />
+              <span className="font-medium">Understanding Account Scopes</span>
+            </div>
+          </AccordionTrigger>
+          <AccordionContent>
+            <div className="space-y-3 text-sm">
+              <div>
+                <h4 className="font-semibold">Purpose</h4>
+                <p className="text-muted-foreground">Account scopes enable specific capabilities for your tenant, controlling which features, packs, and integrations are available to your users.</p>
+              </div>
+              <div>
+                <h4 className="font-semibold">Configuration</h4>
+                <ul className="list-disc pl-5 space-y-1 text-muted-foreground">
+                  <li><strong>Status:</strong> Enabled (active), Preview (testing), or Disabled (inactive)</li>
+                  <li><strong>Source:</strong> Manual (explicitly enabled) or Pack (included with installed pack)</li>
+                  <li><strong>Config:</strong> JSON configuration for pack-specific settings or overrides</li>
+                  <li><strong>Notes:</strong> Internal documentation about why this scope was enabled</li>
+                </ul>
+                <p className="text-muted-foreground mt-2">Enable scopes here to grant capabilities to your entire tenant. For principal-specific access, use Principal Scopes.</p>
+              </div>
+            </div>
+          </AccordionContent>
+        </AccordionItem>
+      </Accordion>
+      <div className="flex flex-col gap-2 md:flex-row md:items-center md:justify-between">
         <Button variant={showCreate ? 'ghost' : 'default'} onClick={() => setShowCreate(prev => !prev)}>
           {showCreate ? 'Close' : 'Enable Scope'}
         </Button>

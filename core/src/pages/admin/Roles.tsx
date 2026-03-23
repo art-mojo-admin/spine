@@ -1,7 +1,8 @@
 import { useAuth } from '@/hooks/useAuth'
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
-import { Shield } from 'lucide-react'
+import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '@/components/ui/accordion'
+import { Shield, Info } from 'lucide-react'
 
 export function RolesPage() {
   const { profile, memberships, currentAccountId, currentRole } = useAuth()
@@ -24,6 +25,59 @@ export function RolesPage() {
         <h1 className="text-3xl font-bold tracking-tight">Roles & Permissions</h1>
         <p className="mt-1 text-muted-foreground">RBAC overview for your account</p>
       </div>
+
+      <Accordion type="single" collapsible className="w-full">
+        <AccordionItem value="system-roles">
+          <AccordionTrigger className="text-left">
+            <div className="flex items-center gap-2">
+              <Info className="h-4 w-4" />
+              <span className="font-medium">Understanding System Roles</span>
+            </div>
+          </AccordionTrigger>
+          <AccordionContent>
+            <div className="space-y-3 text-sm">
+              <div>
+                <h4 className="font-semibold">Purpose</h4>
+                <p className="text-muted-foreground">System roles provide cross-tenant administrative access and are assigned directly to user profiles by system administrators.</p>
+              </div>
+              <div>
+                <h4 className="font-semibold">Configuration</h4>
+                <ul className="list-disc pl-5 space-y-1 text-muted-foreground">
+                  <li><strong>system_admin:</strong> Full system access across all tenants, can manage accounts and users</li>
+                  <li><strong>system_operator:</strong> Read-only access across all tenants for operational support</li>
+                  <li><strong>support_operator:</strong> Access to support tickets across all tenants</li>
+                </ul>
+                <p className="text-muted-foreground mt-2">Only system admins can assign these roles through user profile management.</p>
+              </div>
+            </div>
+          </AccordionContent>
+        </AccordionItem>
+        <AccordionItem value="account-roles">
+          <AccordionTrigger className="text-left">
+            <div className="flex items-center gap-2">
+              <Info className="h-4 w-4" />
+              <span className="font-medium">Understanding Account Roles</span>
+            </div>
+          </AccordionTrigger>
+          <AccordionContent>
+            <div className="space-y-3 text-sm">
+              <div>
+                <h4 className="font-semibold">Purpose</h4>
+                <p className="text-muted-foreground">Account roles define permissions within a specific tenant and are assigned through membership management.</p>
+              </div>
+              <div>
+                <h4 className="font-semibold">Configuration</h4>
+                <ul className="list-disc pl-5 space-y-1 text-muted-foreground">
+                  <li><strong>admin:</strong> Full tenant access, can manage members, settings, and all resources</li>
+                  <li><strong>operator:</strong> Can manage workflows, tickets, knowledge base articles, and automation</li>
+                  <li><strong>member:</strong> Read access with limited write capabilities based on specific permissions</li>
+                </ul>
+                <p className="text-muted-foreground mt-2">Assign these roles in the Members page. For custom roles, use the Tenant Roles page.</p>
+              </div>
+            </div>
+          </AccordionContent>
+        </AccordionItem>
+      </Accordion>
 
       <Card>
         <CardHeader>

@@ -9,7 +9,8 @@ import { Textarea } from '@/components/ui/textarea'
 import { Badge } from '@/components/ui/badge'
 import { Switch } from '@/components/ui/switch'
 import { SelectNative } from '@/components/ui/select-native'
-import { ChevronDown, ChevronRight, Shield, ShieldQuestion } from 'lucide-react'
+import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '@/components/ui/accordion'
+import { ChevronDown, ChevronRight, Shield, ShieldQuestion, Info } from 'lucide-react'
 
 interface PackSummary {
   id: string
@@ -255,6 +256,35 @@ export function RoleMatrixPage() {
           Inspect visibility/editability metadata across tenant overrides and pack templates. System operators can pivot across accounts.
         </p>
       </div>
+
+      <Accordion type="single" collapsible className="w-full">
+        <AccordionItem value="role-matrix">
+          <AccordionTrigger className="text-left">
+            <div className="flex items-center gap-2">
+              <Info className="h-4 w-4" />
+              <span className="font-medium">Understanding Role Matrix</span>
+            </div>
+          </AccordionTrigger>
+          <AccordionContent>
+            <div className="space-y-3 text-sm">
+              <div>
+                <h4 className="font-semibold">Purpose</h4>
+                <p className="text-muted-foreground">The Role Matrix provides advanced visibility into permission policies across your tenant, including overrides from packs and tenant-specific customizations.</p>
+              </div>
+              <div>
+                <h4 className="font-semibold">Configuration</h4>
+                <ul className="list-disc pl-5 space-y-1 text-muted-foreground">
+                  <li>Filter by account ID, pack ID, or entity type to focus on specific resources</li>
+                  <li>Toggle between tenant overrides and pack templates to see permission sources</li>
+                  <li>Inspect individual policies to view and edit visibility/editability JSON</li>
+                  <li>System operators can analyze permissions across multiple tenants</li>
+                </ul>
+                <p className="text-muted-foreground mt-2">Use this tool for debugging permission issues or understanding how pack templates interact with tenant overrides.</p>
+              </div>
+            </div>
+          </AccordionContent>
+        </AccordionItem>
+      </Accordion>
 
       <Card>
         <CardHeader>

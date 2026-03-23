@@ -4,6 +4,8 @@ import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { Input } from '@/components/ui/input'
+import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '@/components/ui/accordion'
+import { Bot, Info } from 'lucide-react'
 
 interface MachinePrincipal {
   id: string
@@ -174,6 +176,38 @@ export function MachinePrincipalsPage() {
           <h1 className="text-3xl font-bold tracking-tight">Machine Principals</h1>
           <p className="text-muted-foreground">Manage automation identities, API keys, and shared service accounts.</p>
         </div>
+      </div>
+
+      <Accordion type="single" collapsible className="w-full">
+        <AccordionItem value="machine-principals">
+          <AccordionTrigger className="text-left">
+            <div className="flex items-center gap-2">
+              <Info className="h-4 w-4" />
+              <span className="font-medium">Understanding Machine Principals</span>
+            </div>
+          </AccordionTrigger>
+          <AccordionContent>
+            <div className="space-y-3 text-sm">
+              <div>
+                <h4 className="font-semibold">Purpose</h4>
+                <p className="text-muted-foreground">Machine principals are non-human identities used by automations, integrations, and services to authenticate and interact with the system programmatically.</p>
+              </div>
+              <div>
+                <h4 className="font-semibold">Configuration</h4>
+                <ul className="list-disc pl-5 space-y-1 text-muted-foreground">
+                  <li><strong>Kind:</strong> Choose between automation, api_key, ai_agent, or integration</li>
+                  <li><strong>Auth Mode:</strong> API key, signed JWT, or OAuth client credentials</li>
+                  <li><strong>Visibility:</strong> Private (tenant-only) or shared (cross-tenant)</li>
+                  <li><strong>Status:</strong> Active, suspended, or revoked for lifecycle management</li>
+                  <li><strong>Audit Channel:</strong> Optional webhook/slack channel for activity logging</li>
+                </ul>
+                <p className="text-muted-foreground mt-2">Assign scopes to principals through Principal Scopes page to control their API access.</p>
+              </div>
+            </div>
+          </AccordionContent>
+        </AccordionItem>
+      </Accordion>
+      <div className="flex flex-col gap-2 md:flex-row md:items-center md:justify-between">
         <div className="flex flex-wrap gap-2">
           <select
             className="rounded-md border bg-background px-3 py-2 text-sm"
