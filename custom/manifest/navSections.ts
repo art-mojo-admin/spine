@@ -20,6 +20,15 @@ export const customNavSections: CustomNavSection[] = [
       items: []
     },
 
+    // Nav sections from debug
+    {
+      key: "debug",
+      title: "debug",
+      scope: 'primary',
+      position: 10,
+      items: []
+    },
+
 ]
 
 export default customNavSections

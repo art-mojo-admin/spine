@@ -86,6 +86,13 @@ export const customRoutes: CustomRouteDefinition[] = [
       minRole: "member"
     },
 
+    // Routes from debug
+    {
+      path: "/debug/roles",
+      loader: () => import('./debug/src/pages/DebugRolePage.tsx'),
+      minRole: "portal"
+    },
+
 ]
 
 // Transform our custom routes to the format expected by the core
