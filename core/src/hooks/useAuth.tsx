@@ -67,7 +67,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const loadProfile = useCallback(async () => {
     try {
-      const data = await apiGet<{ person: { id: string }; profile: Profile; memberships: Membership[] }>('me')
+      const data = await apiGet<{ person: { id: string }; profile: Profile; memberships: Membership[]; available_accounts?: { id: string; display_name: string }[] }>('me')
       const nextProfile: Profile = { ...data.profile, person_id: data.profile.person_id || data.person?.id }
       setProfile(nextProfile)
       setMemberships(data.memberships)
@@ -83,6 +83,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       }
 
       if (data.memberships.length === 0) {
+        // For system admins without memberships, auto-select the first available account
+        if (isSystemLevel && data.available_accounts && data.available_accounts.length > 0) {
+          applyAccountContext(data.available_accounts[0].id)
+          return
+        }
         applyAccountContext(null, null)
         return
       }
@@ -93,10 +98,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       if (err?.status === 401) {
         try {
           await apiPost('provision-user', {})
-          const data = await apiGet<{ person: { id: string }; profile: Profile; memberships: Membership[] }>('me')
-          setProfile({ ...data.profile, person_id: data.profile.person_id || data.person?.id })
+          const data = await apiGet<{ person: { id: string }; profile: Profile; memberships: Membership[]; available_accounts?: { id: string; display_name: string }[] }>('me')
+          const nextProfile = { ...data.profile, person_id: data.profile.person_id || data.person?.id }
+          setProfile(nextProfile)
           setMemberships(data.memberships)
-          if (data.memberships.length > 0) {
+          const isSystemLevel = ['system_admin', 'system_operator'].includes(nextProfile.system_role || '')
+          if (data.memberships.length === 0 && isSystemLevel && data.available_accounts && data.available_accounts.length > 0) {
+            applyAccountContext(data.available_accounts[0].id)
+          } else if (data.memberships.length > 0) {
             const stored = getActiveAccountId()
             const storedNode = getActiveAccountNodeId()
             const availableIds = data.memberships.map((m) => m.account_id)
