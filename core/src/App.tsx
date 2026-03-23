@@ -5,6 +5,7 @@ import { Shell } from '@/components/layout/Shell'
 import { ImpersonationProvider } from '@/hooks/useImpersonation'
 import { ImpersonationBanner } from '@/components/layout/ImpersonationBanner'
 import { getCustomRoutes } from '@/lib/customRoutes'
+import { RoleProtectedRoute } from '@/components/RoleProtectedRoute'
 
 const runtimeCustomRoutes = getCustomRoutes().map(route => ({
   ...route,
@@ -125,8 +126,12 @@ export default function App() {
               <Route path="/admin/automation-log" element={<AutomationLogPage />} />
               <Route path="/admin/integrations" element={<IntegrationCatalogPage />} />
               {/* Custom routes injected by custom code */}
-              {runtimeCustomRoutes.map(({ path, Component }) => (
-                <Route key={path} path={path} element={<Component />} />
+              {runtimeCustomRoutes.map(({ path, Component, minRole }) => (
+                <Route key={path} path={path} element={
+                  <RoleProtectedRoute minRole={minRole}>
+                    <Component />
+                  </RoleProtectedRoute>
+                } />
               ))}
             </Route>
           </Routes>
