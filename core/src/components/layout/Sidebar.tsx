@@ -254,7 +254,7 @@ export function Sidebar() {
                 <ChevronDown className="h-4 w-4" />
               </Button>
             </PopoverTrigger>
-            <PopoverContent align="start" className="w-56 p-2">
+            <PopoverContent align="start" className="w-56 p-2 max-h-[70vh] overflow-y-auto">
               <div className="space-y-1">
                 {adminItems.map(({ to, icon: Icon, label }) => (
                   <NavLink
@@ -294,7 +294,7 @@ export function Sidebar() {
                 <ChevronDown className="h-4 w-4" />
               </Button>
             </PopoverTrigger>
-            <PopoverContent align="start" className="w-56 p-2">
+            <PopoverContent align="start" className="w-56 p-2 max-h-[70vh] overflow-y-auto">
               <div className="space-y-1">
                 <NavLink
                   to="/admin/account-browser"
