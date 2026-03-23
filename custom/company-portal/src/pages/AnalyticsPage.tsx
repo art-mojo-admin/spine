@@ -1,8 +1,8 @@
 import { useEffect, useState } from 'react'
-import { apiGet } from './lib/api'
-import { useAuth } from './hooks/useAuth'
-import { Button } from './components/ui/button'
-import { Card, CardContent, CardHeader, CardTitle } from './components/ui/card'
+import { apiGet } from '../lib/api'
+import { useAuth } from '../hooks/useAuth'
+import { Button } from '../components/ui/button'
+import { Card, CardContent, CardHeader, CardTitle } from '../components/ui/card'
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, LineChart, Line, PieChart, Pie, Cell } from 'recharts'
 import { TrendingUp, Users, MessageSquare, Bot, AlertTriangle, FileText, Download } from 'lucide-react'
 

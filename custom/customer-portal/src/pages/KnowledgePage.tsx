@@ -1,13 +1,13 @@
 import { useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
-import { apiGet } from './lib/api'
-import { useAuth } from './hooks/useAuth'
-import { Button } from './components/ui/button'
-import { Input } from './components/ui/input'
-import { Card, CardContent, CardHeader, CardTitle } from './components/ui/card'
-import { Badge } from './components/ui/badge'
+import { apiGet } from '../lib/api'
+import { useAuth } from '../hooks/useAuth'
+import { Button } from '../components/ui/button'
+import { Input } from '../components/ui/input'
+import { Card, CardContent, CardHeader, CardTitle } from '../components/ui/card'
+import { Badge } from '../components/ui/badge'
 import { Search, BookOpen, FileText, MessageCircle, Zap, Users } from 'lucide-react'
-import { cn } from './lib/utils'
+import { cn } from '../lib/utils'
 
 interface KnowledgeArticle {
   id: string
@@ -233,7 +233,7 @@ export default function KnowledgePage() {
                   </div>
                   <CardTitle className="text-base leading-tight">
                     <Link
-                      to={`/customer-portal/knowledge/${article.id}`}}
+                      to={`/customer-portal/knowledge/${article.id}`}
                       className="hover:text-primary transition-colors"
                     >
                       {article.title}

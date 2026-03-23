@@ -86,46 +86,55 @@ export default function App() {
           <Routes>
             <Route path="/login" element={<LoginPage />} />
             <Route element={<ProtectedRoutes />}>
-              {/* Core primitives */}
+              {/* Redirect root — accessible to all authenticated users */}
               <Route path="/" element={<Navigate to="/admin/system-health" replace />} />
-              <Route path="/accounts" element={<AccountsPage />} />
-              <Route path="/accounts/:accountId" element={<AccountDetailPage />} />
-              <Route path="/persons" element={<PersonsPage />} />
-              <Route path="/persons/:personId" element={<PersonDetailPage />} />
-              {/* Core system admin */}
-              <Route path="/admin/system-health" element={<SystemHealthPage />} />
-              <Route path="/admin/settings" element={<SettingsPage />} />
-              <Route path="/admin/setup" element={<SetupWizardPage />} />
-              <Route path="/admin/account-browser" element={<AccountBrowserPage />} />
-              {/* Identity & access */}
-              <Route path="/admin/members" element={<MembersPage />} />
-              <Route path="/admin/roles" element={<RolesPage />} />
-              <Route path="/admin/tenant-roles" element={<TenantRolesPage />} />
-              <Route path="/admin/role-matrix" element={<RoleMatrixPage />} />
-              <Route path="/admin/machine-principals" element={<MachinePrincipalsPage />} />
-              <Route path="/admin/account-scopes" element={<AccountScopesPage />} />
-              <Route path="/admin/scopes" element={<ScopeLibraryPage />} />
-              <Route path="/admin/principal-scopes" element={<PrincipalScopesPage />} />
-              {/* Apps & Navigation */}
-              <Route path="/admin/apps" element={<AppsPage />} />
-              <Route path="/admin/marketplace" element={<MarketplacePage />} />
-              <Route path="/admin/marketplace/:slug" element={<MarketplaceDetailPage />} />
-              {/* Type registry */}
-              <Route path="/admin/item-types" element={<ItemTypesPage />} />
-              {/* Pack lifecycle */}
-              <Route path="/admin/packs" element={<ConfigPacksPage />} />
-              {/* Webhooks */}
-              <Route path="/admin/webhooks" element={<WebhooksPage />} />
-              <Route path="/admin/inbound-webhooks" element={<InboundWebhooksPage />} />
-              {/* Runtime admin */}
-              <Route path="/admin/automations" element={<AutomationsPage />} />
-              <Route path="/admin/schedules" element={<ScheduledTriggersPage />} />
-              <Route path="/admin/custom-actions" element={<CustomActionTypesPage />} />
-              <Route path="/admin/webhook-deliveries" element={<WebhookDeliveriesPage />} />
-              <Route path="/admin/scheduler-health" element={<SchedulerHealthPage />} />
-              <Route path="/admin/automation-log" element={<AutomationLogPage />} />
-              <Route path="/admin/integrations" element={<IntegrationCatalogPage />} />
-              {/* Custom routes injected by custom code */}
+
+              {/* Core operator-level routes (operator / admin / system_admin) */}
+              <Route element={<RoleProtectedRoute minRole="operator" />}>
+                <Route path="/accounts" element={<AccountsPage />} />
+                <Route path="/accounts/:accountId" element={<AccountDetailPage />} />
+                <Route path="/persons" element={<PersonsPage />} />
+                <Route path="/persons/:personId" element={<PersonDetailPage />} />
+              </Route>
+
+              {/* Core admin routes (admin / system_admin / system_operator) */}
+              <Route element={<RoleProtectedRoute minRole="admin" />}>
+                {/* System */}
+                <Route path="/admin/system-health" element={<SystemHealthPage />} />
+                <Route path="/admin/settings" element={<SettingsPage />} />
+                <Route path="/admin/setup" element={<SetupWizardPage />} />
+                <Route path="/admin/account-browser" element={<AccountBrowserPage />} />
+                {/* Identity & access */}
+                <Route path="/admin/members" element={<MembersPage />} />
+                <Route path="/admin/roles" element={<RolesPage />} />
+                <Route path="/admin/tenant-roles" element={<TenantRolesPage />} />
+                <Route path="/admin/role-matrix" element={<RoleMatrixPage />} />
+                <Route path="/admin/machine-principals" element={<MachinePrincipalsPage />} />
+                <Route path="/admin/account-scopes" element={<AccountScopesPage />} />
+                <Route path="/admin/scopes" element={<ScopeLibraryPage />} />
+                <Route path="/admin/principal-scopes" element={<PrincipalScopesPage />} />
+                {/* Apps & marketplace */}
+                <Route path="/admin/apps" element={<AppsPage />} />
+                <Route path="/admin/marketplace" element={<MarketplacePage />} />
+                <Route path="/admin/marketplace/:slug" element={<MarketplaceDetailPage />} />
+                {/* Type registry */}
+                <Route path="/admin/item-types" element={<ItemTypesPage />} />
+                {/* Pack lifecycle */}
+                <Route path="/admin/packs" element={<ConfigPacksPage />} />
+                {/* Webhooks */}
+                <Route path="/admin/webhooks" element={<WebhooksPage />} />
+                <Route path="/admin/inbound-webhooks" element={<InboundWebhooksPage />} />
+                {/* Runtime admin */}
+                <Route path="/admin/automations" element={<AutomationsPage />} />
+                <Route path="/admin/schedules" element={<ScheduledTriggersPage />} />
+                <Route path="/admin/custom-actions" element={<CustomActionTypesPage />} />
+                <Route path="/admin/webhook-deliveries" element={<WebhookDeliveriesPage />} />
+                <Route path="/admin/scheduler-health" element={<SchedulerHealthPage />} />
+                <Route path="/admin/automation-log" element={<AutomationLogPage />} />
+                <Route path="/admin/integrations" element={<IntegrationCatalogPage />} />
+              </Route>
+
+              {/* Custom app routes — minRole is declared per-route in spine-app.json */}
               {runtimeCustomRoutes.map(({ path, Component, minRole }) => (
                 <Route key={path} path={path} element={
                   <RoleProtectedRoute minRole={minRole}>

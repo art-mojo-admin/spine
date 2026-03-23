@@ -71,7 +71,7 @@ for manifest in "${APP_MANIFESTS[@]}"; do
             # Output the route object
             echo "    {" >> "$MANIFEST_DIR/routes.ts"
             echo "      path: \"$path\"," >> "$MANIFEST_DIR/routes.ts"
-            echo "      loader: () => import('./$app_slug/${component#./}')," >> "$MANIFEST_DIR/routes.ts"
+            echo "      loader: () => import('@custom/$app_slug/${component#./}')," >> "$MANIFEST_DIR/routes.ts"
             echo "      minRole: \"$min_role\"" >> "$MANIFEST_DIR/routes.ts"
             echo "    }," >> "$MANIFEST_DIR/routes.ts"
         fi
@@ -82,14 +82,7 @@ done
 cat >> "$MANIFEST_DIR/routes.ts" << 'EOF'
 ]
 
-// Transform our custom routes to the format expected by the core
-const transformedRoutes: CustomRouteDefinition[] = customRoutes.map(route => ({
-  path: route.path,
-  component: route.component,
-  minRole: route.minRole
-}))
-
-export default transformedRoutes
+export default customRoutes
 EOF
 
 # 4. Generate navSections.ts manually

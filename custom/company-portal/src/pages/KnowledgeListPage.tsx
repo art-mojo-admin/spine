@@ -1,14 +1,14 @@
 import { useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
-import { apiGet, apiPatch } from './lib/api'
-import { useAuth } from './hooks/useAuth'
-import { Button } from './components/ui/button'
-import { Input } from './components/ui/input'
-import { Card, CardContent, CardHeader, CardTitle } from './components/ui/card'
-import { Badge } from './components/ui/badge'
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from './components/ui/select'
+import { apiGet, apiPatch } from '../lib/api'
+import { useAuth } from '../hooks/useAuth'
+import { Button } from '../components/ui/button'
+import { Input } from '../components/ui/input'
+import { Card, CardContent, CardHeader, CardTitle } from '../components/ui/card'
+import { Badge } from '../components/ui/badge'
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../components/ui/select'
 import { FileText, MessageCircle, BookOpen, Users, Zap, Search, Eye, Edit, Send, Archive, Plus } from 'lucide-react'
-import { cn } from './lib/utils'
+import { cn } from '../lib/utils'
 
 interface KnowledgeArticle {
   id: string

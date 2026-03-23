@@ -1,10 +1,10 @@
 import { useEffect, useState } from 'react'
-import { apiGet, apiPost, apiPatch, apiDelete } from './lib/api'
-import { useAuth } from './hooks/useAuth'
-import { Button } from './components/ui/button'
-import { Input } from './components/ui/input'
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from './components/ui/card'
-import { Badge } from './components/ui/badge'
+import { apiGet, apiPost, apiPatch, apiDelete } from '../lib/api'
+import { useAuth } from '../hooks/useAuth'
+import { Button } from '../components/ui/button'
+import { Input } from '../components/ui/input'
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '../components/ui/card'
+import { Badge } from '../components/ui/badge'
 import {
   UserPlus, Copy, Trash2, Users, Shield, Pencil, Check, X, Mail, Clock,
 } from 'lucide-react'

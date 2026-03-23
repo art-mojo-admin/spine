@@ -5,101 +5,87 @@ export const customRoutes: CustomRouteDefinition[] = [
     // Routes from company-portal
     {
       path: "/company-portal",
-      loader: () => import('./company-portal/src/pages/OperatorDashboardPage.tsx'),
+      loader: () => import('@custom/company-portal/src/pages/OperatorDashboardPage.tsx'),
       minRole: "operator"
     },
     {
       path: "/company-portal/queue",
-      loader: () => import('./company-portal/src/pages/SupportQueuePage.tsx'),
+      loader: () => import('@custom/company-portal/src/pages/SupportQueuePage.tsx'),
       minRole: "operator"
     },
     {
       path: "/company-portal/cases/:caseId",
-      loader: () => import('./company-portal/src/pages/CaseWorkspacePage.tsx'),
+      loader: () => import('@custom/company-portal/src/pages/CaseWorkspacePage.tsx'),
       minRole: "operator"
     },
     {
       path: "/company-portal/knowledge",
-      loader: () => import('./company-portal/src/pages/KnowledgeListPage.tsx'),
+      loader: () => import('@custom/company-portal/src/pages/KnowledgeListPage.tsx'),
       minRole: "operator"
     },
     {
       path: "/company-portal/knowledge/:articleId",
-      loader: () => import('./company-portal/src/pages/KnowledgeEditorPage.tsx'),
+      loader: () => import('@custom/company-portal/src/pages/KnowledgeEditorPage.tsx'),
       minRole: "operator"
     },
     {
       path: "/company-portal/knowledge/new",
-      loader: () => import('./company-portal/src/pages/KnowledgeEditorPage.tsx'),
+      loader: () => import('@custom/company-portal/src/pages/KnowledgeEditorPage.tsx'),
       minRole: "operator"
     },
     {
       path: "/company-portal/community",
-      loader: () => import('./company-portal/src/pages/CommunityModerationPage.tsx'),
+      loader: () => import('@custom/company-portal/src/pages/CommunityModerationPage.tsx'),
       minRole: "operator"
     },
     {
       path: "/company-portal/analytics",
-      loader: () => import('./company-portal/src/pages/AnalyticsPage.tsx'),
+      loader: () => import('@custom/company-portal/src/pages/AnalyticsPage.tsx'),
       minRole: "operator"
     },
     {
       path: "/company-portal/users",
-      loader: () => import('./company-portal/src/pages/UsersPage.tsx'),
+      loader: () => import('@custom/company-portal/src/pages/UsersPage.tsx'),
       minRole: "operator"
     },
 
     // Routes from customer-portal
     {
       path: "/customer-portal",
-      loader: () => import('./customer-portal/src/pages/MemberDashboardPage.tsx'),
+      loader: () => import('@custom/customer-portal/src/pages/MemberDashboardPage.tsx'),
       minRole: "member"
     },
     {
       path: "/customer-portal/knowledge",
-      loader: () => import('./customer-portal/src/pages/KnowledgePage.tsx'),
+      loader: () => import('@custom/customer-portal/src/pages/KnowledgePage.tsx'),
       minRole: "member"
     },
     {
       path: "/customer-portal/knowledge/:articleId",
-      loader: () => import('./customer-portal/src/pages/KnowledgeArticlePage.tsx'),
+      loader: () => import('@custom/customer-portal/src/pages/KnowledgeArticlePage.tsx'),
       minRole: "member"
     },
     {
       path: "/customer-portal/support",
-      loader: () => import('./customer-portal/src/pages/SupportPage.tsx'),
+      loader: () => import('@custom/customer-portal/src/pages/SupportPage.tsx'),
       minRole: "member"
     },
     {
       path: "/customer-portal/support/cases/:caseId",
-      loader: () => import('./customer-portal/src/pages/SupportCasesPage.tsx'),
+      loader: () => import('@custom/customer-portal/src/pages/SupportCasesPage.tsx'),
       minRole: "member"
     },
     {
       path: "/customer-portal/community",
-      loader: () => import('./customer-portal/src/pages/CommunityPage.tsx'),
+      loader: () => import('@custom/customer-portal/src/pages/CommunityPage.tsx'),
       minRole: "member"
     },
     {
       path: "/customer-portal/community/:postId",
-      loader: () => import('./customer-portal/src/pages/CommunityPostPage.tsx'),
+      loader: () => import('@custom/customer-portal/src/pages/CommunityPostPage.tsx'),
       minRole: "member"
-    },
-
-    // Routes from debug
-    {
-      path: "/debug/roles",
-      loader: () => import('./debug/src/pages/DebugRolePage.tsx'),
-      minRole: "portal"
     },
 
 ]
 
-// Transform our custom routes to the format expected by the core
-const transformedRoutes: CustomRouteDefinition[] = customRoutes.map(route => ({
-  path: route.path,
-  component: route.component,
-  minRole: route.minRole
-}))
-
-export default transformedRoutes
+export default customRoutes

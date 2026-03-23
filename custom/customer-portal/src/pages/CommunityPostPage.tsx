@@ -1,13 +1,13 @@
 import { useEffect, useState } from 'react'
 import { useParams, Link } from 'react-router-dom'
-import { apiGet, apiPost } from './lib/api'
-import { useAuth } from './hooks/useAuth'
-import { Button } from './components/ui/button'
-import { Textarea } from './components/ui/textarea'
-import { Card, CardContent, CardHeader, CardTitle } from './components/ui/card'
-import { Badge } from './components/ui/badge'
+import { apiGet, apiPost } from '../lib/api'
+import { useAuth } from '../hooks/useAuth'
+import { Button } from '../components/ui/button'
+import { Textarea } from '../components/ui/textarea'
+import { Card, CardContent, CardHeader, CardTitle } from '../components/ui/card'
+import { Badge } from '../components/ui/badge'
 import { MessageSquare, Send, ArrowLeft, Users, Megaphone, HelpCircle, Pin } from 'lucide-react'
-import { cn } from './lib/utils'
+import { cn } from '../lib/utils'
 
 interface CommunityPost {
   id: string
@@ -191,7 +191,7 @@ export default function CommunityPostPage() {
                   {post.linked_articles.map(article => (
                     <Link
                       key={article.id}
-                      to={`/customer-portal/knowledge/${article.id}`}}
+                      to={`/customer-portal/knowledge/${article.id}`}
                       className="block p-3 border rounded hover:bg-muted transition-colors"
                     >
                       <div className="font-medium">{article.title}</div>

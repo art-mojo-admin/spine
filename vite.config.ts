@@ -8,7 +8,7 @@ export default defineConfig({
     alias: {
       '@': path.resolve(__dirname, './src'),           // Assembled src
       '@core': path.resolve(__dirname, './core/src'),  // Core source
-      '@custom': path.resolve(__dirname, './custom/src'), // Custom source
+      '@custom': path.resolve(__dirname, './custom'), // Custom apps directory
     },
   },
   server: {

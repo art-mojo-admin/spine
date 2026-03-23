@@ -1,10 +1,10 @@
 import { useEffect, useState } from 'react'
 import { useParams, Link } from 'react-router-dom'
-import { apiGet } from './lib/api'
-import { useAuth } from './hooks/useAuth'
-import { Button } from './components/ui/button'
-import { Card, CardContent, CardHeader, CardTitle } from './components/ui/card'
-import { Badge } from './components/ui/badge'
+import { apiGet } from '../lib/api'
+import { useAuth } from '../hooks/useAuth'
+import { Button } from '../components/ui/button'
+import { Card, CardContent, CardHeader, CardTitle } from '../components/ui/card'
+import { Badge } from '../components/ui/badge'
 import { ArrowLeft, BookOpen, FileText, MessageSquare, MessageCircle, Users, Zap } from 'lucide-react'
 
 interface KnowledgeArticle {
@@ -142,7 +142,7 @@ export default function KnowledgeArticlePage() {
                   {article.related_articles.map(related => (
                     <Link
                       key={related.id}
-                      to={`/customer-portal/knowledge/${related.id}`}}
+                      to={`/customer-portal/knowledge/${related.id}`}
                       className="block p-3 border rounded hover:bg-muted transition-colors"
                     >
                       <div className="font-medium">{related.title}</div>
