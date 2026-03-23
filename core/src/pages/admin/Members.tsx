@@ -13,7 +13,6 @@ export function MembersPage() {
   const [invites, setInvites] = useState<any[]>([])
   const [showInvite, setShowInvite] = useState(false)
   const [inviteEmail, setInviteEmail] = useState('')
-  const [inviteRole, setInviteRole] = useState('member')
   const [loading, setLoading] = useState(true)
   const [copied, setCopied] = useState<string | null>(null)
 
@@ -37,7 +36,7 @@ export function MembersPage() {
 
   async function sendInvite() {
     if (!inviteEmail.trim()) return
-    await apiPost('invites', { email: inviteEmail, account_role: inviteRole })
+    await apiPost('invites', { email: inviteEmail })
     setInviteEmail('')
     setShowInvite(false)
     loadData()
@@ -81,15 +80,6 @@ export function MembersPage() {
                 onChange={e => setInviteEmail(e.target.value)}
                 className="flex-1"
               />
-              <select
-                value={inviteRole}
-                onChange={e => setInviteRole(e.target.value)}
-                className="rounded-md border bg-background px-3 py-2 text-sm"
-              >
-                <option value="member">Member</option>
-                <option value="operator">Operator</option>
-                <option value="admin">Admin</option>
-              </select>
               <Button onClick={sendInvite}>Send Invite</Button>
               <Button variant="ghost" onClick={() => setShowInvite(false)}>Cancel</Button>
             </div>
@@ -114,7 +104,7 @@ export function MembersPage() {
                         Expires {new Date(invite.expires_at).toLocaleDateString()}
                       </p>
                     </div>
-                    <Badge variant="secondary">{invite.account_role}</Badge>
+                    <Badge variant="secondary">Pending</Badge>
                     <Button
                       variant="ghost"
                       size="sm"
@@ -158,7 +148,7 @@ export function MembersPage() {
                     <p className="text-sm font-medium">{m.persons?.full_name || m.person_id}</p>
                     <p className="text-xs text-muted-foreground">{m.persons?.email || ''}</p>
                   </div>
-                  <Badge variant={statusColor(m.status) as any}>{m.account_role}</Badge>
+                  <Badge variant={statusColor(m.status) as any}>{m.status}</Badge>
                 </div>
               ))}
             </div>

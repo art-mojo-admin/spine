@@ -1,4 +1,4 @@
-import { createHandler, requireAuth, requireTenant, requireRole, json, error, parseBody } from './_shared/middleware'
+import { createHandler, requireAuth, requireTenant, requirePrincipalScope, json, error, parseBody } from './_shared/middleware'
 import { db } from './_shared/db'
 import { emitAudit, emitActivity } from './_shared/audit'
 
@@ -8,8 +8,8 @@ export default createHandler({
     if (authCheck) return authCheck
     const tenantCheck = requireTenant(ctx)
     if (tenantCheck) return tenantCheck
-    const roleCheck = requireRole(ctx, ['admin'])
-    if (roleCheck) return roleCheck
+    const scopeCheck = requirePrincipalScope(ctx, 'admin.members')
+    if (scopeCheck) return scopeCheck
 
     const { data } = await db
       .from('invites')
@@ -25,8 +25,8 @@ export default createHandler({
     if (authCheck) return authCheck
     const tenantCheck = requireTenant(ctx)
     if (tenantCheck) return tenantCheck
-    const roleCheck = requireRole(ctx, ['admin'])
-    if (roleCheck) return roleCheck
+    const scopeCheck = requirePrincipalScope(ctx, 'admin.members')
+    if (scopeCheck) return scopeCheck
 
     const body = await parseBody<{ email: string; account_role?: string }>(req)
     if (!body.email) return error('email required')
@@ -66,8 +66,8 @@ export default createHandler({
     if (authCheck) return authCheck
     const tenantCheck = requireTenant(ctx)
     if (tenantCheck) return tenantCheck
-    const roleCheck = requireRole(ctx, ['admin'])
-    if (roleCheck) return roleCheck
+    const scopeCheck = requirePrincipalScope(ctx, 'admin.members')
+    if (scopeCheck) return scopeCheck
 
     const id = params.get('id')
     if (!id) return error('id required')

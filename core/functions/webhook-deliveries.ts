@@ -1,4 +1,4 @@
-import { createHandler, requireAuth, requireTenant, requireRole, json, error, parseBody } from './_shared/middleware'
+import { createHandler, requireAuth, requireTenant, requirePrincipalScope, json, error, parseBody } from './_shared/middleware'
 import { db } from './_shared/db'
 import { emitAudit, emitActivity } from './_shared/audit'
 
@@ -8,8 +8,8 @@ export default createHandler({
     if (authCheck) return authCheck
     const tenantCheck = requireTenant(ctx)
     if (tenantCheck) return tenantCheck
-    const roleCheck = requireRole(ctx, ['admin'])
-    if (roleCheck) return roleCheck
+    const scopeCheck = requirePrincipalScope(ctx, 'admin.webhooks')
+    if (scopeCheck) return scopeCheck
 
     const subscriptionId = params.get('webhook_subscription_id')
     const status = params.get('status')
@@ -32,8 +32,8 @@ export default createHandler({
     if (authCheck) return authCheck
     const tenantCheck = requireTenant(ctx)
     if (tenantCheck) return tenantCheck
-    const roleCheck = requireRole(ctx, ['admin'])
-    if (roleCheck) return roleCheck
+    const scopeCheck = requirePrincipalScope(ctx, 'admin.webhooks')
+    if (scopeCheck) return scopeCheck
 
     const id = params.get('id')
     if (!id) return error('id required for replay')

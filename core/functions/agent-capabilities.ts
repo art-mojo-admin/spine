@@ -1,4 +1,4 @@
-import { createHandler, requireAuth, requireTenant, requireRole, json, error, parseBody } from './_shared/middleware'
+import { createHandler, requireAuth, requireTenant, requirePrincipalScope, json, error, parseBody } from './_shared/middleware'
 import { db } from './_shared/db'
 import { emitAudit, emitActivity } from './_shared/audit'
 
@@ -37,8 +37,8 @@ export default createHandler({
     if (authCheck) return authCheck
     const tenantCheck = requireTenant(ctx)
     if (tenantCheck) return tenantCheck
-    const roleCheck = requireRole(ctx, ['admin', 'system_admin'])
-    if (roleCheck) return roleCheck
+    const scopeCheck = requirePrincipalScope(ctx, 'admin.integrations')
+    if (scopeCheck) return scopeCheck
 
     const body = await parseBody<{
       capability_name: string
@@ -67,8 +67,8 @@ export default createHandler({
     if (authCheck) return authCheck
     const tenantCheck = requireTenant(ctx)
     if (tenantCheck) return tenantCheck
-    const roleCheck = requireRole(ctx, ['admin', 'system_admin'])
-    if (roleCheck) return roleCheck
+    const scopeCheck = requirePrincipalScope(ctx, 'admin.integrations')
+    if (scopeCheck) return scopeCheck
 
     const capabilityId = params.get('capability_id')
     if (!capabilityId) return error('capability_id required')
@@ -96,8 +96,8 @@ export default createHandler({
     if (authCheck) return authCheck
     const tenantCheck = requireTenant(ctx)
     if (tenantCheck) return tenantCheck
-    const roleCheck = requireRole(ctx, ['admin', 'system_admin'])
-    if (roleCheck) return roleCheck
+    const scopeCheck = requirePrincipalScope(ctx, 'admin.integrations')
+    if (scopeCheck) return scopeCheck
 
     const capabilityId = params.get('capability_id')
     if (!capabilityId) return error('capability_id required')

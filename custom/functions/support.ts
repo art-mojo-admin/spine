@@ -3,7 +3,7 @@ import { db } from '../../core/functions/_shared/db'
 import { emitAudit, emitActivity } from '../../core/functions/_shared/audit'
 
 function makeCtx(accountId: string, personId: string): RequestContext {
-  return { requestId: '', personId, accountId, accountNodeId: null, accountRole: null, systemRole: null, authUid: null, impersonating: false, realPersonId: null, impersonationSessionId: null }
+  return { requestId: '', personId, accountId, accountNodeId: null, accountRole: null, principalScopes: [], systemRole: null, authUid: null, impersonating: false, realPersonId: null, impersonationSessionId: null }
 }
 
 export default createHandler({

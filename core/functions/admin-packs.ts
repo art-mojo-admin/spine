@@ -1,4 +1,4 @@
-import { createHandler, requireAuth, requireTenant, requireRole, json, error, parseBody } from './_shared/middleware'
+import { createHandler, requireAuth, requireTenant, requirePrincipalScope, requireSystemAdmin, json, error, parseBody } from './_shared/middleware'
 import { db } from './_shared/db'
 import { emitAudit, emitActivity } from './_shared/audit'
 
@@ -8,8 +8,8 @@ export default createHandler({
     if (authCheck) return authCheck
     const tenantCheck = requireTenant(ctx)
     if (tenantCheck) return tenantCheck
-    const roleCheck = requireRole(ctx, ['admin', 'system_admin'])
-    if (roleCheck) return roleCheck
+    const scopeCheck = requirePrincipalScope(ctx, 'admin.packs')
+    if (scopeCheck) return scopeCheck
 
     const mode = params.get('mode') as 'overview' | 'lifecycle' | 'history' | 'dependencies' | 'manifests'
     const packId = params.get('pack_id')
@@ -50,8 +50,8 @@ export default createHandler({
     if (authCheck) return authCheck
     const tenantCheck = requireTenant(ctx)
     if (tenantCheck) return tenantCheck
-    const roleCheck = requireRole(ctx, ['admin', 'system_admin'])
-    if (roleCheck) return roleCheck
+    const scopeCheck = requirePrincipalScope(ctx, 'admin.packs')
+    if (scopeCheck) return scopeCheck
 
     const body = await parseBody<{
       pack_id: string
@@ -78,8 +78,8 @@ export default createHandler({
     if (authCheck) return authCheck
     const tenantCheck = requireTenant(ctx)
     if (tenantCheck) return tenantCheck
-    const roleCheck = requireRole(ctx, ['admin', 'system_admin'])
-    if (roleCheck) return roleCheck
+    const scopeCheck = requirePrincipalScope(ctx, 'admin.packs')
+    if (scopeCheck) return scopeCheck
 
     const installedPackId = params.get('installed_pack_id')
     if (!installedPackId) return error('installed_pack_id required')
@@ -103,8 +103,8 @@ export default createHandler({
     if (authCheck) return authCheck
     const tenantCheck = requireTenant(ctx)
     if (tenantCheck) return tenantCheck
-    const roleCheck = requireRole(ctx, ['admin', 'system_admin'])
-    if (roleCheck) return roleCheck
+    const scopeCheck = requirePrincipalScope(ctx, 'admin.packs')
+    if (scopeCheck) return scopeCheck
 
     const installedPackId = params.get('installed_pack_id')
     if (!installedPackId) return error('installed_pack_id required')

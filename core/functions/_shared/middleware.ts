@@ -7,7 +7,8 @@ export interface RequestContext {
   personId: string | null
   accountId: string | null
   accountNodeId: string | null
-  accountRole: string | null
+  accountRole: string | null // DEPRECATED: retained for compatibility during migration
+  principalScopes: string[] // New scope-based access control
   systemRole: string | null
   authUid: string | null
   impersonating: boolean
@@ -115,7 +116,7 @@ async function resolveTenant(
   req: Request,
   personId: string | null,
   systemRole: string | null = null,
-): Promise<{ accountId: string | null; accountRole: string | null }> {
+): Promise<{ accountId: string | null; accountRole: string | null; principalScopes: string[] }> {
   const headerAccountId = req.headers.get('x-account-id')
   const url = new URL(req.url)
   const paramAccountId = url.searchParams.get('account_id')
@@ -132,10 +133,19 @@ async function resolveTenant(
         .single()
 
       if (membership) {
-        return { accountId: membership.account_id, accountRole: membership.account_role }
+        // Load principal scopes for this person in this account
+        const { data: scopes } = await db
+          .from('principal_scopes')
+          .select('auth_scopes!inner(slug)')
+          .eq('person_id', personId)
+          .eq('account_id', membership.account_id)
+          .eq('status', 'enabled')
+        
+        const principalScopes = scopes?.map((s: any) => s.auth_scopes.slug) || []
+        return { accountId: membership.account_id, accountRole: membership.account_role, principalScopes }
       }
     }
-    return { accountId: null, accountRole: null }
+    return { accountId: null, accountRole: null, principalScopes: [] }
   }
 
   const { data: membership } = await db
@@ -147,15 +157,24 @@ async function resolveTenant(
     .single()
 
   if (membership) {
-    return { accountId, accountRole: membership.account_role }
+    // Load principal scopes for this person in this account
+    const { data: scopes } = await db
+      .from('principal_scopes')
+      .select('auth_scopes!inner(slug)')
+      .eq('person_id', personId)
+      .eq('account_id', accountId)
+      .eq('status', 'enabled')
+    
+    const principalScopes = scopes?.map((s: any) => s.auth_scopes.slug) || []
+    return { accountId, accountRole: membership.account_role, principalScopes }
   }
 
   // System admins can access any account even without a membership
-  if (systemRole && ['system_admin', 'system_operator'].includes(systemRole)) {
-    return { accountId, accountRole: 'admin' }
+  if (systemRole && ['system_admin'].includes(systemRole)) {
+    return { accountId, accountRole: 'admin', principalScopes: [] }
   }
 
-  return { accountId: null, accountRole: null }
+  return { accountId: null, accountRole: null, principalScopes: [] }
 }
 
 async function resolveAccountNode(
@@ -202,8 +221,8 @@ async function resolveImpersonation(
   const sessionId = req.headers.get('x-impersonate-session-id')
   if (!sessionId || !auth.personId) return null
 
-  // Caller must be a system admin/operator to impersonate
-  if (!auth.systemRole || !['system_admin', 'system_operator'].includes(auth.systemRole)) {
+  // Caller must be a system admin to impersonate
+  if (!auth.systemRole || !['system_admin'].includes(auth.systemRole)) {
     console.warn(`[impersonate] Non-admin ${auth.personId} attempted impersonation`)
     return null
   }
@@ -265,12 +284,23 @@ export function createHandler(routes: RouteMap) {
       let ctx: RequestContext
 
       if (impersonation) {
+        // Load principal scopes for impersonated target
+        const { data: scopes } = await db
+          .from('principal_scopes')
+          .select('auth_scopes!inner(slug)')
+          .eq('person_id', impersonation.targetPersonId)
+          .eq('account_id', impersonation.targetAccountId)
+          .eq('status', 'enabled')
+        
+        const principalScopes = scopes?.map((s: any) => s.auth_scopes.slug) || []
+        
         ctx = {
           requestId,
           personId: impersonation.targetPersonId,
           accountId: impersonation.targetAccountId,
           accountNodeId: impersonation.targetAccountId,
           accountRole: impersonation.targetAccountRole,
+          principalScopes,
           systemRole: null,
           authUid: auth.authUid ?? null,
           impersonating: true,
@@ -286,6 +316,7 @@ export function createHandler(routes: RouteMap) {
           accountId: tenant.accountId,
           accountNodeId,
           accountRole: tenant.accountRole,
+          principalScopes: tenant.principalScopes,
           systemRole: auth.systemRole ?? null,
           authUid: auth.authUid ?? null,
           impersonating: false,
@@ -336,30 +367,31 @@ export function requireTenant(ctx: RequestContext): HandlerResult | null {
   return null
 }
 
-export function requireRole(ctx: RequestContext, roles: string[]): HandlerResult | null {
-  if (ctx.systemRole && ['system_admin', 'system_operator'].includes(ctx.systemRole)) {
+export function requireSystemAdmin(ctx: RequestContext): HandlerResult | null {
+  if (ctx.systemRole === 'system_admin') {
     return null
   }
-  if (!ctx.accountRole || !roles.includes(ctx.accountRole)) {
-    return error('Insufficient permissions', 403)
+  return error('System admin required', 403)
+}
+
+export function requirePrincipalScope(ctx: RequestContext, scopeSlug: string): HandlerResult | null {
+  // System admin bypasses all scope checks
+  if (ctx.systemRole === 'system_admin') {
+    return null
+  }
+  
+  if (!ctx.principalScopes.includes(scopeSlug)) {
+    return error(`Insufficient permissions: requires scope '${scopeSlug}'`, 403)
   }
   return null
 }
 
-const ROLE_RANK: Record<string, number> = {
-  portal: 0,
-  member: 1,
-  operator: 2,
-  admin: 3,
-}
-
-export function requireMinRole(ctx: RequestContext, minRole: string): HandlerResult | null {
-  if (ctx.systemRole && ['system_admin', 'system_operator'].includes(ctx.systemRole)) {
+// Legacy functions retained for migration compatibility - DEPRECATED
+export function requireRole(ctx: RequestContext, roles: string[]): HandlerResult | null {
+  if (ctx.systemRole === 'system_admin') {
     return null
   }
-  const required = ROLE_RANK[minRole] ?? 0
-  const actual = ROLE_RANK[ctx.accountRole || ''] ?? -1
-  if (actual < required) {
+  if (!ctx.accountRole || !roles.includes(ctx.accountRole)) {
     return error('Insufficient permissions', 403)
   }
   return null

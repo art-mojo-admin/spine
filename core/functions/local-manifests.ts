@@ -1,4 +1,4 @@
-import { createHandler, requireAuth, requireTenant, requireRole, json, error, parseBody } from './_shared/middleware'
+import { createHandler, requireAuth, requireTenant, requirePrincipalScope, json, error, parseBody } from './_shared/middleware'
 import { db } from './_shared/db'
 import { emitAudit, emitActivity } from './_shared/audit'
 
@@ -40,8 +40,8 @@ export default createHandler({
     if (authCheck) return authCheck
     const tenantCheck = requireTenant(ctx)
     if (tenantCheck) return tenantCheck
-    const roleCheck = requireRole(ctx, ['admin', 'operator'])
-    if (roleCheck) return roleCheck
+    const scopeCheck = requirePrincipalScope(ctx, 'admin.packs')
+    if (scopeCheck) return scopeCheck
 
     const body = await parseBody<{
       pack_id?: string
@@ -68,8 +68,8 @@ export default createHandler({
     if (authCheck) return authCheck
     const tenantCheck = requireTenant(ctx)
     if (tenantCheck) return tenantCheck
-    const roleCheck = requireRole(ctx, ['admin', 'operator'])
-    if (roleCheck) return roleCheck
+    const scopeCheck = requirePrincipalScope(ctx, 'admin.packs')
+    if (scopeCheck) return scopeCheck
 
     const manifestId = params.get('manifest_id')
     if (!manifestId) return error('manifest_id required')
@@ -94,8 +94,8 @@ export default createHandler({
     if (authCheck) return authCheck
     const tenantCheck = requireTenant(ctx)
     if (tenantCheck) return tenantCheck
-    const roleCheck = requireRole(ctx, ['admin', 'operator'])
-    if (roleCheck) return roleCheck
+    const scopeCheck = requirePrincipalScope(ctx, 'admin.packs')
+    if (scopeCheck) return scopeCheck
 
     const manifestId = params.get('manifest_id')
     if (!manifestId) return error('manifest_id required')

@@ -248,6 +248,7 @@ export default async function handler(req: Request): Promise<Response> {
     accountId: auth.accountId,
     accountNodeId: auth.accountId,
     accountRole: 'operator',
+    principalScopes: [],
     systemRole: null,
     authUid: null,
     impersonating: false,

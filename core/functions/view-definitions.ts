@@ -1,4 +1,4 @@
-import { createHandler, requireAuth, requireTenant, requireRole, requireMinRole, json, error, parseBody, clampLimit } from './_shared/middleware'
+import { createHandler, requireAuth, requireTenant, requireRole, json, error, parseBody, clampLimit } from './_shared/middleware'
 import { db } from './_shared/db'
 import { emitActivity } from './_shared/audit'
 

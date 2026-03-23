@@ -4,7 +4,7 @@ import {
   createHandler,
   requireAuth,
   requireTenant,
-  requireRole,
+  requirePrincipalScope,
   json,
   error,
   parseBody,
@@ -572,8 +572,8 @@ export default createHandler({
     if (authCheck) return authCheck
     const tenantCheck = requireTenant(ctx)
     if (tenantCheck) return tenantCheck
-    const roleCheck = requireRole(ctx, ['admin'])
-    if (roleCheck) return roleCheck
+    const scopeCheck = requirePrincipalScope(ctx, 'admin.packs')
+    if (scopeCheck) return scopeCheck
 
     const body = await parseBody<any>(req)
     const action = body.action
