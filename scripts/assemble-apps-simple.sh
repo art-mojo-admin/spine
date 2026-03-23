@@ -61,7 +61,7 @@ for manifest in "${APP_MANIFESTS[@]}"; do
     
     # Extract routes using simple text processing
     # This is a simplified approach - in production you'd want proper JSON parsing
-    grep -A 10 '"routes"' "$manifest" | grep -E '"path"|"component"|"min_role"' | while IFS= read -r line; do
+    awk '/routes/,/\],/' "$manifest" | grep -E '"path"|"component"|"min_role"' | while IFS= read -r line; do
         if [[ $line == *"path"* ]]; then
             path=$(echo "$line" | sed 's/.*"path": *"\([^"]*\)".*/\1/')
         elif [[ $line == *"component"* ]]; then
@@ -71,7 +71,7 @@ for manifest in "${APP_MANIFESTS[@]}"; do
             # Output the route object
             echo "    {" >> "$MANIFEST_DIR/routes.ts"
             echo "      path: \"$path\"," >> "$MANIFEST_DIR/routes.ts"
-            echo "      component: \"$component\"," >> "$MANIFEST_DIR/routes.ts"
+            echo "      loader: () => import('./$app_slug/${component#./}')," >> "$MANIFEST_DIR/routes.ts"
             echo "      minRole: \"$min_role\"" >> "$MANIFEST_DIR/routes.ts"
             echo "    }," >> "$MANIFEST_DIR/routes.ts"
         fi
@@ -86,7 +86,7 @@ cat >> "$MANIFEST_DIR/routes.ts" << 'EOF'
 const transformedRoutes: CustomRouteDefinition[] = customRoutes.map(route => ({
   path: route.path,
   component: route.component,
-  minRole: route.min_role
+  minRole: route.minRole
 }))
 
 export default transformedRoutes
