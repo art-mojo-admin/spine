@@ -5,19 +5,29 @@ export const customNavSections: CustomNavSection[] = [
     // Nav sections from company-portal
     {
       key: "company-portal",
-      title: "company-portal",
-      scope: 'primary',
-      position: 10,
-      items: []
+      title: "Company Portal",
+      scope: "primary",
+      position: 20,
+      items: [
+        { key: "support-queue", to: "/company-portal/queue", label: "Support Queue", icon: "MessageSquare", minRole: "operator" },
+        { key: "knowledge-mgmt", to: "/company-portal/knowledge", label: "Knowledge Management", icon: "Search", minRole: "operator" },
+        { key: "community-moderation", to: "/company-portal/community", label: "Community Moderation", icon: "Users", minRole: "operator" },
+        { key: "analytics", to: "/company-portal/analytics", label: "Analytics", icon: "Activity", minRole: "operator" },
+        { key: "user-management", to: "/company-portal/users", label: "User Management", icon: "UserCheck", minRole: "operator" },
+      ]
     },
 
     // Nav sections from customer-portal
     {
       key: "customer-portal",
-      title: "customer-portal",
-      scope: 'primary',
+      title: "Customer Portal",
+      scope: "primary",
       position: 10,
-      items: []
+      items: [
+        { key: "knowledge", to: "/customer-portal/knowledge", label: "Knowledge Base", icon: "Search", minRole: "member" },
+        { key: "support", to: "/customer-portal/support", label: "Support", icon: "MessageSquare", minRole: "member" },
+        { key: "community", to: "/customer-portal/community", label: "Community", icon: "Users", minRole: "member" },
+      ]
     },
 
 ]

@@ -25,7 +25,7 @@ export function ItemTypesPage() {
 
   async function loadTypes() {
     try {
-      const res = await fetch('/api/admin/item-types', {
+      const res = await fetch('/api/item-types', {
         headers: { Authorization: `Bearer ${session?.access_token}` }
       })
       if (!res.ok) throw new Error('Failed to load item types')
@@ -51,7 +51,7 @@ export function ItemTypesPage() {
       }
 
       const method = editingSlug ? 'PATCH' : 'POST'
-      const res = await fetch('/api/admin/item-types', {
+      const res = await fetch('/api/item-types', {
         method,
         headers: { 
           'Content-Type': 'application/json',
@@ -80,7 +80,7 @@ export function ItemTypesPage() {
     if (!confirm('Are you sure you want to delete this item type? This will break any items using it.')) return
     
     try {
-      const res = await fetch(`/api/admin/item-types?slug=${slug}`, {
+      const res = await fetch(`/api/item-types?slug=${slug}`, {
         method: 'DELETE',
         headers: { Authorization: `Bearer ${session?.access_token}` }
       })

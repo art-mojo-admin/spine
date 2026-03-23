@@ -1,22 +1,10 @@
-// API utilities for company-portal
-// This is a placeholder - in a real implementation, you would copy the actual API utilities
+import { api as coreApi, ApiError } from '@/lib/api'
 
-export const apiGet = async (url: string) => {
-  // Placeholder implementation
-  return {}
-}
+const norm = (ep: string) => ep.replace(/^\/custom\//, '')
 
-export const apiPost = async (url: string, data?: any) => {
-  // Placeholder implementation  
-  return {}
-}
-
-export const apiPatch = async (url: string, data?: any) => {
-  // Placeholder implementation
-  return {}
-}
-
-export const apiDelete = async (url: string) => {
-  // Placeholder implementation
-  return {}
-}
+export const api = coreApi
+export const apiGet = <T = any>(ep: string, params?: Record<string, string>) => coreApi<T>(norm(ep), { params })
+export const apiPost = <T = any>(ep: string, body: unknown) => coreApi<T>(norm(ep), { method: 'POST', body })
+export const apiPatch = <T = any>(ep: string, body: unknown, params?: Record<string, string>) => coreApi<T>(norm(ep), { method: 'PATCH', body, params })
+export const apiDelete = <T = any>(ep: string, params?: Record<string, string>) => coreApi<T>(norm(ep), { method: 'DELETE', params })
+export { ApiError }

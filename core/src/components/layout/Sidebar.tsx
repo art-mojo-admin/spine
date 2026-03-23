@@ -31,6 +31,8 @@ import {
   Activity as ActivityIcon,
   Puzzle,
   Database,
+  MessageSquare,
+  BookOpen,
 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { signOut } from '@/lib/auth'
@@ -81,6 +83,8 @@ const ICON_MAP: Record<string, React.ComponentType<{ className?: string }>> = {
   UserCheck,
   LayoutDashboard,
   Grid3x3,
+  MessageSquare,
+  BookOpen,
 }
 
 const coreNavItems = [
@@ -126,11 +130,6 @@ export function Sidebar() {
   const isSystemAdmin = profile?.system_role === 'system_admin' || profile?.system_role === 'system_operator'
   const showTenantSwitcher = memberships.length > 1
   
-  // Hide admin navigation and tenant references for operator/member routes
-  const isOperatorOrMemberRoute = location.pathname.startsWith('/operator') || location.pathname.startsWith('/member')
-  const showAdminNav = isAdmin && !isOperatorOrMemberRoute
-  const showTenantInfo = !isOperatorOrMemberRoute
-
   const userRank = ROLE_RANK[currentRole ?? profile?.system_role ?? 'member'] ?? 1
 
   const { primarySections, adminSections } = useMemo(() => {
@@ -153,6 +152,21 @@ export function Sidebar() {
       adminSections: sortSections(filtered.filter(section => section.scope === 'admin')),
     }
   }, [userRank])
+
+  // Detect portal context: if current path prefix matches any primary section item, we're in a portal
+  const activePortalSection = useMemo(() => {
+    const prefix = '/' + location.pathname.split('/').filter(Boolean)[0]
+    if (!prefix || prefix === '/') return null
+    return primarySections.find(section =>
+      section.items.some(item => item.to === prefix || item.to.startsWith(prefix + '/'))
+    ) ?? null
+  }, [location.pathname, primarySections])
+
+  const isPortalRoute = !!activePortalSection
+  // Hide admin nav and tenant UI in portal and legacy operator/member routes
+  const isLegacyOperatorRoute = location.pathname.startsWith('/operator') || location.pathname.startsWith('/member')
+  const showAdminNav = isAdmin && !isPortalRoute && !isLegacyOperatorRoute
+  const showTenantInfo = !isPortalRoute && !isLegacyOperatorRoute
 
   const renderCustomSections = (sections: typeof primarySections) =>
     sections.map(section => (
@@ -218,27 +232,34 @@ export function Sidebar() {
       )}
 
       <nav className="flex-1 space-y-1 overflow-y-auto p-3">
-        {/* Core primitive nav - only show for non-operator/member routes */}
-        {showTenantInfo && coreNavItems.map(({ key, to, icon: Icon, label }) => (
-          <NavLink
-            key={key}
-            to={to}
-            className={({ isActive }) =>
-              cn(
-                'flex items-center gap-3 rounded-md px-3 py-2 text-sm font-medium transition-colors',
-                isActive
-                  ? 'bg-primary/10 text-primary'
-                  : 'text-muted-foreground hover:bg-accent hover:text-accent-foreground',
-              )
-            }
-          >
-            <Icon className="h-4 w-4" />
-            {label}
-          </NavLink>
-        ))}
+        {isPortalRoute ? (
+          /* Portal mode — show only this portal's nav sections */
+          activePortalSection ? renderCustomSections([activePortalSection]) : null
+        ) : (
+          <>
+            {/* Core primitive nav */}
+            {showTenantInfo && coreNavItems.map(({ key, to, icon: Icon, label }) => (
+              <NavLink
+                key={key}
+                to={to}
+                className={({ isActive }) =>
+                  cn(
+                    'flex items-center gap-3 rounded-md px-3 py-2 text-sm font-medium transition-colors',
+                    isActive
+                      ? 'bg-primary/10 text-primary'
+                      : 'text-muted-foreground hover:bg-accent hover:text-accent-foreground',
+                  )
+                }
+              >
+                <Icon className="h-4 w-4" />
+                {label}
+              </NavLink>
+            ))}
 
-        {/* Custom nav sections injected by custom code */}
-        {renderCustomSections(primarySections)}
+            {/* Custom nav sections injected by custom code */}
+            {renderCustomSections(primarySections)}
+          </>
+        )}
 
         {showAdminNav && (
           <Popover>

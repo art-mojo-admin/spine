@@ -35,7 +35,11 @@ interface RoleProtectedRouteProps {
  * profile.system_role so that system_admin users always pass.
  */
 export function RoleProtectedRoute({ children, minRole, redirectTo = '/admin/system-health' }: RoleProtectedRouteProps) {
-  const { profile, currentRole } = useAuth()
+  const { profile, currentRole, loading } = useAuth()
+
+  // Don't make access decisions until auth has resolved — prevents spurious redirects
+  // during lazy-load navigation where useAuth() briefly returns null profile/role.
+  if (loading) return null
 
   const effectiveRole = currentRole ?? profile?.system_role ?? 'member'
   const userRank = ROLE_RANK[effectiveRole] ?? 1

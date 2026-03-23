@@ -7,8 +7,9 @@ import { ActiveAppNotice, ActiveAppSwitcher } from '@/components/admin/ActiveApp
 export function Shell() {
   const { active: isImpersonating } = useImpersonation()
   const location = useLocation()
+  const isPortalRoute = location.pathname.startsWith('/customer-portal') || location.pathname.startsWith('/company-portal')
   const showAdminNotice = location.pathname.startsWith('/admin')
-  const showActiveAppSwitcher = showAdminNotice || (!location.pathname.startsWith('/operator') && !location.pathname.startsWith('/member'))
+  const showActiveAppSwitcher = !isPortalRoute && (showAdminNotice || (!location.pathname.startsWith('/operator') && !location.pathname.startsWith('/member')))
 
   return (
     <ActiveAppProvider>
