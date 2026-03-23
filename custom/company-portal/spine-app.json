@@ -1,0 +1,115 @@
+{
+  "slug": "company-portal",
+  "name": "Company Portal",
+  "version": "1.0.0",
+  "description": "Advanced tools for support operators including queue management, knowledge editing, and analytics.",
+  "category": "Operations",
+  "author": "Spine Framework",
+  "npm_package": "@spine/company-portal",
+  "install_type": "npm",
+  "install_prompt": "Please run: npm install @spine/company-portal",
+  "requires_scopes": ["admin.automations", "admin.audit"],
+  "requires_migration": false,
+  "features": [
+    "Support Queue Management",
+    "Knowledge Base Administration",
+    "Community Moderation Tools",
+    "Analytics Dashboard",
+    "User Management",
+    "AI Support Integration",
+    "Knowledge Base Improvement Tools",
+    "Gmail Extension Support"
+  ],
+  "routes": [
+    {
+      "path": "/company-portal",
+      "component": "./src/pages/OperatorDashboardPage.tsx",
+      "min_role": "operator"
+    },
+    {
+      "path": "/company-portal/queue",
+      "component": "./src/pages/SupportQueuePage.tsx",
+      "min_role": "operator"
+    },
+    {
+      "path": "/company-portal/cases/:caseId",
+      "component": "./src/pages/CaseWorkspacePage.tsx",
+      "min_role": "operator"
+    },
+    {
+      "path": "/company-portal/knowledge",
+      "component": "./src/pages/KnowledgeListPage.tsx",
+      "min_role": "operator"
+    },
+    {
+      "path": "/company-portal/knowledge/:articleId",
+      "component": "./src/pages/KnowledgeEditorPage.tsx",
+      "min_role": "operator"
+    },
+    {
+      "path": "/company-portal/knowledge/new",
+      "component": "./src/pages/KnowledgeEditorPage.tsx",
+      "min_role": "operator"
+    },
+    {
+      "path": "/company-portal/community",
+      "component": "./src/pages/CommunityModerationPage.tsx",
+      "min_role": "operator"
+    },
+    {
+      "path": "/company-portal/analytics",
+      "component": "./src/pages/AnalyticsPage.tsx",
+      "min_role": "operator"
+    },
+    {
+      "path": "/company-portal/users",
+      "component": "./src/pages/UsersPage.tsx",
+      "min_role": "operator"
+    }
+  ],
+  "nav_sections": [
+    {
+      "key": "company-portal",
+      "title": "Company Portal",
+      "scope": "primary",
+      "position": 20,
+      "items": [
+        {
+          "key": "support-queue",
+          "to": "/company-portal/queue",
+          "label": "Support Queue",
+          "icon": "MessageSquare",
+          "min_role": "operator"
+        },
+        {
+          "key": "knowledge-mgmt",
+          "to": "/company-portal/knowledge",
+          "label": "Knowledge Management",
+          "icon": "Search",
+          "min_role": "operator"
+        },
+        {
+          "key": "community-moderation",
+          "to": "/company-portal/community",
+          "label": "Community Moderation",
+          "icon": "Users",
+          "min_role": "operator"
+        },
+        {
+          "key": "analytics",
+          "to": "/company-portal/analytics",
+          "label": "Analytics",
+          "icon": "Activity",
+          "min_role": "operator"
+        },
+        {
+          "key": "user-management",
+          "to": "/company-portal/users",
+          "label": "User Management",
+          "icon": "UserCheck",
+          "min_role": "operator"
+        }
+      ]
+    }
+  ]
+}

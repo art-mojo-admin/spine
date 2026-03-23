@@ -5,7 +5,7 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
-    "assemble": "bash scripts/assemble-functions.sh && bash scripts/assemble-frontend.sh",
+    "assemble": "bash scripts/assemble-functions.sh && bash scripts/assemble-frontend.sh && bash scripts/assemble-apps-simple.sh",
     "assemble:frontend": "bash scripts/assemble-frontend.sh",
     "assemble:functions": "bash scripts/assemble-functions.sh",
     "manifest": "bash scripts/build-manifest.sh",

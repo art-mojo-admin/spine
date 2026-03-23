@@ -100,6 +100,7 @@ const adminItems: { to: string; icon: any; label: string }[] = [
   { to: '/admin/account-scopes', icon: ShieldCheck, label: 'Account Scopes' },
   { to: '/admin/principal-scopes', icon: UserCheck, label: 'Principal Scopes' },
   { to: '/admin/apps', icon: Package, label: 'Apps' },
+  { to: '/admin/marketplace', icon: Search, label: 'Marketplace' },
   { to: '/admin/item-types', icon: Database, label: 'Item Types' },
   { to: '/admin/packs', icon: Package, label: 'Packs' },
   { to: '/admin/webhooks', icon: Webhook, label: 'Webhooks' },

@@ -47,6 +47,8 @@ const WebhookDeliveriesPage = lazy(() => import('@/pages/admin/WebhookDeliveries
 const SchedulerHealthPage = lazy(() => import('@/pages/admin/SchedulerHealth').then(m => ({ default: m.SchedulerHealthPage })))
 const AutomationLogPage = lazy(() => import('@/pages/admin/AutomationLog').then(m => ({ default: m.AutomationLogPage })))
 const IntegrationCatalogPage = lazy(() => import('@/pages/admin/IntegrationCatalog').then(m => ({ default: m.IntegrationCatalogPage })))
+const MarketplacePage = lazy(() => import('@/pages/admin/Marketplace').then(m => ({ default: m.MarketplacePage })))
+const MarketplaceDetailPage = lazy(() => import('@/pages/admin/MarketplaceDetail').then(m => ({ default: m.MarketplaceDetailPage })))
 
 function PageLoader() {
   return (
@@ -105,6 +107,8 @@ export default function App() {
               <Route path="/admin/principal-scopes" element={<PrincipalScopesPage />} />
               {/* Apps & Navigation */}
               <Route path="/admin/apps" element={<AppsPage />} />
+              <Route path="/admin/marketplace" element={<MarketplacePage />} />
+              <Route path="/admin/marketplace/:slug" element={<MarketplaceDetailPage />} />
               {/* Type registry */}
               <Route path="/admin/item-types" element={<ItemTypesPage />} />
               {/* Pack lifecycle */}
