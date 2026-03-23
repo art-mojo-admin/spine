@@ -30,6 +30,7 @@ import {
   Send,
   Activity as ActivityIcon,
   Puzzle,
+  Database,
 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { signOut } from '@/lib/auth'
@@ -38,7 +39,14 @@ import { useImpersonation } from '@/hooks/useImpersonation'
 import { AccountNodePanel } from '@/components/layout/AccountNodePanel'
 // Core navigation sections
 function getCustomNavSections() {
-  return []
+  try {
+    // Import custom nav sections from the custom manifest
+    const customNav = require('@/manifest/navSections').customNavSections
+    return customNav || []
+  } catch (e) {
+    // Fallback if custom nav sections don't exist
+    return []
+  }
 }
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
 
@@ -84,14 +92,15 @@ const coreNavItems = [
 
 const adminItems: { to: string; icon: any; label: string }[] = [
   { to: '/admin/members', icon: UserPlus, label: 'Members' },
-  { to: '/admin/roles', icon: Shield, label: 'Roles' },
+  { to: '/admin/roles', icon: Shield, label: 'System Roles' },
+  { to: '/admin/tenant-roles', icon: Users, label: 'Tenant Roles' },
   { to: '/admin/role-matrix', icon: Grid3x3, label: 'Role Matrix' },
   { to: '/admin/machine-principals', icon: Bot, label: 'Machine Principals' },
   { to: '/admin/scopes', icon: Shield, label: 'Scope Library' },
   { to: '/admin/account-scopes', icon: ShieldCheck, label: 'Account Scopes' },
   { to: '/admin/principal-scopes', icon: UserCheck, label: 'Principal Scopes' },
-  { to: '/admin/field-definitions', icon: SlidersHorizontal, label: 'Field Definitions' },
-  { to: '/admin/link-types', icon: Link2, label: 'Link Types' },
+  { to: '/admin/apps', icon: Package, label: 'Apps' },
+  { to: '/admin/item-types', icon: Database, label: 'Item Types' },
   { to: '/admin/packs', icon: Package, label: 'Packs' },
   { to: '/admin/webhooks', icon: Webhook, label: 'Webhooks' },
   { to: '/admin/inbound-webhooks', icon: ArrowDownToLine, label: 'Inbound Hooks' },
@@ -231,70 +240,93 @@ export function Sidebar() {
         {renderCustomSections(primarySections)}
 
         {showAdminNav && (
-          <>
-            <div className="pb-1 pt-4">
-              <p className="px-3 text-xs font-semibold uppercase tracking-wider text-muted-foreground">
-                Admin
-              </p>
-            </div>
-            {adminItems.map(({ to, icon: Icon, label }) => (
-              <NavLink
-                key={to}
-                to={to}
-                className={({ isActive }) =>
-                  cn(
-                    'flex items-center gap-3 rounded-md px-3 py-2 text-sm font-medium transition-colors',
-                    isActive
-                      ? 'bg-primary/10 text-primary'
-                      : 'text-muted-foreground hover:bg-accent hover:text-accent-foreground',
-                  )
-                }
+          <Popover>
+            <PopoverTrigger asChild>
+              <Button
+                variant="ghost"
+                size="sm"
+                className="w-full justify-between px-3 py-2 mt-4"
               >
-                <Icon className="h-4 w-4" />
-                {label}
-              </NavLink>
-            ))}
-
-            {renderCustomSections(adminSections)}
-          </>
+                <div className="flex items-center gap-3">
+                  <Settings className="h-4 w-4" />
+                  <span className="text-sm font-medium">Admin</span>
+                </div>
+                <ChevronDown className="h-4 w-4" />
+              </Button>
+            </PopoverTrigger>
+            <PopoverContent align="start" className="w-56 p-2">
+              <div className="space-y-1">
+                {adminItems.map(({ to, icon: Icon, label }) => (
+                  <NavLink
+                    key={to}
+                    to={to}
+                    className={({ isActive }) =>
+                      cn(
+                        'flex items-center gap-3 rounded-md px-3 py-2 text-sm font-medium transition-colors',
+                        isActive
+                          ? 'bg-primary/10 text-primary'
+                          : 'text-muted-foreground hover:bg-accent hover:text-accent-foreground',
+                      )
+                    }
+                  >
+                    <Icon className="h-4 w-4" />
+                    {label}
+                  </NavLink>
+                ))}
+                {renderCustomSections(adminSections)}
+              </div>
+            </PopoverContent>
+          </Popover>
         )}
 
         {isSystemAdmin && !isImpersonating && showTenantInfo && (
-          <>
-            <div className="pb-1 pt-4">
-              <p className="px-3 text-xs font-semibold uppercase tracking-wider text-muted-foreground">
-                System
-              </p>
-            </div>
-            <NavLink
-              to="/admin/account-browser"
-              className={({ isActive }) =>
-                cn(
-                  'flex items-center gap-3 rounded-md px-3 py-2 text-sm font-medium transition-colors',
-                  isActive
-                    ? 'bg-primary/10 text-primary'
-                    : 'text-muted-foreground hover:bg-accent hover:text-accent-foreground',
-                )
-              }
-            >
-              <ShieldAlert className="h-4 w-4" />
-              Account Browser
-            </NavLink>
-            <NavLink
-              to="/admin/system-health"
-              className={({ isActive }) =>
-                cn(
-                  'flex items-center gap-3 rounded-md px-3 py-2 text-sm font-medium transition-colors',
-                  isActive
-                    ? 'bg-primary/10 text-primary'
-                    : 'text-muted-foreground hover:bg-accent hover:text-accent-foreground',
-                )
-              }
-            >
-              <HeartPulse className="h-4 w-4" />
-              System Health
-            </NavLink>
-          </>
+          <Popover>
+            <PopoverTrigger asChild>
+              <Button
+                variant="ghost"
+                size="sm"
+                className="w-full justify-between px-3 py-2 mt-2"
+              >
+                <div className="flex items-center gap-3">
+                  <ShieldAlert className="h-4 w-4" />
+                  <span className="text-sm font-medium">System</span>
+                </div>
+                <ChevronDown className="h-4 w-4" />
+              </Button>
+            </PopoverTrigger>
+            <PopoverContent align="start" className="w-56 p-2">
+              <div className="space-y-1">
+                <NavLink
+                  to="/admin/account-browser"
+                  className={({ isActive }) =>
+                    cn(
+                      'flex items-center gap-3 rounded-md px-3 py-2 text-sm font-medium transition-colors',
+                      isActive
+                        ? 'bg-primary/10 text-primary'
+                        : 'text-muted-foreground hover:bg-accent hover:text-accent-foreground',
+                    )
+                  }
+                >
+                  <ShieldAlert className="h-4 w-4" />
+                  Account Browser
+                </NavLink>
+                <NavLink
+                  to="/admin/system-health"
+                  className={({ isActive }) =>
+                    cn(
+                      'flex items-center gap-3 rounded-md px-3 py-2 text-sm font-medium transition-colors',
+                      isActive
+                        ? 'bg-primary/10 text-primary'
+                        : 'text-muted-foreground hover:bg-accent hover:text-accent-foreground',
+                    )
+                  }
+                >
+                  <HeartPulse className="h-4 w-4" />
+                  System Health
+                </NavLink>
+              </div>
+            </PopoverContent>
+          </Popover>
         )}
       </nav>
 

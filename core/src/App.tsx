@@ -27,8 +27,6 @@ const SettingsPage = lazy(() => import('@/pages/admin/Settings').then(m => ({ de
 const RolesPage = lazy(() => import('@/pages/admin/Roles').then(m => ({ default: m.RolesPage })))
 const MembersPage = lazy(() => import('@/pages/admin/Members').then(m => ({ default: m.MembersPage })))
 const InboundWebhooksPage = lazy(() => import('@/pages/admin/InboundWebhooks').then(m => ({ default: m.InboundWebhooksPage })))
-const LinkTypeDefinitionsPage = lazy(() => import('@/pages/admin/LinkTypeDefinitions').then(m => ({ default: m.LinkTypeDefinitionsPage })))
-const FieldDefinitionsPage = lazy(() => import('@/pages/admin/FieldDefinitions').then(m => ({ default: m.FieldDefinitionsPage })))
 const ConfigPacksPage = lazy(() => import('@/pages/admin/ConfigPacks').then(m => ({ default: m.ConfigPacksPage })))
 const AccountScopesPage = lazy(() => import('@/pages/admin/AccountScopes').then(m => ({ default: m.AccountScopesPage })))
 const ScopeLibraryPage = lazy(() => import('@/pages/admin/ScopeLibrary').then(m => ({ default: m.ScopeLibraryPage })))
@@ -37,6 +35,9 @@ const PrincipalScopesPage = lazy(() => import('@/pages/admin/PrincipalScopes').t
 const RoleMatrixPage = lazy(() => import('@/pages/admin/RoleMatrix').then(m => ({ default: m.RoleMatrixPage })))
 const AccountBrowserPage = lazy(() => import('@/pages/admin/AccountBrowser').then(m => ({ default: m.AccountBrowserPage })))
 const SetupWizardPage = lazy(() => import('@/pages/admin/SetupWizard').then(m => ({ default: m.SetupWizardPage })))
+const AppsPage = lazy(() => import('@/pages/admin/Apps').then(m => ({ default: m.default })))
+const TenantRolesPage = lazy(() => import('@/pages/admin/TenantRoles').then(m => ({ default: m.TenantRolesPage })))
+const ItemTypesPage = lazy(() => import('@/pages/admin/ItemTypes').then(m => ({ default: m.ItemTypesPage })))
 
 // Runtime admin pages
 const AutomationsPage = lazy(() => import('@/pages/admin/Automations').then(m => ({ default: m.AutomationsPage })))
@@ -88,8 +89,6 @@ export default function App() {
               <Route path="/accounts/:accountId" element={<AccountDetailPage />} />
               <Route path="/persons" element={<PersonsPage />} />
               <Route path="/persons/:personId" element={<PersonDetailPage />} />
-              <Route path="/activity" element={<ActivityPage />} />
-              <Route path="/search" element={<SearchPage />} />
               {/* Core system admin */}
               <Route path="/admin/system-health" element={<SystemHealthPage />} />
               <Route path="/admin/settings" element={<SettingsPage />} />
@@ -98,14 +97,16 @@ export default function App() {
               {/* Identity & access */}
               <Route path="/admin/members" element={<MembersPage />} />
               <Route path="/admin/roles" element={<RolesPage />} />
+              <Route path="/admin/tenant-roles" element={<TenantRolesPage />} />
               <Route path="/admin/role-matrix" element={<RoleMatrixPage />} />
               <Route path="/admin/machine-principals" element={<MachinePrincipalsPage />} />
               <Route path="/admin/account-scopes" element={<AccountScopesPage />} />
               <Route path="/admin/scopes" element={<ScopeLibraryPage />} />
               <Route path="/admin/principal-scopes" element={<PrincipalScopesPage />} />
+              {/* Apps & Navigation */}
+              <Route path="/admin/apps" element={<AppsPage />} />
               {/* Type registry */}
-              <Route path="/admin/field-definitions" element={<FieldDefinitionsPage />} />
-              <Route path="/admin/link-types" element={<LinkTypeDefinitionsPage />} />
+              <Route path="/admin/item-types" element={<ItemTypesPage />} />
               {/* Pack lifecycle */}
               <Route path="/admin/packs" element={<ConfigPacksPage />} />
               {/* Webhooks */}

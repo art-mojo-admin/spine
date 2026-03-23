@@ -3,6 +3,7 @@ import { db } from './_shared/db'
 import { emitAudit, emitActivity, emitOutboxEvent } from './_shared/audit'
 import { evaluateAutomations } from './_shared/automation'
 import { autoEmbed } from './_shared/embed'
+import { ItemsDAL } from './_shared/items-dal'
 
 export default createHandler({
   async GET(req, ctx, params) {
@@ -34,6 +35,11 @@ export default createHandler({
         .single()
 
       if (!data) return error('Not found', 404)
+      
+      const schema = await ItemsDAL.getItemTypeSchema(data.item_type)
+      if (schema) {
+         return json(ItemsDAL.sanitizeItemData(data, schema, ctx.accountRole))
+      }
       return json(data)
     }
 
@@ -80,6 +86,14 @@ export default createHandler({
     else if (parentId) query = query.eq('parent_item_id', parentId)
 
     const { data } = await query.limit(200)
+    
+    if (data && itemType && !itemType.includes(',')) {
+      const schema = await ItemsDAL.getItemTypeSchema(itemType)
+      if (schema) {
+         return json(data.map(item => ItemsDAL.sanitizeItemData(item, schema, ctx.accountRole)))
+      }
+    }
+    
     return json(data || [])
   },
 
@@ -88,12 +102,21 @@ export default createHandler({
     if (authCheck) return authCheck
     const tenantCheck = requireTenant(ctx)
     if (tenantCheck) return tenantCheck
-    const roleCheck = requireRole(ctx, ['admin', 'operator'])
-    if (roleCheck) return roleCheck
 
     const body = await parseBody<any>(req)
     if (!body.item_type || !body.title) {
       return error('item_type and title required')
+    }
+
+    const schema = await ItemsDAL.getItemTypeSchema(body.item_type)
+    if (schema) {
+      const canCreate = ItemsDAL.evaluateRecordAccess(schema, ctx.accountRole, 'create')
+      if (!canCreate) {
+        return error('You do not have permission to create this item type', 403)
+      }
+    } else {
+       const roleCheck = requireRole(ctx, ['admin', 'operator'])
+       if (roleCheck) return roleCheck
     }
 
     // Resolve creating principal
@@ -137,8 +160,6 @@ export default createHandler({
     if (authCheck) return authCheck
     const tenantCheck = requireTenant(ctx)
     if (tenantCheck) return tenantCheck
-    const roleCheck = requireRole(ctx, ['admin', 'operator'])
-    if (roleCheck) return roleCheck
 
     const id = params.get('id')
     if (!id) return error('id required')
@@ -152,8 +173,26 @@ export default createHandler({
       .single()
     if (!before) return error('Not found', 404)
 
+    const schema = await ItemsDAL.getItemTypeSchema(before.item_type)
+    if (schema) {
+      const canUpdate = ItemsDAL.evaluateRecordAccess(schema, ctx.accountRole, 'update')
+      if (canUpdate === 'none') {
+        return error('You do not have permission to update this item', 403)
+      }
+    } else {
+       const roleCheck = requireRole(ctx, ['admin', 'operator'])
+       if (roleCheck) return roleCheck
+    }
+
     const body = await parseBody<any>(req)
     
+    if (schema && body.data) {
+      const validation = ItemsDAL.validateUpdateData(body.data, before.data, schema, ctx.accountRole)
+      if (!validation.valid) {
+        return error(validation.error || 'Invalid update payload', 400)
+      }
+    }
+
     // Version check for optimistic locking
     if (body.version !== undefined && body.version !== before.version) {
       return error('Version conflict - item has been modified', 409)
@@ -169,6 +208,7 @@ export default createHandler({
     if (body.status !== undefined) updates.status = body.status
     if (body.archived_at !== undefined) updates.archived_at = body.archived_at
     if (body.metadata !== undefined) updates.metadata = body.metadata
+    if (body.data !== undefined) updates.data = body.data
     if (body.parent_item_id !== undefined) updates.parent_item_id = body.parent_item_id
     if (body.custom_fields !== undefined) updates.custom_fields = body.custom_fields
     if (body.owner_account_id !== undefined) updates.owner_account_id = body.owner_account_id
@@ -196,6 +236,9 @@ export default createHandler({
     await evaluateAutomations(ctx.accountId!, eventType, ctx, { before, after: data })
     await autoEmbed(ctx.accountId!, 'item', id, `${data.title} ${data.description || ''}`, { title: data.title })
 
+    if (schema) {
+      return json(ItemsDAL.sanitizeItemData(data, schema, ctx.accountRole))
+    }
     return json(data)
   },
 
@@ -204,8 +247,6 @@ export default createHandler({
     if (authCheck) return authCheck
     const tenantCheck = requireTenant(ctx)
     if (tenantCheck) return tenantCheck
-    const roleCheck = requireRole(ctx, ['admin'])
-    if (roleCheck) return roleCheck
 
     const id = params.get('id')
     if (!id) return error('id required')
@@ -218,17 +259,46 @@ export default createHandler({
       .single()
     if (!before) return error('Not found', 404)
 
-    const { error: dbErr } = await db.from('items').update({ 
-      archived_at: new Date().toISOString(),
-      status: 'archived'
-    }).eq('id', id)
+    const schema = await ItemsDAL.getItemTypeSchema(before.item_type)
+    let isSoftDelete = false
 
-    if (dbErr) return error(dbErr.message, 500)
+    if (schema) {
+      const deleteAccess = ItemsDAL.evaluateRecordAccess(schema, ctx.accountRole, 'delete')
+      if (deleteAccess === 'none') {
+         return error('You do not have permission to delete this item', 403)
+      }
+      if (deleteAccess === 'soft') {
+         isSoftDelete = true
+      }
+    } else {
+       const roleCheck = requireRole(ctx, ['admin'])
+       if (roleCheck) return roleCheck
+    }
 
-    await emitAudit(ctx, 'archive', 'item', id, before, { ...before, archived_at: new Date().toISOString(), status: 'archived' })
-    await emitActivity(ctx, 'item.archived', `Archived item "${before.title}"`, 'item', id)
-    await emitOutboxEvent(ctx.accountId!, 'item.archived', 'item', id, { before })
+    if (isSoftDelete) {
+       const { error: dbErr } = await db.from('items').update({ 
+         is_active: false,
+         archived_at: new Date().toISOString(),
+         status: 'archived'
+       }).eq('id', id)
+   
+       if (dbErr) return error(dbErr.message, 500)
+   
+       await emitAudit(ctx, 'archive', 'item', id, before, { ...before, is_active: false, archived_at: new Date().toISOString(), status: 'archived' })
+       await emitActivity(ctx, 'item.archived', `Archived item "${before.title}"`, 'item', id)
+       await emitOutboxEvent(ctx.accountId!, 'item.archived', 'item', id, { before })
+   
+       return json({ archived: true })
+    } else {
+       // Hard delete for sys admins / legacy support
+       const { error: dbErr } = await db.from('items').delete().eq('id', id)
+       if (dbErr) return error(dbErr.message, 500)
 
-    return json({ archived: true })
+       await emitAudit(ctx, 'delete', 'item', id, before, null)
+       await emitActivity(ctx, 'item.deleted', `Deleted item "${before.title}"`, 'item', id)
+       await emitOutboxEvent(ctx.accountId!, 'item.deleted', 'item', id, { before })
+
+       return json({ deleted: true })
+    }
   },
 })

@@ -52,7 +52,7 @@ export async function logError(opts: {
 export function extractFunctionName(url: string): string {
   try {
     const path = new URL(url).pathname
-    // /.netlify/functions/tickets → tickets
+    // /.netlify/functions/api → api
     const match = path.match(/\/\.netlify\/functions\/([^/?]+)/)
     return match?.[1] || path.split('/').pop() || 'unknown'
   } catch {

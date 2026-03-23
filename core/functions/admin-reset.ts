@@ -55,7 +55,6 @@ const ACCOUNT_TABLES: { table: string; column?: string }[] = [
   // Phase E tables
   { table: 'admin_audit_views' },
   { table: 'admin_alerts' },
-  { table: 'admin_dashboard_widgets' },
   { table: 'admin_health_snapshots' },
   // Phase C tables
   { table: 'installed_packs' },

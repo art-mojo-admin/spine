@@ -33,7 +33,7 @@ export const customNavSections: CustomNavSection[] = [
   {
     key: 'operator-tools',
     title: 'Operator Tools',
-    scope: 'admin',
+    scope: 'primary',
     position: 20,
     items: [
       {
@@ -62,6 +62,13 @@ export const customNavSections: CustomNavSection[] = [
         to: '/operator/analytics',
         label: 'Analytics',
         icon: 'Activity',
+        minRole: 'operator'
+      },
+      {
+        key: 'user-management',
+        to: '/operator/users',
+        label: 'User Management',
+        icon: 'UserCheck',
         minRole: 'operator'
       }
     ]
