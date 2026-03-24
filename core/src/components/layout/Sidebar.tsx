@@ -130,7 +130,9 @@ export function Sidebar() {
   const isSystemAdmin = profile?.system_role === 'system_admin' || profile?.system_role === 'system_operator'
   const showTenantSwitcher = memberships.length > 1
   
-  const userRank = ROLE_RANK[currentRole ?? profile?.system_role ?? 'member'] ?? 1
+  const accountRank = ROLE_RANK[currentRole ?? ''] ?? 0
+  const systemRank = ROLE_RANK[profile?.system_role ?? ''] ?? 0
+  const userRank = Math.max(accountRank, systemRank)
 
   const { primarySections, adminSections } = useMemo(() => {
     const filtered = manifestNavSections
