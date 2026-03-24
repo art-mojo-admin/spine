@@ -1,1 +1,1 @@
-export { useAuth } from '@core/hooks/useAuth'
+export { useAuth } from '@/hooks/useAuth'
