@@ -157,18 +157,7 @@ async function getSystemHealth() {
 export async function getItemTypeDetails(accountId: string, itemTypeSlug: string) {
   const { data, error } = await db
     .from('item_type_registry')
-    .select(`
-      *,
-      field_definitions:account_id!inner (
-        field_key,
-        field_type,
-        field_label,
-        is_required,
-        default_value,
-        validation_rules,
-        display_config
-      )
-    `)
+    .select('*')
     .eq('slug', itemTypeSlug)
     .single()
 
@@ -177,18 +166,6 @@ export async function getItemTypeDetails(accountId: string, itemTypeSlug: string
   return data
 }
 
-export async function getLinkTypeDetails(accountId: string, linkTypeSlug: string) {
-  const { data, error } = await db
-    .from('link_type_definitions')
-    .select('*')
-    .eq('slug', linkTypeSlug)
-    .eq('account_id', accountId)
-    .single()
-
-  if (error) throw error
-
-  return data
-}
 
 export async function getAccountActivitySummary(accountId: string, days: number = 30) {
   const { data, error } = await db

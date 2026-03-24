@@ -16,13 +16,8 @@ import { emitActivity } from './_shared/audit'
 // Tables that have pack_id and is_active columns for toggling
 const PACK_TABLES = [
   'workflow_definitions',
-  'stage_definitions',
-  'transition_definitions',
-  'workflow_actions',
   'items',
   'automation_rules',
-  'field_definitions',
-  'link_type_definitions',
   'item_links',
   'custom_action_types',
   'view_definitions',
@@ -38,28 +33,23 @@ const TEMPLATE_ACCOUNT_ID = '00000000-0000-0000-0000-000000000001'
 // Tables that DO have an account_id column (for scoping to tenant)
 const TABLES_WITH_ACCOUNT_ID = new Set([
   'workflow_definitions', 'items', 'automation_rules',
-  'field_definitions', 'link_type_definitions', 'item_links',
+  'item_links',
   'custom_action_types', 'view_definitions', 'app_definitions',
   'threads',
 ])
 // Tables WITHOUT account_id — children linked via parent FK
-// stage_definitions, transition_definitions, workflow_actions, messages
+// messages
 
 const CLONE_SEQUENCE: { table: typeof PACK_TABLES[number]; entityType: string }[] = [
   { table: 'workflow_definitions', entityType: 'workflow_definition' },
-  { table: 'stage_definitions', entityType: 'stage_definition' },
-  { table: 'transition_definitions', entityType: 'transition_definition' },
-  { table: 'workflow_actions', entityType: 'workflow_action' },
   { table: 'automation_rules', entityType: 'automation_rule' },
-  { table: 'field_definitions', entityType: 'field_definition' },
-  { table: 'link_type_definitions', entityType: 'link_type_definition' },
+  { table: 'item_links', entityType: 'item_link' },
   { table: 'view_definitions', entityType: 'view_definition' },
   { table: 'app_definitions', entityType: 'app_definition' },
   { table: 'custom_action_types', entityType: 'custom_action_type' },
   { table: 'threads', entityType: 'thread' },
   { table: 'messages', entityType: 'message' },
   { table: 'items', entityType: 'item' },
-  { table: 'item_links', entityType: 'item_link' },
 ]
 
 function logPackAction(ctx: RequestContext, packId: string | undefined, step: string, meta: Record<string, unknown> = {}) {
@@ -472,12 +462,8 @@ export default createHandler({
         return error('Not authorized to export this pack', 403)
       }
 
-      const [workflows, stages, transitions, fields, linkTypes, automations, views, apps] = await Promise.all([
+      const [workflows, automations, views, apps] = await Promise.all([
         db.from('workflow_definitions').select('*').eq('pack_id', id).eq('is_test_data', false),
-        db.from('stage_definitions').select('*').eq('pack_id', id).eq('is_test_data', false),
-        db.from('transition_definitions').select('*').eq('pack_id', id).eq('is_test_data', false),
-        db.from('field_definitions').select('*').eq('pack_id', id).eq('is_test_data', false),
-        db.from('link_type_definitions').select('*').eq('pack_id', id).eq('is_test_data', false),
         db.from('automation_rules').select('*').eq('pack_id', id).eq('is_test_data', false),
         db.from('view_definitions').select('*').eq('pack_id', id).eq('is_test_data', false),
         db.from('app_definitions').select('*').eq('pack_id', id).eq('is_test_data', false),
@@ -498,10 +484,6 @@ export default createHandler({
         category: pack.category,
         config: {
           workflows: workflows.data || [],
-          stages: stages.data || [],
-          transitions: transitions.data || [],
-          custom_fields: fields.data || [],
-          link_types: linkTypes.data || [],
           automations: automations.data || [],
           views: views.data || [],
           apps: apps.data || [],

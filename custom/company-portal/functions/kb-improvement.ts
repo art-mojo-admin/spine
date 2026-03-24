@@ -60,23 +60,21 @@ export default createHandler({
 
 async function processKBImprovement(accountId: string, personId: string, body: any) {
   // Get the support case
-  const { data: supportCase, error: caseErr } = await db
+  const { data: supportCase } = await db
     .from('items')
     .select(`
       id,
       title,
       description,
       metadata,
-      stage_definition_id,
-      created_at,
-      field_values!inner(field_key, value)
+      custom_fields,
+      status,
+      created_at
     `)
     .eq('account_id', accountId)
     .eq('id', body.case_id)
-    .eq('item_type_id', (await db.from('item_type_registry').select('id').eq('slug', 'support_case').single()).data?.id)
     .single()
 
-  if (caseErr) throw caseErr
   if (!supportCase) return error('Support case not found', 404)
 
   // Check permissions (operators and admins only)
@@ -92,21 +90,13 @@ async function processKBImprovement(accountId: string, personId: string, body: a
     return error('Access denied', 403)
   }
 
-  // Extract case metadata
-  const metadata = { ...supportCase.metadata }
-  const fieldValues = supportCase.field_values || []
-  fieldValues.forEach((fv: any) => {
-    metadata[fv.field_key] = fv.value
-  })
+  // Extract case metadata (merge custom_fields for backward compatibility)
+  const metadata = { ...supportCase.metadata, ...supportCase.custom_fields }
 
   // Check if case is resolved
-  const { data: currentStage } = await db
-    .from('stage_definitions')
-    .select('name')
-    .eq('id', supportCase.stage_definition_id)
-    .single()
+  const isResolved = supportCase.status === 'resolved'
 
-  if (currentStage?.name !== 'Resolved') {
+  if (!isResolved) {
     return error('Case must be resolved before creating KB content', 400)
   }
 

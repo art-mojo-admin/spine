@@ -315,12 +315,12 @@ export async function executeWorkflowActions(
 ): Promise<void> {
   try {
     let query = db
-      .from('workflow_actions')
+      .from('automation_rules')
       .select('*')
       .eq('workflow_definition_id', workflowDefId)
-      .eq('trigger_type', triggerType)
+      .eq('trigger_event', triggerType)
       .eq('enabled', true)
-      .order('position', { ascending: true })
+      .order('created_at', { ascending: true })
 
     if (triggerRefId) {
       query = query.eq('trigger_ref_id', triggerRefId)

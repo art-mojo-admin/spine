@@ -25,12 +25,6 @@ export default createHandler({
         case 'registry':
           result = await getItemTypeRegistry(ctx.accountId!, includeSystem)
           break
-        case 'fields':
-          result = await getFieldDefinitions(ctx.accountId!, itemTypeId || undefined)
-          break
-        case 'links':
-          result = await getLinkTypeDefinitions(ctx.accountId!)
-          break
         case 'usage':
           result = await getTypeUsageStatistics(ctx.accountId!)
           break
@@ -159,34 +153,6 @@ async function getItemTypeRegistry(accountId: string, includeSystem?: boolean) {
   return data || []
 }
 
-async function getFieldDefinitions(accountId: string, itemTypeId?: string) {
-  let query = db
-    .from('field_definitions')
-    .select('*')
-    .eq('account_id', accountId)
-    .order('item_type', { ascending: true })
-    .order('field_key', { ascending: true })
-
-  if (itemTypeId) {
-    query = query.eq('item_type', itemTypeId)
-  }
-
-  const { data, error } = await query
-
-  if (error) throw error
-  return data || []
-}
-
-async function getLinkTypeDefinitions(accountId: string) {
-  const { data, error } = await db
-    .from('link_type_definitions')
-    .select('*')
-    .eq('account_id', accountId)
-    .order('slug', { ascending: true })
-
-  if (error) throw error
-  return data || []
-}
 
 async function getTypeUsageStatistics(accountId: string) {
   const { data } = await db
@@ -200,11 +166,6 @@ async function getTypeUsageStatistics(accountId: string) {
         WHERE items.item_type = item_type_registry.slug 
           AND items.account_id = ${accountId}
       ) as item_count,
-      (
-        SELECT COUNT(*) 
-        FROM field_definitions 
-        WHERE field_definitions.item_type = item_type_registry.slug
-      ) as field_count,
       (
         SELECT COUNT(*) 
         FROM item_links 
@@ -382,117 +343,19 @@ async function validateItemTypeDefinition(itemType: any) {
   }
 }
 
-export async function createFieldDefinition(ctx: any, itemType: string, fieldKey: string, fieldType: string, fieldLabel: string, isRequired: boolean = false, defaultValue?: any, validationRules?: any) {
-  const { data } = await db
-    .from('field_definitions')
-    .insert({
-      account_id: ctx.accountId,
-      item_type: itemType,
-      field_key: fieldKey,
-      field_type: fieldType,
-      field_label: fieldLabel,
-      is_required: isRequired,
-      default_value: defaultValue,
-      validation_rules: validationRules || {},
-      display_config: {},
-      ownership: 'tenant'
-    })
-    .select()
-    .single()
-
-  if (!data) throw new Error('Failed to create field definition')
-
-  await emitAudit(ctx, 'create', 'field_definition', data.id, null, { item_type: itemType, field_key: fieldKey })
-  await emitActivity(ctx, 'field_definition.created', `Created field definition ${fieldKey} for ${itemType}`, 'field_definition', data.id)
-
-  return data
-}
 
 export async function getTypeHierarchy(accountId: string) {
-  // Get all item types with their relationships
+  // Get all item types
   const { data } = await db
     .from('item_type_registry')
     .select(`
       slug,
       label,
-      allowed_link_types,
-      (
-        SELECT 
-          ltd.slug,
-          ltd.label,
-          ltd.source_item_type,
-          ltd.target_item_type
-        FROM link_type_definitions ltd
-        WHERE ltd.account_id = ${accountId}
-      ) as link_definitions
+      allowed_link_types
     `)
     .order('slug', { ascending: true })
 
   return data || []
 }
 
-export async function validateItemData(ctx: any, itemType: string, itemData: any) {
-  // Get field definitions for this item type
-  const fieldDefs = await getFieldDefinitions(ctx.accountId!, itemType)
-
-  const errors: string[] = []
-  const warnings: string[] = []
-
-  for (const field of fieldDefs || []) {
-    const fieldValue = itemData[field.field_key]
-
-    // Check required fields
-    if (field.is_required && (fieldValue === undefined || fieldValue === null || fieldValue === '')) {
-      errors.push(`Required field '${field.field_label}' is missing`)
-    }
-
-    // Validate field type
-    if (fieldValue !== undefined && fieldValue !== null) {
-      const expectedType = field.field_type
-      const actualType = typeof fieldValue
-
-      if (expectedType === 'string' && actualType !== 'string') {
-        errors.push(`Field '${field.field_label}' must be a string`)
-      } else if (expectedType === 'number' && actualType !== 'number') {
-        errors.push(`Field '${field.field_label}' must be a number`)
-      } else if (expectedType === 'boolean' && actualType !== 'boolean') {
-        errors.push(`Field '${field.field_label}' must be a boolean`)
-      } else if (expectedType === 'array' && !Array.isArray(fieldValue)) {
-        errors.push(`Field '${field.field_label}' must be an array`)
-      } else if (expectedType === 'object' && (actualType !== 'object' || Array.isArray(fieldValue))) {
-        errors.push(`Field '${field.field_label}' must be an object`)
-      }
-    }
-
-    // Apply validation rules
-    if (field.validation_rules && fieldValue !== undefined && fieldValue !== null) {
-      const rules = field.validation_rules as any
-
-      if (rules.min_length && typeof fieldValue === 'string' && fieldValue.length < rules.min_length) {
-        errors.push(`Field '${field.field_label}' must be at least ${rules.min_length} characters`)
-      }
-
-      if (rules.max_length && typeof fieldValue === 'string' && fieldValue.length > rules.max_length) {
-        errors.push(`Field '${field.field_label}' must not exceed ${rules.max_length} characters`)
-      }
-
-      if (rules.min_value && typeof fieldValue === 'number' && fieldValue < rules.min_value) {
-        errors.push(`Field '${field.field_label}' must be at least ${rules.min_value}`)
-      }
-
-      if (rules.max_value && typeof fieldValue === 'number' && fieldValue > rules.max_value) {
-        errors.push(`Field '${field.field_label}' must not exceed ${rules.max_value}`)
-      }
-
-      if (rules.pattern && typeof fieldValue === 'string' && !new RegExp(rules.pattern).test(fieldValue)) {
-        errors.push(`Field '${field.field_label}' does not match required pattern`)
-      }
-    }
-  }
-
-  return {
-    is_valid: errors.length === 0,
-    errors,
-    warnings
-  }
-}
+      

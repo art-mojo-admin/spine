@@ -107,17 +107,15 @@ async function listCases(accountId: string, personId: string, filters: { status?
       title,
       description,
       metadata,
+      custom_fields,
       status,
-      stage_definition_id,
       created_at,
       updated_at,
-      created_by,
-      stage_definitions!inner(name),
-      field_values!inner(field_key, value)
+      created_by
     `)
     .eq('account_id', accountId)
-    .eq('item_type_id', (await db.from('item_type_registry').select('id').eq('slug', 'support_case').single()).data?.id)
-    .eq('status', 'active')
+    .eq('item_type', 'support_case')
+    .eq('is_active', true)
 
   // Members can only see their own cases
   if (callerRole === 'member') {
@@ -126,32 +124,31 @@ async function listCases(accountId: string, personId: string, filters: { status?
 
   // Apply filters
   if (filters.status) {
-    query = query.eq('stage_definitions.name', filters.status)
+    query = query.eq('status', filters.status)
   }
   if (filters.priority) {
-    query = query.eq('field_values.field_key', 'priority').eq('field_values.value', filters.priority)
+    query = query.contains('custom_fields', { priority: filters.priority })
   }
 
   const { data, error: dbErr } = await query
 
   if (dbErr) throw dbErr
 
-  // Transform field values
+  // Transform to v2 format
   const cases = (data || []).map(item => {
     const metadata = item.metadata || {}
-    const fieldValues = item.field_values || []
+    const customFields = item.custom_fields || {}
     
-    fieldValues.forEach((fv: any) => {
-      metadata[fv.field_key] = fv.value
-    })
+    // Merge custom fields into metadata for backward compatibility
+    const mergedMetadata = { ...metadata, ...customFields }
 
     return {
       id: item.id,
       title: item.title,
       description: item.description,
-      metadata,
+      metadata: mergedMetadata,
       status: item.status,
-      stage: (item.stage_definitions as any)?.name,
+      stage: item.status, // status replaces stage
       created_at: item.created_at,
       updated_at: item.updated_at,
       created_by: item.created_by,
@@ -169,19 +166,17 @@ async function getCase(accountId: string, personId: string, itemId: string, call
       id,
       title,
       description,
-      metadata,
       status,
-      stage_definition_id,
+      metadata,
+      custom_fields,
       created_at,
       updated_at,
-      created_by,
-      stage_definitions!inner(name),
-      field_values!inner(field_key, value)
+      created_by
     `)
     .eq('account_id', accountId)
+    .eq('item_type', 'support_case')
+    .eq('is_active', true)
     .eq('id', itemId)
-    .eq('item_type_id', (await db.from('item_type_registry').select('id').eq('slug', 'support_case').single()).data?.id)
-    .eq('status', 'active')
     .single()
 
   if (dbErr) throw dbErr
@@ -400,46 +395,21 @@ async function createCase(accountId: string, personId: string, body: any, caller
     .from('items')
     .insert({
       account_id: accountId,
-      item_type_id: itemType?.id,
+      item_type: 'support_case',
       workflow_definition_id: (await db.from('workflow_definitions').select('id').eq('name', 'Support Case Lifecycle').eq('account_id', accountId).single()).data?.id,
-      stage_definition_id: openStage?.id,
       title: validatedData.title,
       description: validatedData.description,
-      metadata: sanitizedMetadata,
-      status: 'active',
-      created_by: personId,
+      status: 'open',
+      created_by_principal_id: personId,
+      custom_fields: sanitizedMetadata,
     })
     .select()
     .single()
 
   if (dbErr) throw dbErr
 
-  // Create field values with schema validation
-  const fieldValues = [
-    { field_key: 'priority', value: validatedData.priority },
-    { field_key: 'category', value: validatedData.category || 'general' },
-    { field_key: 'tags', value: validatedData.tags || [] },
-  ]
 
-  // Validate each field value against schema
-  for (const fv of fieldValues) {
-    if (schema.fields && schema.fields[fv.field_key]) {
-      const fieldSchema = schema.fields[fv.field_key]
-      const fieldAccess = ItemsDAL.evaluateFieldAccess(fieldSchema, callerRole, 'all', 'update')
-      if (fieldAccess === 'none') {
-        continue // Skip fields user can't update
-      }
-    }
-
-    await db.from('field_values').insert({
-      account_id: accountId,
-      item_id: data.id,
-      field_key: fv.field_key,
-      value: fv.value,
-      created_by: personId,
-    })
-  }
-
+    
   // Create thread for the case
   const { data: thread } = await db
     .from('threads')
@@ -486,34 +456,23 @@ async function updateCase(accountId: string, personId: string, itemId: string, b
 
   // Prepare update data
   const updateData: any = {}
-  const metadata = { ...current.metadata }
+  const customFields = { ...current.custom_fields }
 
   if (body.title) updateData.title = body.title
   if (body.description) updateData.description = body.description
-  if (body.priority) {
-    metadata.priority = body.priority
-  }
-  if (body.ai_confidence_score !== undefined) metadata.ai_confidence_score = body.ai_confidence_score
-  if (body.escalation_reason) metadata.escalation_reason = body.escalation_reason
-  if (body.ai_summary) metadata.ai_summary = body.ai_summary
-  if (body.resolution_kind) metadata.resolution_kind = body.resolution_kind
-  if (body.resolution_notes) metadata.resolution_notes = body.resolution_notes
+  if (body.priority) customFields.priority = body.priority
+  if (body.ai_confidence_score !== undefined) customFields.ai_confidence_score = body.ai_confidence_score
+  if (body.escalation_reason) customFields.escalation_reason = body.escalation_reason
+  if (body.ai_summary) customFields.ai_summary = body.ai_summary
+  if (body.resolution_kind) customFields.resolution_kind = body.resolution_kind
+  if (body.resolution_notes) customFields.resolution_notes = body.resolution_notes
 
-  updateData.metadata = metadata
+  updateData.custom_fields = customFields
   updateData.updated_at = new Date().toISOString()
 
-  // Handle stage transitions
-  if (body.stage) {
-    const { data: newStage } = await db
-      .from('stage_definitions')
-      .select('id')
-      .eq('name', body.stage)
-      .eq('workflow_definition_id', current.workflow_definition_id)
-      .single()
-
-    if (newStage) {
-      updateData.stage_definition_id = newStage.id
-    }
+  // Handle status transitions
+  if (body.status) {
+    updateData.status = body.status
   }
 
   const { data, error: dbErr } = await db
