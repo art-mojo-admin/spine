@@ -19,15 +19,18 @@ export default createHandler({
     const status = params.get('status')
     const priority = params.get('priority')
 
+    // Derive effective role — system_admin always gets admin
+    const effectiveRole = ctx.systemRole === 'system_admin' ? 'admin' : (ctx.accountRole || 'member')
+
     try {
       switch (mode) {
         case 'list':
-          return await listCases(ctx.accountId!, ctx.personId!, { status, priority })
+          return await listCases(ctx.accountId!, ctx.personId!, { status, priority }, effectiveRole)
         case 'detail':
           if (!itemId) return error('item_id required')
-          return await getCase(ctx.accountId!, ctx.personId!, itemId)
+          return await getCase(ctx.accountId!, ctx.personId!, itemId, effectiveRole)
         case 'queue':
-          return await getSupportQueue(ctx.accountId!, ctx.personId!)
+          return await getSupportQueue(ctx.accountId!, ctx.personId!, effectiveRole)
         case 'my-cases':
           return await getMyCases(ctx.accountId!, ctx.personId!)
         default:
@@ -57,8 +60,9 @@ export default createHandler({
       return error('title and description required')
     }
 
+    const effectiveRole = ctx.systemRole === 'system_admin' ? 'admin' : (ctx.accountRole || 'member')
     try {
-      return await createCase(ctx.accountId!, ctx.personId!, body)
+      return await createCase(ctx.accountId!, ctx.personId!, body, effectiveRole)
     } catch (err: any) {
       return error(err.message || 'Case creation failed', 500)
     }
@@ -94,16 +98,7 @@ export default createHandler({
   },
 })
 
-async function listCases(accountId: string, personId: string, filters: { status?: string, priority?: string }) {
-  // Get the caller's role to enforce access
-  const { data: caller } = await db
-    .from('memberships')
-    .select('account_role')
-    .eq('account_id', accountId)
-    .eq('person_id', personId)
-    .single()
-
-  const callerRole = caller?.account_role || 'member'
+async function listCases(accountId: string, personId: string, filters: { status?: string | null; priority?: string | null }, callerRole: string) {
 
   let query = db
     .from('items')
@@ -166,16 +161,7 @@ async function listCases(accountId: string, personId: string, filters: { status?
   return json(cases)
 }
 
-async function getCase(accountId: string, personId: string, itemId: string) {
-  // Get the caller's role to enforce access
-  const { data: caller } = await db
-    .from('memberships')
-    .select('account_role')
-    .eq('account_id', accountId)
-    .eq('person_id', personId)
-    .single()
-
-  const callerRole = caller?.account_role || 'member'
+async function getCase(accountId: string, personId: string, itemId: string, callerRole: string) {
 
   const { data, error: dbErr } = await db
     .from('items')
@@ -265,16 +251,8 @@ async function getCase(accountId: string, personId: string, itemId: string) {
   return json(caseDetail)
 }
 
-async function getSupportQueue(accountId: string, personId: string) {
+async function getSupportQueue(accountId: string, personId: string, callerRole: string) {
   // Only operators and admins can see the queue
-  const { data: caller } = await db
-    .from('memberships')
-    .select('account_role')
-    .eq('account_id', accountId)
-    .eq('person_id', personId)
-    .single()
-
-  const callerRole = caller?.account_role || 'member'
   if (callerRole === 'member') {
     return error('Access denied', 403)
   }
@@ -376,16 +354,7 @@ async function getMyCases(accountId: string, personId: string) {
   return json(cases)
 }
 
-async function createCase(accountId: string, personId: string, body: any) {
-  // Get user's role for permission checking
-  const { data: caller } = await db
-    .from('memberships')
-    .select('account_role')
-    .eq('account_id', accountId)
-    .eq('person_id', personId)
-    .single()
-
-  const callerRole = caller?.account_role || 'member'
+async function createCase(accountId: string, personId: string, body: any, callerRole: string) {
 
   // Get item type schema for validation
   const schema = await ItemsDAL.getItemTypeSchema('support_case')

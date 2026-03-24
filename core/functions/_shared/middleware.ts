@@ -112,6 +112,12 @@ async function resolveAuth(req: Request): Promise<Partial<RequestContext>> {
   }
 }
 
+function deriveRoleFromScopes(scopes: string[]): string {
+  if (scopes.some(s => s.startsWith('admin.'))) return 'admin'
+  if (scopes.some(s => s.startsWith('operator.'))) return 'operator'
+  return 'member'
+}
+
 async function resolveTenant(
   req: Request,
   personId: string | null,
@@ -126,23 +132,21 @@ async function resolveTenant(
     if (personId) {
       const { data: membership } = await db
         .from('memberships')
-        .select('account_id, account_role')
+        .select('account_id')
         .eq('person_id', personId)
         .eq('status', 'active')
         .limit(1)
         .single()
 
       if (membership) {
-        // Load principal scopes for this person in this account
         const { data: scopes } = await db
           .from('principal_scopes')
           .select('auth_scopes!inner(slug)')
           .eq('person_id', personId)
           .eq('account_id', membership.account_id)
-          .eq('status', 'enabled')
         
         const principalScopes = scopes?.map((s: any) => s.auth_scopes.slug) || []
-        return { accountId: membership.account_id, accountRole: membership.account_role, principalScopes }
+        return { accountId: membership.account_id, accountRole: deriveRoleFromScopes(principalScopes), principalScopes }
       }
     }
     return { accountId: null, accountRole: null, principalScopes: [] }
@@ -150,23 +154,21 @@ async function resolveTenant(
 
   const { data: membership } = await db
     .from('memberships')
-    .select('account_role')
+    .select('id')
     .eq('person_id', personId)
     .eq('account_id', accountId)
     .eq('status', 'active')
     .single()
 
   if (membership) {
-    // Load principal scopes for this person in this account
     const { data: scopes } = await db
       .from('principal_scopes')
       .select('auth_scopes!inner(slug)')
       .eq('person_id', personId)
       .eq('account_id', accountId)
-      .eq('status', 'enabled')
     
     const principalScopes = scopes?.map((s: any) => s.auth_scopes.slug) || []
-    return { accountId, accountRole: membership.account_role, principalScopes }
+    return { accountId, accountRole: deriveRoleFromScopes(principalScopes), principalScopes }
   }
 
   // System admins can access any account even without a membership
@@ -290,7 +292,6 @@ export function createHandler(routes: RouteMap) {
           .select('auth_scopes!inner(slug)')
           .eq('person_id', impersonation.targetPersonId)
           .eq('account_id', impersonation.targetAccountId)
-          .eq('status', 'enabled')
         
         const principalScopes = scopes?.map((s: any) => s.auth_scopes.slug) || []
         

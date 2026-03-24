@@ -34,8 +34,8 @@ export default function SupportQueuePage() {
   const { currentAccountId, profile } = useAuth()
   const [cases, setCases] = useState<SupportCase[]>([])
   const [loading, setLoading] = useState(true)
-  const [filterStage, setFilterStage] = useState<string>('')
-  const [filterPriority, setFilterPriority] = useState<string>('')
+  const [filterStage, setFilterStage] = useState<string>('all')
+  const [filterPriority, setFilterPriority] = useState<string>('all')
   const [searchQuery, setSearchQuery] = useState('')
   const [selectedCase, setSelectedCase] = useState<string | null>(null)
   const [assigning, setAssigning] = useState(false)
@@ -50,8 +50,8 @@ export default function SupportQueuePage() {
     try {
       setLoading(true)
       const params = new URLSearchParams()
-      if (filterStage) params.set('status', filterStage)
-      if (filterPriority) params.set('priority', filterPriority)
+      if (filterStage && filterStage !== 'all') params.set('status', filterStage)
+      if (filterPriority && filterPriority !== 'all') params.set('priority', filterPriority)
       if (searchQuery) params.set('search', searchQuery)
       
       const response = await apiGet(`/custom/support?mode=queue&${params}`)
@@ -193,7 +193,7 @@ export default function SupportQueuePage() {
                 <SelectValue placeholder="Filter by stage" />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="">All Stages</SelectItem>
+                <SelectItem value="all">All Stages</SelectItem>
                 <SelectItem value="Open">Open</SelectItem>
                 <SelectItem value="AI Attempt">AI Attempt</SelectItem>
                 <SelectItem value="Escalated">Escalated</SelectItem>
@@ -208,7 +208,7 @@ export default function SupportQueuePage() {
                 <SelectValue placeholder="Filter by priority" />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="">All Priorities</SelectItem>
+                <SelectItem value="all">All Priorities</SelectItem>
                 <SelectItem value="urgent">Urgent</SelectItem>
                 <SelectItem value="high">High</SelectItem>
                 <SelectItem value="medium">Medium</SelectItem>
@@ -240,8 +240,8 @@ export default function SupportQueuePage() {
                 variant="outline"
                 onClick={() => {
                   setSearchQuery('')
-                  setFilterStage('')
-                  setFilterPriority('')
+                  setFilterStage('all')
+                  setFilterPriority('all')
                 }}
               >
                 Clear Filters
