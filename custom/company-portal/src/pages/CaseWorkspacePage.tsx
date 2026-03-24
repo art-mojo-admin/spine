@@ -11,6 +11,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '.
 import { Separator } from '../components/ui/separator'
 import { MessageSquare, Bot, Send, FileText, CheckCircle, Clock, AlertCircle, User, ArrowRight } from 'lucide-react'
 import { cn } from '../lib/utils'
+import { FormRenderer, type ItemTypeSchema } from '../components/ui/FieldRenderer'
 
 interface SupportCase {
   id: string
@@ -74,6 +75,8 @@ export default function CaseWorkspacePage() {
   const [showKBImprovement, setShowKBImprovement] = useState(false)
   const [kbAction, setKbAction] = useState<'create_draft' | 'update_existing'>('create_draft')
   const [selectedArticle, setSelectedArticle] = useState<string>('')
+  const [schema, setSchema] = useState<ItemTypeSchema | null>(null)
+  const [schemaLoading, setSchemaLoading] = useState(true)
 
   // KB improvement form
   const [kbForm, setKbForm] = useState({

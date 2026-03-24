@@ -1,0 +1,117 @@
+# CRM App Installation Example
+# Complete example for installing the CRM application
+
+app:
+  name: "CRM"
+  slug: "crm"
+  version: "1.0.0"
+  external_app_id: "crm-v1"
+  description: "Customer relationship management platform"
+  author: "Spine Framework"
+
+installation:
+  # Step 1: Create installed_packs record
+  pack_installation:
+    account_id: "${TARGET_ACCOUNT_ID}"
+    external_app_id: "crm-v1"
+    external_app_version: "1.0.0"
+    install_mode: "full"
+    manifest_version: 1
+    
+  # Step 2: Create app_definitions
+  app_creation:
+    - slug: "crm"
+      name: "CRM"
+      installed_pack_id: "${PACK_INSTALLATION_ID}"
+      min_role: "member"
+      nav_items:
+        - key: "dashboard"
+          to: "/crm"
+          label: "CRM Dashboard"
+          icon: "building-2"
+          min_role: "member"
+        - key: "deals"
+          to: "/crm/deals"
+          label: "Deals"
+          icon: "trending-up"
+          min_role: "member"
+        - key: "contacts"
+          to: "/crm/contacts"
+          label: "Contacts"
+          icon: "users"
+          min_role: "member"
+        - key: "companies"
+          to: "/crm/companies"
+          label: "Companies"
+          icon: "building"
+          min_role: "member"
+        - key: "leads"
+          to: "/crm/leads"
+          label: "Leads"
+          icon: "target"
+          min_role: "member"
+        - key: "campaigns"
+          to: "/crm/campaigns"
+          label: "Campaigns"
+          icon: "megaphone"
+          min_role: "operator"
+        - key: "analytics"
+          to: "/crm/analytics"
+          label: "Analytics"
+          icon: "bar-chart"
+          min_role: "admin"
+      default_view: "crm_dashboard"
+      integration_deps:
+        - "email"
+        - "calendar"
+        - "analytics"
+        
+  # Step 3: Run data migrations
+  migrations:
+    - file: "migrations/001_crm_setup.sql"
+      description: "Create CRM item types and views"
+      rollback_file: "migrations/rollback_001_crm_setup.sql"
+    - file: "migrations/002_crm_stages.sql"
+      description: "Create CRM workflow stages"
+      dependencies:
+        - "001_crm_setup"
+    - file: "migrations/003_crm_automations.sql"
+      description: "Create CRM automation rules"
+      dependencies:
+        - "001_crm_setup"
+        - "002_crm_stages"
+    - file: "migrations/004_crm_sample_data.sql"
+      description: "Seed sample CRM data"
+      dependencies:
+        - "001_crm_setup"
+        - "002_crm_stages"
+        
+  # Step 4: Verify installation
+  verification:
+    - check: "app_definition_exists"
+      slug: "crm"
+    - check: "item_type_exists"
+      slug: "deal"
+    - check: "item_type_exists"
+      slug: "contact"
+    - check: "item_type_exists"
+      slug: "company"
+    - check: "item_type_exists"
+      slug: "lead"
+    - check: "item_type_exists"
+      slug: "campaign"
+    - check: "view_exists"
+      slug: "crm_dashboard"
+    - check: "view_exists"
+      slug: "deals_list"
+    - check: "view_exists"
+      slug: "contacts_list"
+    - check: "integration_exists"
+      integration_id: "email"
+    - check: "integration_exists"
+      integration_id: "calendar"
+    - check: "integration_exists"
+      integration_id: "analytics"
+
+variables:
+  TARGET_ACCOUNT_ID: "your-account-id-here"

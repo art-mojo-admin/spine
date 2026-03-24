@@ -13,7 +13,9 @@
     "prebuild": "npm run assemble && npm run verify",
     "build": "tsc -b && vite build",
     "preview": "vite preview",
-    "lint": "eslint ."
+    "lint": "eslint .",
+    "app-install": "tsx scripts/app-install-cli.ts",
+    "load-test": "tsx scripts/load-test-app-install.ts"
   },
   "dependencies": {
     "@radix-ui/react-accordion": "^1.2.12",
@@ -84,7 +86,11 @@
     "react-refresh": "^0.14.0",
     "tailwindcss": "^3.4.17",
     "typescript": "~5.6.2",
-    "vite": "^6.0.11"
+    "vite": "^6.0.11",
+    "ajv": "^8.12.0",
+    "commander": "^12.0.0",
+    "js-yaml": "^4.1.0",
+    "tsx": "^4.21.0"
   },
   "packageManager": "yarn@1.22.22+sha512.a6b2f7906b721bba3d67d4aff083df04dad64c399707841b7acf00f6b133b7ac24255f2652fa22ae3534329dc6180534e98d17432037ff6fd140556e2bb3137e"
 }

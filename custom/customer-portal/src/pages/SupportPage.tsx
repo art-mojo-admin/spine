@@ -10,6 +10,7 @@ import { Badge } from '../components/ui/badge'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../components/ui/select'
 import { MessageCircle, Bot, Send, AlertCircle, CheckCircle, Clock } from 'lucide-react'
 import { cn } from '../lib/utils'
+import { FormRenderer, type ItemTypeSchema } from '../components/ui/FieldRenderer'
 
 interface SupportCase {
   id: string
@@ -47,6 +48,8 @@ export default function SupportPage() {
   const [submitting, setSubmitting] = useState(false)
   const [aiResponse, setAiResponse] = useState<AIResponse | null>(null)
   const [aiLoading, setAiLoading] = useState(false)
+  const [schema, setSchema] = useState<ItemTypeSchema | null>(null)
+  const [schemaLoading, setSchemaLoading] = useState(true)
 
   // New case form
   const [newCase, setNewCase] = useState({
@@ -58,8 +61,52 @@ export default function SupportPage() {
   })
 
   useEffect(() => {
+    loadSchema()
     loadCases()
   }, [])
+
+  const loadSchema = async () => {
+    try {
+      setSchemaLoading(true)
+      // In a real implementation, this would fetch from the API
+      // For now, we'll use a mock schema that matches the support_case item type
+      const mockSchema: ItemTypeSchema = {
+        record_permissions: {
+          member: { create: true, read: "all", update: "own", delete: "soft" },
+          admin: { create: true, read: "all", update: "all", delete: "all" }
+        },
+        fields: {
+          title: {
+            type: "text",
+            required: true
+          },
+          description: {
+            type: "textarea",
+            required: true
+          },
+          priority: {
+            type: "select",
+            options: ["low", "medium", "high", "urgent"],
+            required: true
+          },
+          category: {
+            type: "select",
+            options: ["technical", "billing", "feature", "general"],
+            required: false
+          },
+          tags: {
+            type: "array",
+            required: false
+          }
+        }
+      }
+      setSchema(mockSchema)
+    } catch (err) {
+      console.error('Failed to load schema:', err)
+    } finally {
+      setSchemaLoading(false)
+    }
+  }
 
   const loadCases = async () => {
     if (!currentAccountId) return
@@ -217,75 +264,38 @@ export default function SupportPage() {
             <CardTitle>Create New Support Case</CardTitle>
           </CardHeader>
           <CardContent>
-            <form onSubmit={handleSubmitCase} className="space-y-4">
-              <div>
-                <label className="text-sm font-medium mb-2 block">Title</label>
-                <Input
-                  placeholder="Brief description of your issue"
-                  value={newCase.title}
-                  onChange={(e) => setNewCase({ ...newCase, title: e.target.value })}
-                  required
+            {schemaLoading ? (
+              <div className="text-center py-8">
+                <div className="text-muted-foreground">Loading form schema...</div>
+              </div>
+            ) : schema ? (
+              <form onSubmit={handleSubmitCase} className="space-y-4">
+                <FormRenderer
+                  schema={schema}
+                  data={newCase}
+                  userRole={profile?.system_role === 'system_admin' ? 'admin' : 'member'}
+                  editing={true}
+                  onChange={(field, value) => setNewCase({ ...newCase, [field]: value })}
                 />
-              </div>
 
-              <div>
-                <label className="text-sm font-medium mb-2 block">Description</label>
-                <Textarea
-                  placeholder="Detailed description of your issue, steps to reproduce, etc."
-                  value={newCase.description}
-                  onChange={(e) => setNewCase({ ...newCase, description: e.target.value })}
-                  rows={4}
-                  required
-                />
-              </div>
-
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <label className="text-sm font-medium mb-2 block">Priority</label>
-                  <Select value={newCase.priority} onValueChange={(value) => setNewCase({ ...newCase, priority: value })}>
-                    <SelectTrigger>
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="low">Low</SelectItem>
-                      <SelectItem value="medium">Medium</SelectItem>
-                      <SelectItem value="high">High</SelectItem>
-                      <SelectItem value="urgent">Urgent</SelectItem>
-                    </SelectContent>
-                  </Select>
+                <div className="flex gap-2">
+                  <Button type="submit" disabled={submitting}>
+                    {submitting ? 'Creating...' : 'Create Case'}
+                  </Button>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    onClick={() => setShowNewCase(false)}
+                  >
+                    Cancel
+                  </Button>
                 </div>
-
-                <div>
-                  <label className="text-sm font-medium mb-2 block">Category</label>
-                  <Select value={newCase.category} onValueChange={(value) => setNewCase({ ...newCase, category: value })}>
-                    <SelectTrigger>
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="general">General</SelectItem>
-                      <SelectItem value="technical">Technical</SelectItem>
-                      <SelectItem value="billing">Billing</SelectItem>
-                      <SelectItem value="account">Account</SelectItem>
-                      <SelectItem value="api">API</SelectItem>
-                      <SelectItem value="ui">User Interface</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
+              </form>
+            ) : (
+              <div className="text-center py-8">
+                <div className="text-muted-foreground">Failed to load form schema</div>
               </div>
-
-              <div className="flex gap-2">
-                <Button type="submit" disabled={submitting}>
-                  {submitting ? 'Creating...' : 'Create Case'}
-                </Button>
-                <Button
-                  type="button"
-                  variant="outline"
-                  onClick={() => setShowNewCase(false)}
-                >
-                  Cancel
-                </Button>
-              </div>
-            </form>
+            )}
           </CardContent>
         </Card>
       ) : (

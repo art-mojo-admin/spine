@@ -1,6 +1,7 @@
 import { createHandler, requireAuth, requireTenant, json, error, parseBody, type RequestContext } from '../../core/functions/_shared/middleware'
 import { db } from '../../core/functions/_shared/db'
 import { emitAudit, emitActivity } from '../../core/functions/_shared/audit'
+import { ItemsDAL, type ItemTypeSchema } from '../../core/functions/_shared/items-dal'
 
 function makeCtx(accountId: string, personId: string): RequestContext {
   return { requestId: '', personId, accountId, accountNodeId: null, accountRole: null, principalScopes: [], systemRole: null, authUid: null, impersonating: false, realPersonId: null, impersonationSessionId: null }
@@ -376,6 +377,34 @@ async function getMyCases(accountId: string, personId: string) {
 }
 
 async function createCase(accountId: string, personId: string, body: any) {
+  // Get user's role for permission checking
+  const { data: caller } = await db
+    .from('memberships')
+    .select('account_role')
+    .eq('account_id', accountId)
+    .eq('person_id', personId)
+    .single()
+
+  const callerRole = caller?.account_role || 'member'
+
+  // Get item type schema for validation
+  const schema = await ItemsDAL.getItemTypeSchema('support_case')
+  if (!schema) {
+    return error('Support case item type not found', 404)
+  }
+
+  // Check create permissions
+  const canCreate = ItemsDAL.evaluateRecordAccess(schema, callerRole, 'create')
+  if (!canCreate) {
+    return error('Insufficient permissions to create support cases', 403)
+  }
+
+  // Validate and sanitize input data
+  const validatedData = ItemsDAL.validateUpdateData(body, {}, schema, callerRole)
+  if (!validatedData) {
+    return error('Invalid data provided', 400)
+  }
+
   // Get item type and initial stage
   const { data: itemType } = await db
     .from('item_type_registry')
@@ -390,6 +419,14 @@ async function createCase(accountId: string, personId: string, body: any) {
     .eq('workflow_definition_id', (await db.from('workflow_definitions').select('id').eq('name', 'Support Case Lifecycle').eq('account_id', accountId).single()).data?.id)
     .single()
 
+  // Sanitize metadata according to schema
+  const sanitizedMetadata = ItemsDAL.sanitizeItemData({
+    priority: validatedData.priority,
+    category: validatedData.category,
+    tags: validatedData.tags || [],
+    ai_attempted: validatedData.ai_attempted || false,
+  }, schema, callerRole)
+
   const { data, error: dbErr } = await db
     .from('items')
     .insert({
@@ -397,31 +434,34 @@ async function createCase(accountId: string, personId: string, body: any) {
       item_type_id: itemType?.id,
       workflow_definition_id: (await db.from('workflow_definitions').select('id').eq('name', 'Support Case Lifecycle').eq('account_id', accountId).single()).data?.id,
       stage_definition_id: openStage?.id,
-      title: body.title,
-      description: body.description,
-      metadata: {
-        priority: body.priority,
-        category: body.category,
-        tags: body.tags || [],
-        ai_attempted: body.ai_attempted || false,
-      },
+      title: validatedData.title,
+      description: validatedData.description,
+      metadata: sanitizedMetadata,
       status: 'active',
       created_by: personId,
-      ownership: 'tenant',
     })
     .select()
     .single()
 
   if (dbErr) throw dbErr
 
-  // Create field values
+  // Create field values with schema validation
   const fieldValues = [
-    { field_key: 'priority', value: body.priority },
-    { field_key: 'category', value: body.category || 'general' },
-    { field_key: 'tags', value: body.tags || [] },
+    { field_key: 'priority', value: validatedData.priority },
+    { field_key: 'category', value: validatedData.category || 'general' },
+    { field_key: 'tags', value: validatedData.tags || [] },
   ]
 
+  // Validate each field value against schema
   for (const fv of fieldValues) {
+    if (schema.fields && schema.fields[fv.field_key]) {
+      const fieldSchema = schema.fields[fv.field_key]
+      const fieldAccess = ItemsDAL.evaluateFieldAccess(fieldSchema, callerRole, 'all', 'update')
+      if (fieldAccess === 'none') {
+        continue // Skip fields user can't update
+      }
+    }
+
     await db.from('field_values').insert({
       account_id: accountId,
       item_id: data.id,

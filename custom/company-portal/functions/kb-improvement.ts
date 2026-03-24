@@ -1,6 +1,7 @@
 import { createHandler, requireAuth, requireTenant, json, error, parseBody, type RequestContext } from '../../core/functions/_shared/middleware'
 import { db } from '../../core/functions/_shared/db'
 import { emitAudit, emitActivity } from '../../core/functions/_shared/audit'
+import { ItemsDAL, type ItemTypeSchema } from '../../core/functions/_shared/items-dal'
 
 function makeCtx(accountId: string, personId: string): RequestContext {
   return { requestId: '', personId, accountId, accountNodeId: null, accountRole: null, principalScopes: [], systemRole: null, authUid: null, impersonating: false, realPersonId: null, impersonationSessionId: null }
@@ -123,6 +124,28 @@ async function processKBImprovement(accountId: string, personId: string, body: a
 }
 
 async function createKnowledgeDraft(accountId: string, personId: string, supportCase: any, caseMetadata: any, body: any) {
+  // Get user's role for permission checking
+  const { data: caller } = await db
+    .from('memberships')
+    .select('account_role')
+    .eq('account_id', accountId)
+    .eq('person_id', personId)
+    .single()
+
+  const callerRole = caller?.account_role || 'member'
+
+  // Get item type schema for validation
+  const schema = await ItemsDAL.getItemTypeSchema('knowledge_article')
+  if (!schema) {
+    return error('Knowledge article item type not found', 404)
+  }
+
+  // Check create permissions
+  const canCreate = ItemsDAL.evaluateRecordAccess(schema, callerRole, 'create')
+  if (!canCreate) {
+    return error('Insufficient permissions to create knowledge articles', 403)
+  }
+
   // Get knowledge article item type and draft stage
   const { data: itemType } = await db
     .from('item_type_registry')
@@ -145,6 +168,35 @@ async function createKnowledgeDraft(accountId: string, personId: string, support
   const tags = body.tags || extractTagsFromCase(supportCase, caseMetadata)
   const audience = body.audience || determineAudience(caseMetadata)
 
+  // Validate and sanitize input data
+  const articleData = {
+    title,
+    description: summary,
+    article_kind: articleKind,
+    visibility: 'member',
+    audience,
+    tags,
+    content,
+    summary,
+  }
+
+  const validatedData = ItemsDAL.validateUpdateData(articleData, {}, schema, callerRole)
+  if (!validatedData) {
+    return error('Invalid article data provided', 400)
+  }
+
+  // Sanitize metadata according to schema
+  const sanitizedMetadata = ItemsDAL.sanitizeItemData({
+    article_kind: validatedData.article_kind,
+    visibility: validatedData.visibility,
+    audience: validatedData.audience,
+    tags: validatedData.tags,
+    content: validatedData.content,
+    source_case_id: supportCase.id,
+    source_case_title: supportCase.title,
+    created_from_case: true,
+  }, schema, callerRole)
+
   // Create the knowledge article
   const { data: article, error: createErr } = await db
     .from('items')
@@ -153,38 +205,37 @@ async function createKnowledgeDraft(accountId: string, personId: string, support
       item_type_id: itemType?.id,
       workflow_definition_id: (await db.from('workflow_definitions').select('id').eq('name', 'Knowledge Lifecycle').eq('account_id', accountId).single()).data?.id,
       stage_definition_id: draftStage?.id,
-      title,
-      description: summary,
-      metadata: {
-        article_kind: articleKind,
-        visibility: 'member', // Default to member visibility
-        audience,
-        tags,
-        content,
-        source_case_id: supportCase.id,
-        source_case_title: supportCase.title,
-        created_from_case: true,
-      },
+      title: validatedData.title,
+      description: validatedData.summary,
+      metadata: sanitizedMetadata,
       status: 'active',
       created_by: personId,
-      ownership: 'tenant',
     })
     .select()
     .single()
 
   if (createErr) throw createErr
 
-  // Create field values
+  // Create field values with schema validation
   const fieldValues = [
-    { field_key: 'article_kind', value: articleKind },
-    { field_key: 'visibility', value: 'member' },
-    { field_key: 'audience', value: audience },
-    { field_key: 'tags', value: tags },
-    { field_key: 'summary', value: summary },
-    { field_key: 'content', value: content },
+    { field_key: 'article_kind', value: validatedData.article_kind },
+    { field_key: 'visibility', value: validatedData.visibility },
+    { field_key: 'audience', value: validatedData.audience },
+    { field_key: 'tags', value: validatedData.tags },
+    { field_key: 'summary', value: validatedData.summary },
+    { field_key: 'content', value: validatedData.content },
   ]
 
+  // Validate each field value against schema
   for (const fv of fieldValues) {
+    if (schema.fields && schema.fields[fv.field_key]) {
+      const fieldSchema = schema.fields[fv.field_key]
+      const fieldAccess = ItemsDAL.evaluateFieldAccess(fieldSchema, callerRole, 'all', 'update')
+      if (fieldAccess === 'none') {
+        continue // Skip fields user can't update
+      }
+    }
+
     await db.from('field_values').insert({
       account_id: accountId,
       item_id: article.id,

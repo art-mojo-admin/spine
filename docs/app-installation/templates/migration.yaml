@@ -1,0 +1,114 @@
+# Migration Instructions Template
+# Use this template for creating migration instruction files
+
+migration:
+  id: "001_migration_id"
+  description: "Migration description"
+  version: "1.0.0"
+  
+  # Migration dependencies (must run first)
+  dependencies:
+    - "base_setup"
+  
+  steps:
+    # SQL migrations
+    - type: "sql"
+      file: "sql/create_tables.sql"
+      description: "Create required tables"
+      rollback_file: "sql/drop_tables.sql"
+      
+    # Registry updates (item types, views, etc.)
+    - type: "registry_update"
+      registry: "item_type_registry"
+      operation: "insert"
+      description: "Add new item type"
+      data:
+        slug: "custom_item"
+        display_name: "Custom Item"
+        description: "Custom item type description"
+        schema:
+          record_permissions:
+            member: 
+              create: true
+              read: "all"
+              update: "own"
+              delete: "soft"
+            admin:
+              create: true
+              read: "all"
+              update: "all"
+              delete: "all"
+          fields:
+            title:
+              type: "text"
+              required: true
+            status:
+              type: "select"
+              options: ["active", "pending", "closed"]
+              required: true
+            priority:
+              type: "select"
+              options: ["low", "medium", "high"]
+              required: false
+              permission_overrides:
+                admin:
+                  read: "all"
+                  update: "all"
+                member:
+                  read: "all"
+                  update: "own"
+                  
+    - type: "registry_update"
+      registry: "view_definitions"
+      operation: "insert"
+      description: "Add list view for custom items"
+      data:
+        slug: "custom_items_list"
+        display_name: "Custom Items"
+        view_type: "list"
+        config:
+          columns:
+            - key: "title"
+              label: "Title"
+              type: "text"
+            - key: "status"
+              label: "Status"
+              type: "badge"
+            - key: "priority"
+              label: "Priority"
+              type: "badge"
+          filters:
+            - key: "status"
+              type: "select"
+              options: ["active", "pending", "closed"]
+              
+    # Data seeding
+    - type: "data_seed"
+      table: "items"
+      description: "Seed initial data"
+      data:
+        - item_type: "custom_item"
+          title: "Example Item 1"
+          metadata:
+            status: "active"
+            priority: "medium"
+        - item_type: "custom_item"
+          title: "Example Item 2"
+          metadata:
+            status: "pending"
+            priority: "high"
+            
+  # Verification steps
+  verification:
+    - type: "table_exists"
+      table: "items"
+    - type: "row_exists"
+      table: "item_type_registry"
+      condition: "slug = 'custom_item'"
+    - type: "row_exists"
+      table: "view_definitions"
+      condition: "slug = 'custom_items_list'"
+    - type: "data_count"
+      table: "items"
+      condition: "item_type = 'custom_item'"
+      expected_count: 2

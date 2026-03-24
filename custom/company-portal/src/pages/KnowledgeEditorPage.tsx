@@ -9,6 +9,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '../components/ui/card'
 import { Badge } from '../components/ui/badge'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../components/ui/select'
 import { ArrowLeft, Save, Eye, FileText } from 'lucide-react'
+import { FormRenderer, type ItemTypeSchema } from '../components/ui/FieldRenderer'
 
 interface KnowledgeArticle {
   id: string
@@ -35,6 +36,8 @@ export default function KnowledgeEditorPage() {
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
   const [isEditing, setIsEditing] = useState(!articleId) // New article if no ID
+  const [schema, setSchema] = useState<ItemTypeSchema | null>(null)
+  const [schemaLoading, setSchemaLoading] = useState(true)
 
   // Form state
   const [formData, setFormData] = useState({
@@ -49,6 +52,7 @@ export default function KnowledgeEditorPage() {
   })
 
   useEffect(() => {
+    loadSchema()
     if (articleId) {
       loadArticle()
     } else {
@@ -56,6 +60,57 @@ export default function KnowledgeEditorPage() {
       setIsEditing(true)
     }
   }, [articleId])
+
+  const loadSchema = async () => {
+    try {
+      setSchemaLoading(true)
+      // Mock schema for knowledge_article - in production this would fetch from API
+      const mockSchema: ItemTypeSchema = {
+        record_permissions: {
+          member: { create: false, read: "all", update: "own", delete: "soft" },
+          operator: { create: true, read: "all", update: "all", delete: "soft" },
+          admin: { create: true, read: "all", update: "all", delete: "all" }
+        },
+        fields: {
+          title: {
+            type: "text",
+            required: true
+          },
+          summary: {
+            type: "textarea",
+            required: true
+          },
+          content: {
+            type: "textarea",
+            required: true
+          },
+          article_kind: {
+            type: "select",
+            options: ["faq", "tutorial", "guide", "policy", "announcement"],
+            required: true
+          },
+          visibility: {
+            type: "select",
+            options: ["public", "member", "operator", "admin"],
+            required: true
+          },
+          audience: {
+            type: "array",
+            required: false
+          },
+          tags: {
+            type: "array",
+            required: false
+          }
+        }
+      }
+      setSchema(mockSchema)
+    } catch (err) {
+      console.error('Failed to load schema:', err)
+    } finally {
+      setSchemaLoading(false)
+    }
+  }
 
   const loadArticle = async () => {
     if (!articleId || !currentAccountId) return
@@ -206,36 +261,23 @@ export default function KnowledgeEditorPage() {
             </CardHeader>
             <CardContent className="space-y-6">
               {isEditing ? (
-                <>
-                  <div>
-                    <label className="text-sm font-medium mb-2 block">Title</label>
-                    <Input
-                      value={formData.title}
-                      onChange={(e) => setFormData({ ...formData, title: e.target.value })}
-                      placeholder="Article title"
-                    />
+                schemaLoading ? (
+                  <div className="text-center py-8">
+                    <div className="text-muted-foreground">Loading form schema...</div>
                   </div>
-
-                  <div>
-                    <label className="text-sm font-medium mb-2 block">Summary</label>
-                    <Textarea
-                      value={formData.summary}
-                      onChange={(e) => setFormData({ ...formData, summary: e.target.value })}
-                      placeholder="Brief summary"
-                      rows={3}
-                    />
+                ) : schema ? (
+                  <FormRenderer
+                    schema={schema}
+                    data={formData}
+                    userRole={profile?.system_role === 'system_admin' ? 'admin' : 'operator'}
+                    editing={true}
+                    onChange={(field, value) => setFormData({ ...formData, [field]: value })}
+                  />
+                ) : (
+                  <div className="text-center py-8">
+                    <div className="text-muted-foreground">Failed to load form schema</div>
                   </div>
-
-                  <div>
-                    <label className="text-sm font-medium mb-2 block">Content</label>
-                    <Textarea
-                      value={formData.content}
-                      onChange={(e) => setFormData({ ...formData, content: e.target.value })}
-                      placeholder="Full article content (HTML supported)"
-                      rows={12}
-                    />
-                  </div>
-                </>
+                )
               ) : (
                 <>
                   <div>
