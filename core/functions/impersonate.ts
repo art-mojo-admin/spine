@@ -92,7 +92,7 @@ export default createHandler({
     // Verify target is a member of the target account
     const { data: membership } = await db
       .from('memberships')
-      .select('account_role')
+      .select('id')
       .eq('person_id', body.target_person_id)
       .eq('account_id', body.target_account_id)
       .eq('status', 'active')
@@ -101,6 +101,17 @@ export default createHandler({
     if (!membership) {
       return error('Target person is not an active member of the specified account', 404)
     }
+
+    // Derive target role from principal_scopes
+    const { data: targetScopes } = await db
+      .from('principal_scopes')
+      .select('auth_scopes!inner(slug)')
+      .eq('person_id', body.target_person_id)
+      .eq('account_id', body.target_account_id)
+    const scopeSlugs = (targetScopes || []).map((s: any) => s.auth_scopes.slug)
+    const targetRole = scopeSlugs.some((s: string) => s.startsWith('admin.')) ? 'admin'
+      : scopeSlugs.some((s: string) => s.startsWith('operator.')) ? 'operator'
+      : 'member'
 
     // End any existing active sessions for this admin
     await db
@@ -116,7 +127,7 @@ export default createHandler({
         admin_person_id: ctx.personId,
         target_person_id: body.target_person_id,
         target_account_id: body.target_account_id,
-        target_account_role: membership.account_role,
+        target_account_role: targetRole,
         reason: body.reason || null,
       })
       .select()
@@ -135,7 +146,7 @@ export default createHandler({
       admin_person_id: ctx.personId,
       target_person_id: body.target_person_id,
       target_account_id: body.target_account_id,
-      target_role: membership.account_role,
+      target_role: targetRole,
       reason: body.reason,
     })
 

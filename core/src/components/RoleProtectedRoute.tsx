@@ -41,7 +41,9 @@ export function RoleProtectedRoute({ children, minRole, redirectTo = '/admin/sys
   // during lazy-load navigation where useAuth() briefly returns null profile/role.
   if (loading) return null
 
-  const effectiveRole = currentRole ?? profile?.system_role ?? 'member'
+  const accountRank = ROLE_RANK[currentRole ?? ''] ?? 0
+  const systemRank = ROLE_RANK[profile?.system_role ?? ''] ?? 0
+  const effectiveRole = systemRank > accountRank ? (profile?.system_role ?? 'member') : (currentRole ?? 'member')
   const userRank = ROLE_RANK[effectiveRole] ?? 1
   const requiredRank = ROLE_RANK[minRole ?? 'member'] ?? 1
 

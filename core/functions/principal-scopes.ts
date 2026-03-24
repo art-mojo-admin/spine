@@ -12,7 +12,7 @@ type AssignmentType = 'direct' | 'role_bundle' | 'justification' | 'system_defau
 async function ensurePersonInAccount(accountId: string, personId: string) {
   const { data, error: dbErr } = await db
     .from('memberships')
-    .select('id, account_role')
+    .select('id')
     .eq('account_id', accountId)
     .eq('person_id', personId)
     .eq('status', 'active')

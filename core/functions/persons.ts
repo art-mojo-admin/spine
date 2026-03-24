@@ -45,7 +45,7 @@ export default createHandler({
 
     const { data: memberships } = await db
       .from('memberships')
-      .select('person_id, account_role, status')
+      .select('person_id, status')
       .eq('account_id', ctx.accountId)
 
     const personIds = (memberships || []).map((m: any) => m.person_id)
