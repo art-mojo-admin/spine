@@ -94,14 +94,25 @@ export default createHandler({
     const authCheck = requireAuth(ctx)
     if (authCheck) return authCheck
 
-    const body = await parseBody<{ display_name: string; account_type: string }>(req)
+    const body = await parseBody<{ display_name: string; account_type: string; owner_account_id?: string }>(req)
     if (!body.display_name) return error('display_name required')
+
+    // Only system admins can create tenant accounts
+    if (body.account_type === 'tenant' && ctx.systemRole !== 'system_admin') {
+      return error('Only system admins can create tenant accounts', 403)
+    }
+
+    // Non-tenant accounts must have an owner (unless system admin)
+    if (body.account_type !== 'tenant' && !body.owner_account_id && ctx.systemRole !== 'system_admin') {
+      return error('owner_account_id required for non-tenant accounts', 400)
+    }
 
     const { data: account, error: dbErr } = await db
       .from('accounts')
       .insert({
         display_name: body.display_name,
         account_type: body.account_type || 'organization',
+        owner_account_id: body.account_type === 'tenant' ? null : (body.owner_account_id || null),
       })
       .select()
       .single()

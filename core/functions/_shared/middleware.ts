@@ -405,6 +405,10 @@ export function isPortalUser(ctx: RequestContext): boolean {
   return ctx.accountRole === 'portal'
 }
 
+export function isTenantAccount(accountType: string): boolean {
+  return accountType === 'tenant'
+}
+
 export function clampLimit(params: URLSearchParams, defaultLimit = 50, maxLimit = 200): number {
   const raw = parseInt(params.get('limit') || String(defaultLimit), 10)
   return Math.min(Math.max(raw || defaultLimit, 1), maxLimit)
