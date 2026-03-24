@@ -48,7 +48,7 @@ export default function CommunityModerationPage() {
   const { currentAccountId, profile } = useAuth()
   const [posts, setPosts] = useState<CommunityPost[]>([])
   const [loading, setLoading] = useState(true)
-  const [filterStatus, setFilterStatus] = useState<string>('')
+  const [filterStatus, setFilterStatus] = useState<string>('all')
   const [processing, setProcessing] = useState(false)
   const [selectedPost, setSelectedPost] = useState<string | null>(null)
 
@@ -62,7 +62,7 @@ export default function CommunityModerationPage() {
     try {
       setLoading(true)
       const params = new URLSearchParams()
-      if (filterStatus) params.set('moderation_status', filterStatus)
+      if (filterStatus && filterStatus !== 'all') params.set('moderation_status', filterStatus)
       
       const response = await apiGet(`/custom/community?mode=moderation-queue&${params}`)
       setPosts(response)
@@ -174,7 +174,7 @@ export default function CommunityModerationPage() {
                 <SelectValue placeholder="All Statuses" />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="">All Statuses</SelectItem>
+                <SelectItem value="all">All Statuses</SelectItem>
                 <SelectItem value="reported">Reported</SelectItem>
                 <SelectItem value="under_review">Under Review</SelectItem>
                 <SelectItem value="action_taken">Action Taken</SelectItem>
@@ -201,7 +201,7 @@ export default function CommunityModerationPage() {
             {filterStatus && (
               <Button
                 variant="outline"
-                onClick={() => setFilterStatus('')}
+                onClick={() => setFilterStatus('all')}
               >
                 Clear Filters
               </Button>

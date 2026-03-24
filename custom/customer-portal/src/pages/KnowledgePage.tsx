@@ -62,12 +62,17 @@ export default function KnowledgePage() {
     try {
       setLoading(true)
       const params = new URLSearchParams()
-      if (searchQuery) params.set('q', searchQuery)
       if (selectedKind) params.set('article_kind', selectedKind)
       if (selectedAudience) params.set('audience', selectedAudience)
       if (selectedTags.length > 0) params.set('tags', selectedTags.join(','))
 
-      const response = await apiGet(`/custom/knowledge?mode=search&${params}`)
+      let response
+      if (searchQuery) {
+        params.set('q', searchQuery)
+        response = await apiGet(`/custom/knowledge?mode=search&${params}`)
+      } else {
+        response = await apiGet(`/custom/knowledge?mode=list&${params}`)
+      }
       setArticles(response)
     } catch (err) {
       console.error('Failed to load articles:', err)

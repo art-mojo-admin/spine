@@ -50,9 +50,9 @@ export default function KnowledgeListPage() {
   const [articles, setArticles] = useState<KnowledgeArticle[]>([])
   const [loading, setLoading] = useState(true)
   const [searchQuery, setSearchQuery] = useState('')
-  const [filterStage, setFilterStage] = useState<string>('')
-  const [filterKind, setFilterKind] = useState<string>('')
-  const [filterVisibility, setFilterVisibility] = useState<string>('')
+  const [filterStage, setFilterStage] = useState<string>('all')
+  const [filterKind, setFilterKind] = useState<string>('all')
+  const [filterVisibility, setFilterVisibility] = useState<string>('all')
   const [selectedArticles, setSelectedArticles] = useState<string[]>([])
   const [bulkAction, setBulkAction] = useState<string>('')
   const [processing, setProcessing] = useState(false)
@@ -67,12 +67,17 @@ export default function KnowledgeListPage() {
     try {
       setLoading(true)
       const params = new URLSearchParams()
-      if (searchQuery) params.set('q', searchQuery)
-      if (filterStage) params.set('stage', filterStage)
-      if (filterKind) params.set('article_kind', filterKind)
-      if (filterVisibility) params.set('visibility', filterVisibility)
-      
-      const response = await apiGet(`/custom/knowledge?mode=search&${params}`)
+      if (filterStage && filterStage !== 'all') params.set('stage', filterStage)
+      if (filterKind && filterKind !== 'all') params.set('article_kind', filterKind)
+      if (filterVisibility && filterVisibility !== 'all') params.set('visibility', filterVisibility)
+
+      let response
+      if (searchQuery) {
+        params.set('q', searchQuery)
+        response = await apiGet(`/custom/knowledge?mode=search&${params}`)
+      } else {
+        response = await apiGet(`/custom/knowledge?mode=list&${params}`)
+      }
       setArticles(response)
     } catch (err) {
       console.error('Failed to load articles:', err)
@@ -233,7 +238,7 @@ export default function KnowledgeListPage() {
                 <SelectValue placeholder="Filter by stage" />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="">All Stages</SelectItem>
+                <SelectItem value="all">All Stages</SelectItem>
                 <SelectItem value="Draft">Draft</SelectItem>
                 <SelectItem value="Review">Review</SelectItem>
                 <SelectItem value="Published">Published</SelectItem>
@@ -246,7 +251,7 @@ export default function KnowledgeListPage() {
                 <SelectValue placeholder="Filter by type" />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="">All Types</SelectItem>
+                <SelectItem value="all">All Types</SelectItem>
                 {Object.entries(ARTICLE_KIND_LABELS).map(([value, label]) => (
                   <SelectItem key={value} value={value}>{label}</SelectItem>
                 ))}
@@ -258,7 +263,7 @@ export default function KnowledgeListPage() {
                 <SelectValue placeholder="Filter by visibility" />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="">All Visibility</SelectItem>
+                <SelectItem value="all">All Visibility</SelectItem>
                 <SelectItem value="member">Member</SelectItem>
                 <SelectItem value="operator">Operator</SelectItem>
                 <SelectItem value="admin">Admin</SelectItem>
@@ -325,9 +330,9 @@ export default function KnowledgeListPage() {
                 variant="outline"
                 onClick={() => {
                   setSearchQuery('')
-                  setFilterStage('')
-                  setFilterKind('')
-                  setFilterVisibility('')
+                  setFilterStage('all')
+                  setFilterKind('all')
+                  setFilterVisibility('all')
                 }}
               >
                 Clear Filters
