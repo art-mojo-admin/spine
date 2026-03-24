@@ -361,6 +361,10 @@ export function requireAuth(ctx: RequestContext): HandlerResult | null {
 }
 
 export function requireTenant(ctx: RequestContext): HandlerResult | null {
+  // System admins can access without tenant context
+  if (ctx.systemRole === 'system_admin') {
+    return null
+  }
   if (!ctx.accountId) {
     return error('Tenant context required', 403)
   }
