@@ -17,15 +17,17 @@ export default createHandler({
     const itemId = params.get('item_id')
     const visibility = params.get('visibility') || 'member'
 
+    const effectiveRole = ctx.systemRole === 'system_admin' ? 'admin' : (ctx.accountRole || 'member')
+
     try {
       switch (mode) {
         case 'list':
-          return await listArticles(ctx.accountId!, ctx.personId!, visibility)
+          return await listArticles(ctx.accountId!, effectiveRole)
         case 'detail':
           if (!itemId) return error('item_id required')
-          return await getArticle(ctx.accountId!, itemId, ctx.personId!)
+          return await getArticle(ctx.accountId!, itemId, effectiveRole)
         case 'search':
-          return await searchArticles(ctx.accountId!, ctx.personId!, params)
+          return await searchArticles(ctx.accountId!, effectiveRole, params)
         default:
           return error('Invalid mode')
       }
@@ -105,17 +107,7 @@ export default createHandler({
   },
 })
 
-async function listArticles(accountId: string, personId: string, visibility: string) {
-  // Get the caller's role to enforce visibility
-  const { data: caller } = await db
-    .from('memberships')
-    .select('account_role')
-    .eq('account_id', accountId)
-    .eq('person_id', personId)
-    .single()
-
-  const callerRole = caller?.account_role || 'member'
-  
+async function listArticles(accountId: string, callerRole: string) {
   // Build visibility filter based on caller role
   let visibilityFilter = ['member']
   if (callerRole === 'operator' || callerRole === 'admin') {
@@ -174,17 +166,7 @@ async function listArticles(accountId: string, personId: string, visibility: str
   return json(articles)
 }
 
-async function getArticle(accountId: string, itemId: string, personId: string) {
-  // Get the caller's role to enforce visibility
-  const { data: caller } = await db
-    .from('memberships')
-    .select('account_role')
-    .eq('account_id', accountId)
-    .eq('person_id', personId)
-    .single()
-
-  const callerRole = caller?.account_role || 'member'
-  
+async function getArticle(accountId: string, itemId: string, callerRole: string) {
   // Build visibility filter
   let visibilityFilter = ['member']
   if (callerRole === 'operator' || callerRole === 'admin') {
@@ -264,7 +246,7 @@ async function getArticle(accountId: string, itemId: string, personId: string) {
   return json(article)
 }
 
-async function searchArticles(accountId: string, personId: string, params: URLSearchParams) {
+async function searchArticles(accountId: string, callerRole: string, params: URLSearchParams) {
   const query = params.get('q')
   const articleKind = params.get('article_kind')
   const audience = params.get('audience')
@@ -272,16 +254,6 @@ async function searchArticles(accountId: string, personId: string, params: URLSe
 
   if (!query) return error('Search query required')
 
-  // Get the caller's role to enforce visibility
-  const { data: caller } = await db
-    .from('memberships')
-    .select('account_role')
-    .eq('account_id', accountId)
-    .eq('person_id', personId)
-    .single()
-
-  const callerRole = caller?.account_role || 'member'
-  
   // Build visibility filter
   let visibilityFilter = ['member']
   if (callerRole === 'operator' || callerRole === 'admin') {

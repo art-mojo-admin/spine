@@ -18,17 +18,19 @@ export default createHandler({
     const postKind = params.get('post_kind')
     const moderationStatus = params.get('moderation_status')
 
+    const effectiveRole = ctx.systemRole === 'system_admin' ? 'admin' : (ctx.accountRole || 'member')
+
     try {
       switch (mode) {
         case 'list':
           return await listPosts(ctx.accountId!, { postKind, moderationStatus })
         case 'detail':
           if (!itemId) return error('item_id required')
-          return await getPost(ctx.accountId!, ctx.personId!, itemId)
+          return await getPost(ctx.accountId!, ctx.personId!, itemId, effectiveRole)
         case 'my-posts':
           return await getMyPosts(ctx.accountId!, ctx.personId!)
         case 'moderation-queue':
-          return await getModerationQueue(ctx.accountId!, ctx.personId!)
+          return await getModerationQueue(ctx.accountId!, ctx.personId!, effectiveRole)
         default:
           return error('Invalid mode')
       }
@@ -59,7 +61,7 @@ export default createHandler({
     try {
       return await createPost(ctx.accountId!, ctx.personId!, body)
     } catch (err: any) {
-      return error(err.message || 'Post creation failed', 500)
+      return error(err.message || 'Post creation failed', 500)  
     }
   },
 
@@ -84,8 +86,9 @@ export default createHandler({
       moderation_action?: string
     }>(req)
 
+    const effectiveRole = ctx.systemRole === 'system_admin' ? 'admin' : (ctx.accountRole || 'member')
     try {
-      return await updatePost(ctx.accountId!, ctx.personId!, itemId, body)
+      return await updatePost(ctx.accountId!, ctx.personId!, itemId, body, effectiveRole)
     } catch (err: any) {
       return error(err.message || 'Post update failed', 500)
     }
@@ -100,8 +103,9 @@ export default createHandler({
     const itemId = params.get('item_id')
     if (!itemId) return error('item_id required')
 
+    const effectiveRole = ctx.systemRole === 'system_admin' ? 'admin' : (ctx.accountRole || 'member')
     try {
-      return await deletePost(ctx.accountId!, ctx.personId!, itemId)
+      return await deletePost(ctx.accountId!, ctx.personId!, itemId, effectiveRole)
     } catch (err: any) {
       return error(err.message || 'Post deletion failed', 500)
     }
@@ -180,7 +184,7 @@ async function listPosts(accountId: string, filters: { postKind?: string, modera
   return json(posts)
 }
 
-async function getPost(accountId: string, personId: string, itemId: string) {
+async function getPost(accountId: string, personId: string, itemId: string, callerRole: string) {
   const { data, error: dbErr } = await db
     .from('items')
     .select(`
@@ -238,14 +242,6 @@ async function getPost(accountId: string, personId: string, itemId: string) {
     .eq('link_type_id', (await db.from('link_type_registry').select('id').eq('slug', 'discusses').single()).data?.id)
 
   // Check if user can edit (owner or moderator)
-  const { data: caller } = await db
-    .from('memberships')
-    .select('account_role')
-    .eq('account_id', accountId)
-    .eq('person_id', personId)
-    .single()
-
-  const callerRole = caller?.account_role || 'member'
   const canEdit = data.created_by === personId || callerRole === 'admin' || callerRole === 'operator'
 
   const postDetail = {
@@ -314,16 +310,8 @@ async function getMyPosts(accountId: string, personId: string) {
   return json(posts)
 }
 
-async function getModerationQueue(accountId: string, personId: string) {
+async function getModerationQueue(accountId: string, personId: string, callerRole: string) {
   // Only operators and admins can see moderation queue
-  const { data: caller } = await db
-    .from('memberships')
-    .select('account_role')
-    .eq('account_id', accountId)
-    .eq('person_id', personId)
-    .single()
-
-  const callerRole = caller?.account_role || 'member'
   if (callerRole === 'member') {
     return error('Access denied', 403)
   }
@@ -470,7 +458,7 @@ async function createPost(accountId: string, personId: string, body: any) {
   return json(data, 201)
 }
 
-async function updatePost(accountId: string, personId: string, itemId: string, body: any) {
+async function updatePost(accountId: string, personId: string, itemId: string, body: any, callerRole: string) {
   // Get current post
   const { data: current, error: fetchErr } = await db
     .from('items')
@@ -483,14 +471,6 @@ async function updatePost(accountId: string, personId: string, itemId: string, b
   if (!current) return error('Post not found', 404)
 
   // Check permissions for moderation actions
-  const { data: caller } = await db
-    .from('memberships')
-    .select('account_role')
-    .eq('account_id', accountId)
-    .eq('person_id', personId)
-    .single()
-
-  const callerRole = caller?.account_role || 'member'
   const isModerator = callerRole === 'admin' || callerRole === 'operator'
   const isOwner = current.created_by === personId
 
@@ -576,7 +556,7 @@ async function updatePost(accountId: string, personId: string, itemId: string, b
   return json(data)
 }
 
-async function deletePost(accountId: string, personId: string, itemId: string) {
+async function deletePost(accountId: string, personId: string, itemId: string, callerRole: string) {
   const { data: current, error: fetchErr } = await db
     .from('items')
     .select('*')
@@ -588,14 +568,6 @@ async function deletePost(accountId: string, personId: string, itemId: string) {
   if (!current) return error('Post not found', 404)
 
   // Check permissions (owner or moderator)
-  const { data: caller } = await db
-    .from('memberships')
-    .select('account_role')
-    .eq('account_id', accountId)
-    .eq('person_id', personId)
-    .single()
-
-  const callerRole = caller?.account_role || 'member'
   if (current.created_by !== personId && callerRole === 'member') {
     return error('Access denied', 403)
   }
