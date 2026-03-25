@@ -32,6 +32,11 @@
   status = 200
 
 [[redirects]]
+  from = "/custom/support/:item_id/message"
+  to = "/.netlify/functions/support-message?item_id=:item_id"
+  status = 200
+
+[[redirects]]
   from = "/*"
   to = "/index.html"
   status = 200
