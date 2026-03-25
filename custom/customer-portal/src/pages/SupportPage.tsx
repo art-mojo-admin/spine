@@ -74,7 +74,7 @@ export default function SupportPage() {
     try {
       setSchemaLoading(true)
       // Fetch the real support_case schema from the public API
-      const response = await apiGet('/api/item-schemas?type=support_case')
+      const response = await apiGet('/item-schemas?type=support_case')
       
       if (response?.schema) {
         // Transform the schema to include base fields (title, description) + custom fields
