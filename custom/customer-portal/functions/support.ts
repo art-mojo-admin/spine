@@ -159,12 +159,11 @@ async function getCase(accountId: string, personId: string, itemId: string, call
       id,
       title,
       description,
-      status,
       metadata,
-      custom_fields,
+      is_active,
       created_at,
       updated_at,
-      created_by
+      created_by_principal_id
     `)
     .eq('account_id', accountId)
     .eq('item_type', 'support_case')
@@ -176,13 +175,11 @@ async function getCase(accountId: string, personId: string, itemId: string, call
   if (!data) return error('Case not found', 404)
 
   // Check access permissions
-  if (callerRole === 'member' && data.created_by !== personId) {
+  if (callerRole === 'member' && data.created_by_principal_id !== personId) {
     return error('Access denied', 403)
   }
 
-  // Get metadata
-  const metadata = data.metadata || {}
-
+  
   // Get thread/conversation
   const { data: thread } = await db
     .from('threads')
@@ -220,8 +217,8 @@ async function getCase(accountId: string, personId: string, itemId: string, call
     id: data.id,
     title: data.title,
     description: data.description,
-    metadata,
-    status: metadata.workflow_status || 'open',
+    metadata: data.metadata,
+    status: data.metadata?.workflow_status || 'open',
     created_at: data.created_at,
     updated_at: data.updated_at,
     created_by_principal_id: data.created_by_principal_id,
