@@ -10,7 +10,7 @@ import { Badge } from '../components/ui/badge'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../components/ui/select'
 import { MessageCircle, Bot, Send, AlertCircle, CheckCircle, Clock } from 'lucide-react'
 import { cn } from '../lib/utils'
-import { FormRenderer, type ItemTypeSchema } from '../components/ui/FieldRenderer'
+import { FieldRenderer, type ItemTypeSchema } from '@/components/shared/FieldRenderer'
 
 interface SupportCase {
   id: string
@@ -278,12 +278,12 @@ export default function SupportPage() {
               </div>
             ) : schema ? (
               <form onSubmit={handleSubmitCase} className="space-y-4">
-                <FormRenderer
+                <FieldRenderer
                   schema={schema}
                   data={newCase}
-                  userRole={profile?.system_role === 'system_admin' ? 'admin' : 'member'}
+                  userRole="portal"
                   editing={true}
-                  onChange={(field, value) => setNewCase({ ...newCase, [field]: value })}
+                  onChange={(data) => setNewCase(data)}
                 />
 
                 <div className="flex gap-2">
