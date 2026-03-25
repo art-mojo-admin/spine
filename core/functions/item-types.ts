@@ -13,7 +13,7 @@ export default createHandler({
     const { data, error: dbErr } = await db
       .from('item_type_registry')
       .select('*')
-      .order('is_system', { ascending: false })
+      .order('is_active', { ascending: false })
       .order('label')
 
     if (dbErr) return error(dbErr.message, 500)

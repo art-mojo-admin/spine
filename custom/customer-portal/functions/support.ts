@@ -246,43 +246,31 @@ async function getSupportQueue(accountId: string, personId: string, callerRole: 
       title,
       description,
       metadata,
-      status,
-      stage_definition_id,
+      is_active,
       created_at,
       updated_at,
-      created_by,
-      stage_definitions!inner(name),
-      field_values!inner(field_key, value),
-      persons!inner(full_name, email)
+      created_by_principal_id
     `)
     .eq('account_id', accountId)
-    .eq('item_type_id', (await db.from('item_type_registry').select('id').eq('slug', 'support_case').single()).data?.id)
-    .eq('status', 'active')
-    .in('stage_definitions.name', ['Open', 'AI Attempt', 'Escalated', 'In Progress'])
+    .eq('item_type', 'support_case')
+    .eq('is_active', true)
     .order('created_at', { ascending: false })
 
   if (dbErr) throw dbErr
 
-  // Transform field values
+  // Transform items for response
   const queue = (data || []).map(item => {
     const metadata = item.metadata || {}
-    const fieldValues = item.field_values || []
-    
-    fieldValues.forEach((fv: any) => {
-      metadata[fv.field_key] = fv.value
-    })
 
     return {
       id: item.id,
       title: item.title,
       description: item.description,
       metadata,
-      status: item.status,
-      stage: (item.stage_definitions as any)?.name,
+      status: metadata.workflow_status || 'open',
       created_at: item.created_at,
       updated_at: item.updated_at,
-      created_by: item.created_by,
-      creator: item.persons,
+      created_by_principal_id: item.created_by_principal_id,
     }
   })
 
@@ -297,39 +285,32 @@ async function getMyCases(accountId: string, personId: string) {
       title,
       description,
       metadata,
-      status,
-      stage_definition_id,
+      is_active,
       created_at,
       updated_at,
-      stage_definitions!inner(name),
-      field_values!inner(field_key, value)
+      created_by_principal_id
     `)
     .eq('account_id', accountId)
-    .eq('item_type_id', (await db.from('item_type_registry').select('id').eq('slug', 'support_case').single()).data?.id)
-    .eq('status', 'active')
-    .eq('created_by', personId)
+    .eq('item_type', 'support_case')
+    .eq('is_active', true)
+    .eq('created_by_principal_id', personId)
     .order('updated_at', { ascending: false })
 
   if (dbErr) throw dbErr
 
-  // Transform field values
+  // Transform items for response
   const cases = (data || []).map(item => {
     const metadata = item.metadata || {}
-    const fieldValues = item.field_values || []
-    
-    fieldValues.forEach((fv: any) => {
-      metadata[fv.field_key] = fv.value
-    })
 
     return {
       id: item.id,
       title: item.title,
       description: item.description,
       metadata,
-      status: item.status,
-      stage: (item.stage_definitions as any)?.name,
+      status: metadata.workflow_status || 'open',
       created_at: item.created_at,
       updated_at: item.updated_at,
+      created_by_principal_id: item.created_by_principal_id,
     }
   })
 
