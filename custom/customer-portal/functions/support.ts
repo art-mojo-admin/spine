@@ -48,9 +48,12 @@ export default createHandler({
     if (tenantCheck) return tenantCheck
 
     // Check if this is a message post to an existing case
-    const itemId = params.get('item_id')
-    if (itemId) {
-      return await postMessage(ctx.accountId!, ctx.personId!, itemId, await parseBody(req))
+    // URL path: /.netlify/functions/support/{item_id}/message
+    const pathParts = new URL(req.url).pathname.split('/').filter(Boolean)
+    const fnIdx = pathParts.indexOf('support')
+    const itemIdFromPath = (fnIdx !== -1 && pathParts[fnIdx + 2] === 'message') ? pathParts[fnIdx + 1] : null
+    if (itemIdFromPath) {
+      return await postMessage(ctx.accountId!, ctx.personId!, itemIdFromPath, await parseBody(req))
     }
 
     // Otherwise, it's a new case creation
