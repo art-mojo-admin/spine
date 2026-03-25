@@ -1,7 +1,7 @@
-import { createHandler, requireAuth, requireTenant, json, error, parseBody, type RequestContext } from '../../../core/functions/_shared/middleware'
-import { db } from '../../../core/functions/_shared/db'
-import { emitAudit, emitActivity } from '../../../core/functions/_shared/audit'
-import { ItemsDAL, type ItemTypeSchema } from '../../../core/functions/_shared/items-dal'
+import { createHandler, requireAuth, requireTenant, json, error, parseBody, type RequestContext } from '../../_shared/middleware'
+import { db } from '../../_shared/db'
+import { emitAudit, emitActivity } from '../../_shared/audit'
+import { ItemsDAL, type ItemTypeSchema } from '../../_shared/items-dal'
 
 function makeCtx(accountId: string, personId: string): RequestContext {
   return { requestId: '', personId, accountId, accountNodeId: null, accountRole: null, principalScopes: [], systemRole: null, authUid: null, impersonating: false, realPersonId: null, impersonationSessionId: null }
@@ -180,13 +180,8 @@ async function getCase(accountId: string, personId: string, itemId: string, call
     return error('Access denied', 403)
   }
 
-  // Transform field values
+  // Get metadata
   const metadata = data.metadata || {}
-  const fieldValues = data.field_values || []
-  
-  fieldValues.forEach((fv: any) => {
-    metadata[fv.field_key] = fv.value
-  })
 
   // Get thread/conversation
   const { data: thread } = await db
@@ -216,7 +211,7 @@ async function getCase(accountId: string, personId: string, itemId: string, call
     .from('item_links')
     .select(`
       target_item_id,
-      items!inner(title, description, metadata, stage_definitions!inner(name))
+      items!inner(title, description, metadata)
     `)
     .eq('source_item_id', itemId)
     .eq('link_type_id', (await db.from('link_type_registry').select('id').eq('slug', 'resulted_in').single()).data?.id)
@@ -226,11 +221,10 @@ async function getCase(accountId: string, personId: string, itemId: string, call
     title: data.title,
     description: data.description,
     metadata,
-    status: data.status,
-    stage: (data.stage_definitions as any)?.name,
+    status: metadata.workflow_status || 'open',
     created_at: data.created_at,
     updated_at: data.updated_at,
-    created_by: data.created_by,
+    created_by_principal_id: data.created_by_principal_id,
     thread: thread || null,
     referenced_articles: references || [],
     resulted_in_articles: resultedIn || [],
@@ -357,9 +351,9 @@ async function createCase(accountId: string, personId: string, body: any, caller
   }
 
   // Validate and sanitize input data
-  const validatedData = ItemsDAL.validateUpdateData(body, {}, schema, callerRole)
-  if (!validatedData) {
-    return error('Invalid data provided', 400)
+  const validation = ItemsDAL.validateUpdateData(body, {}, schema, callerRole)
+  if (!validation.valid) {
+    return error(validation.error || 'Invalid data provided', 400)
   }
 
   // Get workflow and item type
@@ -374,9 +368,9 @@ async function createCase(accountId: string, personId: string, body: any, caller
   // Map fields to metadata according to schema
   const metadata = {
     workflow_status: 'open',
-    priority: validatedData.priority || 'medium',
-    category: validatedData.category || 'general',
-    tags: validatedData.tags || [],
+    priority: body.priority || 'medium',
+    category: body.category || 'general',
+    tags: body.tags || [],
     ai_attempted: false, // Portal users can't set this
   }
 
@@ -386,8 +380,8 @@ async function createCase(accountId: string, personId: string, body: any, caller
       account_id: accountId,
       item_type: 'support_case',
       workflow_definition_id: workflowId,
-      title: validatedData.title,
-      description: validatedData.description,
+      title: body.title,
+      description: body.description,
       is_active: true,
       metadata: metadata,
       created_by_principal_id: personId,
