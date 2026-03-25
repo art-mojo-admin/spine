@@ -1,7 +1,7 @@
-import { createHandler, requireAuth, requireTenant, json, error, parseBody, type RequestContext } from '../../core/functions/_shared/middleware'
-import { db } from '../../core/functions/_shared/db'
-import { emitAudit, emitActivity } from '../../core/functions/_shared/audit'
-import { ItemsDAL, type ItemTypeSchema } from '../../core/functions/_shared/items-dal'
+import { createHandler, requireAuth, requireTenant, json, error, parseBody, type RequestContext } from '../../../core/functions/_shared/middleware'
+import { db } from '../../../core/functions/_shared/db'
+import { emitAudit, emitActivity } from '../../../core/functions/_shared/audit'
+import { ItemsDAL, type ItemTypeSchema } from '../../../core/functions/_shared/items-dal'
 
 function makeCtx(accountId: string, personId: string): RequestContext {
   return { requestId: '', personId, accountId, accountNodeId: null, accountRole: null, principalScopes: [], systemRole: null, authUid: null, impersonating: false, realPersonId: null, impersonationSessionId: null }
@@ -81,7 +81,7 @@ export default createHandler({
       title?: string
       description?: string
       priority?: string
-      stage?: string
+      status?: string
       ai_confidence_score?: number
       escalation_reason?: string
       ai_summary?: string
@@ -107,11 +107,9 @@ async function listCases(accountId: string, personId: string, filters: { status?
       title,
       description,
       metadata,
-      custom_fields,
-      status,
       created_at,
       updated_at,
-      created_by
+      created_by_principal_id
     `)
     .eq('account_id', accountId)
     .eq('item_type', 'support_case')
@@ -119,15 +117,15 @@ async function listCases(accountId: string, personId: string, filters: { status?
 
   // Members can only see their own cases
   if (callerRole === 'member') {
-    query = query.eq('created_by', personId)
+    query = query.eq('created_by_principal_id', personId)
   }
 
   // Apply filters
   if (filters.status) {
-    query = query.eq('status', filters.status)
+    query = query.contains('metadata', { workflow_status: filters.status })
   }
   if (filters.priority) {
-    query = query.contains('custom_fields', { priority: filters.priority })
+    query = query.contains('metadata', { priority: filters.priority })
   }
 
   const { data, error: dbErr } = await query
@@ -137,21 +135,16 @@ async function listCases(accountId: string, personId: string, filters: { status?
   // Transform to v2 format
   const cases = (data || []).map(item => {
     const metadata = item.metadata || {}
-    const customFields = item.custom_fields || {}
-    
-    // Merge custom fields into metadata for backward compatibility
-    const mergedMetadata = { ...metadata, ...customFields }
 
     return {
       id: item.id,
       title: item.title,
       description: item.description,
-      metadata: mergedMetadata,
-      status: item.status,
-      stage: item.status, // status replaces stage
+      metadata: metadata,
+      status: metadata.workflow_status || 'open',
       created_at: item.created_at,
       updated_at: item.updated_at,
-      created_by: item.created_by,
+      created_by_principal_id: item.created_by_principal_id,
     }
   })
 
@@ -369,39 +362,35 @@ async function createCase(accountId: string, personId: string, body: any, caller
     return error('Invalid data provided', 400)
   }
 
-  // Get item type and initial stage
+  // Get workflow and item type
   const { data: itemType } = await db
     .from('item_type_registry')
-    .select('id')
+    .select('id, default_workflow_id')
     .eq('slug', 'support_case')
     .single()
 
-  const { data: openStage } = await db
-    .from('stage_definitions')
-    .select('id')
-    .eq('name', 'Open')
-    .eq('workflow_definition_id', (await db.from('workflow_definitions').select('id').eq('name', 'Support Case Lifecycle').eq('account_id', accountId).single()).data?.id)
-    .single()
+  const workflowId = itemType?.default_workflow_id
 
-  // Sanitize metadata according to schema
-  const sanitizedMetadata = ItemsDAL.sanitizeItemData({
-    priority: validatedData.priority,
-    category: validatedData.category,
+  // Map fields to metadata according to schema
+  const metadata = {
+    workflow_status: 'open',
+    priority: validatedData.priority || 'medium',
+    category: validatedData.category || 'general',
     tags: validatedData.tags || [],
-    ai_attempted: validatedData.ai_attempted || false,
-  }, schema, callerRole)
+    ai_attempted: false, // Portal users can't set this
+  }
 
   const { data, error: dbErr } = await db
     .from('items')
     .insert({
       account_id: accountId,
       item_type: 'support_case',
-      workflow_definition_id: (await db.from('workflow_definitions').select('id').eq('name', 'Support Case Lifecycle').eq('account_id', accountId).single()).data?.id,
+      workflow_definition_id: workflowId,
       title: validatedData.title,
       description: validatedData.description,
-      status: 'open',
+      is_active: true,
+      metadata: metadata,
       created_by_principal_id: personId,
-      custom_fields: sanitizedMetadata,
     })
     .select()
     .single()
@@ -456,24 +445,24 @@ async function updateCase(accountId: string, personId: string, itemId: string, b
 
   // Prepare update data
   const updateData: any = {}
-  const customFields = { ...current.custom_fields }
+  const metadata = { ...current.metadata }
 
   if (body.title) updateData.title = body.title
   if (body.description) updateData.description = body.description
-  if (body.priority) customFields.priority = body.priority
-  if (body.ai_confidence_score !== undefined) customFields.ai_confidence_score = body.ai_confidence_score
-  if (body.escalation_reason) customFields.escalation_reason = body.escalation_reason
-  if (body.ai_summary) customFields.ai_summary = body.ai_summary
-  if (body.resolution_kind) customFields.resolution_kind = body.resolution_kind
-  if (body.resolution_notes) customFields.resolution_notes = body.resolution_notes
+  if (body.priority) metadata.priority = body.priority
+  if (body.ai_confidence_score !== undefined) metadata.ai_confidence_score = body.ai_confidence_score
+  if (body.escalation_reason) metadata.escalation_reason = body.escalation_reason
+  if (body.ai_summary) metadata.ai_summary = body.ai_summary
+  if (body.resolution_kind) metadata.resolution_kind = body.resolution_kind
+  if (body.resolution_notes) metadata.resolution_notes = body.resolution_notes
 
-  updateData.custom_fields = customFields
-  updateData.updated_at = new Date().toISOString()
-
-  // Handle status transitions
+  // Handle workflow status transitions
   if (body.status) {
-    updateData.status = body.status
+    metadata.workflow_status = body.status
   }
+
+  updateData.metadata = metadata
+  updateData.updated_at = new Date().toISOString()
 
   const { data, error: dbErr } = await db
     .from('items')

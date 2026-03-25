@@ -23,11 +23,6 @@ export default createHandler({
             principal_type,
             display_name,
             status
-          ),
-          owner_accounts:owner_account_id (
-            id,
-            display_name,
-            account_type
           )
         `)
         .eq('id', id)
@@ -57,11 +52,6 @@ export default createHandler({
           principal_type,
           display_name,
           status
-        ),
-        owner_accounts:owner_account_id (
-          id,
-          display_name,
-          account_type
         )
       `)
       .eq('account_id', ctx.accountId)
@@ -77,14 +67,12 @@ export default createHandler({
     }
     if (status) {
       if (status.includes(',')) {
-        query = query.in('status', status.split(',').map(s => s.trim()))
+        query = query.contains('metadata', { workflow_status: status.split(',').map(s => s.trim()) })
       } else {
-        query = query.eq('status', status)
+        query = query.contains('metadata', { workflow_status: status })
       }
     }
-    if (parentId === 'null') query = query.is('parent_item_id', null)
-    else if (parentId) query = query.eq('parent_item_id', parentId)
-
+    
     const { data } = await query.limit(200)
     
     if (data && itemType && !itemType.includes(',')) {
@@ -126,20 +114,26 @@ export default createHandler({
       .eq('person_id', ctx.personId)
       .single()
 
+    // Merge all field data into metadata
+    const itemMetadata = {
+      ...body.metadata,
+      ...body.custom_fields,
+      workflow_status: body.workflow_status || 'open',
+      // Add any other custom fields from body
+    }
+
     const { data, error: dbErr } = await db
       .from('items')
       .insert({
         account_id: ctx.accountId,
+        app_id: body.app_id || null,
         item_type: body.item_type,
         slug: body.slug || null,
         title: body.title,
-        status: body.status || 'active',
         description: body.description || null,
-        metadata: body.metadata || {},
-        parent_item_id: body.parent_item_id || null,
-        owner_account_id: body.owner_account_id || ctx.accountId,
+        is_active: body.is_active !== false,
+        metadata: itemMetadata,
         created_by_principal_id: principal?.id,
-        custom_fields: body.custom_fields || {},
       })
       .select()
       .single()
@@ -186,32 +180,25 @@ export default createHandler({
 
     const body = await parseBody<any>(req)
     
-    if (schema && body.data) {
-      const validation = ItemsDAL.validateUpdateData(body.data, before.data, schema, ctx.accountRole)
+    if (schema && body.metadata) {
+      const validation = ItemsDAL.validateUpdateData(body.metadata, before.metadata, schema, ctx.accountRole)
       if (!validation.valid) {
         return error(validation.error || 'Invalid update payload', 400)
       }
     }
 
-    // Version check for optimistic locking
-    if (body.version !== undefined && body.version !== before.version) {
-      return error('Version conflict - item has been modified', 409)
-    }
-
-    const updates: Record<string, any> = {
-      version: (before.version || 1) + 1, // Increment version
-    }
+    const updates: Record<string, any> = {}
     
+    // Handle base fields (title, description)
     if (body.title !== undefined) updates.title = body.title
-    if (body.slug !== undefined) updates.slug = body.slug
     if (body.description !== undefined) updates.description = body.description
-    if (body.status !== undefined) updates.status = body.status
-    if (body.archived_at !== undefined) updates.archived_at = body.archived_at
-    if (body.metadata !== undefined) updates.metadata = body.metadata
-    if (body.data !== undefined) updates.data = body.data
-    if (body.parent_item_id !== undefined) updates.parent_item_id = body.parent_item_id
-    if (body.custom_fields !== undefined) updates.custom_fields = body.custom_fields
-    if (body.owner_account_id !== undefined) updates.owner_account_id = body.owner_account_id
+    if (body.is_active !== undefined) updates.is_active = body.is_active
+    
+    // Merge metadata updates
+    if (body.metadata) {
+      updates.metadata = { ...before.metadata, ...body.metadata }
+    }
+    if (body.slug !== undefined) updates.slug = body.slug
 
     // Resolve updating principal
     const { data: principal } = await db

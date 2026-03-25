@@ -67,8 +67,6 @@ async function processKBImprovement(accountId: string, personId: string, body: a
       title,
       description,
       metadata,
-      custom_fields,
-      status,
       created_at
     `)
     .eq('account_id', accountId)
@@ -90,11 +88,11 @@ async function processKBImprovement(accountId: string, personId: string, body: a
     return error('Access denied', 403)
   }
 
-  // Extract case metadata (merge custom_fields for backward compatibility)
-  const metadata = { ...supportCase.metadata, ...supportCase.custom_fields }
+  // Extract case metadata
+  const metadata = supportCase.metadata || {}
 
   // Check if case is resolved
-  const isResolved = supportCase.status === 'resolved'
+  const isResolved = metadata.workflow_status === 'resolved'
 
   if (!isResolved) {
     return error('Case must be resolved before creating KB content', 400)

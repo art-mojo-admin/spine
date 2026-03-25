@@ -16,13 +16,15 @@ interface SupportCase {
   id: string
   title: string
   description: string
-  metadata: {
+  custom_fields: {
     priority: string
     ai_confidence_score?: number
     escalation_reason?: string
     ai_summary?: string
+    category?: string
+    tags?: string[]
   }
-  stage: string
+  status: string
   created_at: string
   updated_at: string
 }
@@ -68,41 +70,45 @@ export default function SupportPage() {
   const loadSchema = async () => {
     try {
       setSchemaLoading(true)
-      // In a real implementation, this would fetch from the API
-      // For now, we'll use a mock schema that matches the support_case item type
-      const mockSchema: ItemTypeSchema = {
-        record_permissions: {
-          member: { create: true, read: "all", update: "own", delete: "soft" },
-          admin: { create: true, read: "all", update: "all", delete: "all" }
-        },
-        fields: {
-          title: {
-            type: "text",
-            required: true
-          },
-          description: {
-            type: "textarea",
-            required: true
-          },
-          priority: {
-            type: "select",
-            options: ["low", "medium", "high", "urgent"],
-            required: true
-          },
-          category: {
-            type: "select",
-            options: ["technical", "billing", "feature", "general"],
-            required: false
-          },
-          tags: {
-            type: "array",
-            required: false
+      // Fetch the real support_case schema from the API
+      const response = await apiGet('/core/admin-types?mode=registry&include_system=true')
+      const supportCaseType = response.find((type: any) => type.slug === 'support_case')
+      
+      if (supportCaseType?.schema) {
+        // Transform the schema to include base fields (title, description) + custom fields
+        const transformedSchema: ItemTypeSchema = {
+          ...supportCaseType.schema,
+          fields: {
+            title: {
+              type: "text",
+              required: true
+            },
+            description: {
+              type: "textarea", 
+              required: true
+            },
+            ...supportCaseType.schema.fields
           }
         }
+        setSchema(transformedSchema)
+      } else {
+        throw new Error('Support case schema not found')
       }
-      setSchema(mockSchema)
     } catch (err) {
       console.error('Failed to load schema:', err)
+      // Fallback to minimal schema
+      setSchema({
+        record_permissions: {
+          portal: { create: true, read: "own", update: "own", delete: false }
+        },
+        fields: {
+          title: { type: "text", required: true },
+          description: { type: "textarea", required: true },
+          priority: { type: "select", options: ["low", "medium", "high", "urgent"], required: true },
+          category: { type: "select", options: ["general", "bug", "feature", "question", "incident"], required: false },
+          tags: { type: "array", required: false }
+        }
+      })
     } finally {
       setSchemaLoading(false)
     }
@@ -182,14 +188,14 @@ export default function SupportPage() {
     }
   }
 
-  const getStageIcon = (stage: string) => {
-    switch (stage) {
-      case 'Open': return <MessageCircle className="h-4 w-4" />
-      case 'AI Attempt': return <Bot className="h-4 w-4" />
-      case 'Escalated': return <AlertCircle className="h-4 w-4" />
-      case 'In Progress': return <Clock className="h-4 w-4" />
-      case 'Resolved': return <CheckCircle className="h-4 w-4" />
-      case 'Closed': return <CheckCircle className="h-4 w-4" />
+  const getStageIcon = (status: string) => {
+    switch (status) {
+      case 'open': return <MessageCircle className="h-4 w-4" />
+      case 'ai_attempt': return <Bot className="h-4 w-4" />
+      case 'escalated': return <AlertCircle className="h-4 w-4" />
+      case 'in_progress': return <Clock className="h-4 w-4" />
+      case 'resolved': return <CheckCircle className="h-4 w-4" />
+      case 'closed': return <CheckCircle className="h-4 w-4" />
       default: return <MessageCircle className="h-4 w-4" />
     }
   }
@@ -333,15 +339,15 @@ export default function SupportPage() {
                   <div className="flex items-start justify-between mb-2">
                     <div className="flex-1">
                       <div className="flex items-center gap-2 mb-2">
-                        {getStageIcon(case_.stage)}
+                        {getStageIcon(case_.status)}
                         <Link
                           to={`/customer-portal/support/cases/${case_.id}`}
                           className="font-medium hover:text-primary transition-colors"
                         >
                           {case_.title}
                         </Link>
-                        <Badge variant={getPriorityColor(case_.metadata.priority)}>
-                          {case_.metadata.priority}
+                        <Badge variant={getPriorityColor(case_.custom_fields.priority)}>
+                          {case_.custom_fields.priority}
                         </Badge>
                       </div>
                       <p className="text-sm text-muted-foreground mb-2 line-clamp-2">
@@ -349,34 +355,34 @@ export default function SupportPage() {
                       </p>
                     </div>
                     <div className="text-right text-sm text-muted-foreground">
-                      <div>{case_.stage}</div>
+                      <div>{case_.status}</div>
                       <div>{new Date(case_.updated_at).toLocaleDateString()}</div>
                     </div>
                   </div>
 
                   {/* AI Response Summary */}
-                  {case_.metadata.ai_summary && (
+                  {case_.custom_fields.ai_summary && (
                     <div className="mt-3 p-3 bg-blue-50 dark:bg-blue-950/20 rounded border border-blue-200 dark:border-blue-800">
                       <div className="flex items-center gap-2 mb-1">
                         <Bot className="h-4 w-4 text-blue-600" />
                         <span className="text-sm font-medium text-blue-800 dark:text-blue-200">AI Response</span>
-                        {case_.metadata.ai_confidence_score && (
+                        {case_.custom_fields.ai_confidence_score && (
                           <Badge variant="secondary" className="text-xs">
-                            {Math.round(case_.metadata.ai_confidence_score * 100)}% confidence
+                            {Math.round(case_.custom_fields.ai_confidence_score * 100)}% confidence
                           </Badge>
                         )}
                       </div>
                       <p className="text-sm text-blue-700 dark:text-blue-300 line-clamp-2">
-                        {case_.metadata.ai_summary}
+                        {case_.custom_fields.ai_summary}
                       </p>
                     </div>
                   )}
 
                   {/* Escalation Reason */}
-                  {case_.metadata.escalation_reason && (
+                  {case_.custom_fields.escalation_reason && (
                     <div className="mt-2">
                       <Badge variant="destructive" className="text-xs">
-                        Escalated: {case_.metadata.escalation_reason.replace(/_/g, ' ')}
+                        Escalated: {case_.custom_fields.escalation_reason.replace(/_/g, ' ')}
                       </Badge>
                     </div>
                   )}
