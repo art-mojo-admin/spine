@@ -379,9 +379,9 @@ async function createCase(accountId: string, personId: string, body: any, caller
       account_id: accountId,
       target_type: 'item',
       target_id: data.id,
-      status: 'active',
-      visibility: 'private',
-      created_by: personId,
+      thread_type: 'support',
+      status: 'open',
+      visibility: 'portal',
     })
     .select()
     .single()
@@ -390,12 +390,19 @@ async function createCase(accountId: string, personId: string, body: any, caller
   await db
     .from('messages')
     .insert({
-      account_id: accountId,
       thread_id: thread?.id,
-      content: body.description,
+      person_id: personId,
+      actor_principal_id: personId,
+      body: body.description,
       direction: 'inbound',
       sequence: 1,
-      created_by: personId,
+      visibility: 'portal',
+      content_type: 'text/plain',
+      is_active: true,
+      metadata: {},
+      attachments: [],
+      reactions: [],
+      edit_history: [],
     })
 
   await emitAudit(makeCtx(accountId, personId), 'create', 'item', data.id, null, data)
@@ -502,7 +509,7 @@ async function postMessage(ctx: any, itemId: string, body: any) {
     .eq('target_id', itemId)
     .eq('account_id', accountId)
     .eq('is_active', true)
-    .single()
+    .maybeSingle()
 
   // Create thread if it doesn't exist
   if (!thread) {
@@ -512,9 +519,9 @@ async function postMessage(ctx: any, itemId: string, body: any) {
         account_id: accountId,
         target_type: 'item',
         target_id: itemId,
-        thread_type: 'conversation',
-        visibility: 'private',
-        status: 'active',
+        thread_type: 'support',
+        visibility: 'portal',
+        status: 'open',
         is_active: true,
       })
       .select()
