@@ -53,7 +53,7 @@ export default createHandler({
     const fnIdx = pathParts.indexOf('support')
     const itemIdFromPath = (fnIdx !== -1 && pathParts[fnIdx + 2] === 'message') ? pathParts[fnIdx + 1] : null
     if (itemIdFromPath) {
-      return await postMessage(ctx.accountId!, ctx.personId!, itemIdFromPath, await parseBody(req))
+      return await postMessage(ctx, itemIdFromPath, await parseBody(req))
     }
 
     // Otherwise, it's a new case creation
@@ -466,7 +466,10 @@ async function updateCase(accountId: string, personId: string, itemId: string, b
   return json(data)
 }
 
-async function postMessage(accountId: string, personId: string, itemId: string, body: any) {
+async function postMessage(ctx: any, itemId: string, body: any) {
+  const accountId = ctx.accountId!
+  const personId = ctx.personId!
+
   // Validate input
   if (!body.content || !body.direction) {
     return error('content and direction required')
@@ -513,7 +516,6 @@ async function postMessage(accountId: string, personId: string, itemId: string, 
         visibility: 'private',
         status: 'active',
         is_active: true,
-        created_by: personId,
       })
       .select()
       .single()
@@ -538,15 +540,19 @@ async function postMessage(accountId: string, personId: string, itemId: string, 
   const { data: message, error: messageErr } = await db
     .from('messages')
     .insert({
-      account_id: accountId,
       thread_id: thread.id,
       person_id: personId,
-      content: body.content,
+      actor_principal_id: personId,
+      body: body.content,
       direction: body.direction,
       sequence: nextSequence,
       visibility: 'private',
+      content_type: 'text/plain',
       is_active: true,
-      created_by: personId,
+      metadata: {},
+      attachments: [],
+      reactions: [],
+      edit_history: [],
     })
     .select()
     .single()
@@ -555,7 +561,7 @@ async function postMessage(accountId: string, personId: string, itemId: string, 
 
   // Emit activity
   await emitActivity(
-    makeCtx(accountId, personId), 
+    ctx, 
     'support.message_posted', 
     `Posted message to support case`, 
     'item', 
