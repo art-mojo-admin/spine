@@ -1,4 +1,4 @@
-import { createHandler, requireAuth, requireTenant, json, error, parseBody, makeCtx } from '../../core/functions/_shared/middleware'
+import { createHandler, requireAuth, requireTenant, json, error, parseBody } from '../../core/functions/_shared/middleware'
 import { db } from '../../core/functions/_shared/db'
 import { emitActivity } from '../../core/functions/_shared/audit'
 
@@ -104,7 +104,7 @@ export default createHandler({
 
     // Emit activity
     await emitActivity(
-      makeCtx(ctx.accountId, ctx.personId), 
+      ctx, 
       'support.message_posted', 
       `Posted message to support case`, 
       'item', 
