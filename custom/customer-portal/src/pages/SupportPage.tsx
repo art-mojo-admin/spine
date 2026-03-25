@@ -16,17 +16,20 @@ interface SupportCase {
   id: string
   title: string
   description: string
-  custom_fields: {
-    priority: string
+  metadata: {
+    priority?: string
     ai_confidence_score?: number
     escalation_reason?: string
     ai_summary?: string
     category?: string
     tags?: string[]
+    workflow_status?: string
+    ai_attempted?: boolean
   }
   status: string
   created_at: string
   updated_at: string
+  created_by_principal_id?: string
 }
 
 interface AIResponse {
@@ -71,7 +74,7 @@ export default function SupportPage() {
     try {
       setSchemaLoading(true)
       // Fetch the real support_case schema from the API
-      const response = await apiGet('/core/admin-types?mode=registry&include_system=true')
+      const response = await apiGet('/api/item-types')
       const supportCaseType = response.find((type: any) => type.slug === 'support_case')
       
       if (supportCaseType?.schema) {
@@ -339,15 +342,15 @@ export default function SupportPage() {
                   <div className="flex items-start justify-between mb-2">
                     <div className="flex-1">
                       <div className="flex items-center gap-2 mb-2">
-                        {getStageIcon(case_.status)}
+                        {getStageIcon(case_.metadata.workflow_status || case_.status)}
                         <Link
                           to={`/customer-portal/support/cases/${case_.id}`}
                           className="font-medium hover:text-primary transition-colors"
                         >
                           {case_.title}
                         </Link>
-                        <Badge variant={getPriorityColor(case_.custom_fields.priority)}>
-                          {case_.custom_fields.priority}
+                        <Badge variant={getPriorityColor(case_.metadata.priority)}>
+                          {case_.metadata.priority}
                         </Badge>
                       </div>
                       <p className="text-sm text-muted-foreground mb-2 line-clamp-2">
@@ -355,34 +358,34 @@ export default function SupportPage() {
                       </p>
                     </div>
                     <div className="text-right text-sm text-muted-foreground">
-                      <div>{case_.status}</div>
+                      <div>{case_.metadata.workflow_status || case_.status}</div>
                       <div>{new Date(case_.updated_at).toLocaleDateString()}</div>
                     </div>
                   </div>
 
                   {/* AI Response Summary */}
-                  {case_.custom_fields.ai_summary && (
+                  {case_.metadata.ai_summary && (
                     <div className="mt-3 p-3 bg-blue-50 dark:bg-blue-950/20 rounded border border-blue-200 dark:border-blue-800">
                       <div className="flex items-center gap-2 mb-1">
                         <Bot className="h-4 w-4 text-blue-600" />
                         <span className="text-sm font-medium text-blue-800 dark:text-blue-200">AI Response</span>
-                        {case_.custom_fields.ai_confidence_score && (
+                        {case_.metadata.ai_confidence_score && (
                           <Badge variant="secondary" className="text-xs">
-                            {Math.round(case_.custom_fields.ai_confidence_score * 100)}% confidence
+                            {Math.round(case_.metadata.ai_confidence_score * 100)}% confidence
                           </Badge>
                         )}
                       </div>
                       <p className="text-sm text-blue-700 dark:text-blue-300 line-clamp-2">
-                        {case_.custom_fields.ai_summary}
+                        {case_.metadata.ai_summary}
                       </p>
                     </div>
                   )}
 
                   {/* Escalation Reason */}
-                  {case_.custom_fields.escalation_reason && (
+                  {case_.metadata.escalation_reason && (
                     <div className="mt-2">
                       <Badge variant="destructive" className="text-xs">
-                        Escalated: {case_.custom_fields.escalation_reason.replace(/_/g, ' ')}
+                        Escalated: {case_.metadata.escalation_reason.replace(/_/g, ' ')}
                       </Badge>
                     </div>
                   )}
