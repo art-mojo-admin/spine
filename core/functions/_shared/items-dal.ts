@@ -2,11 +2,43 @@ import { db } from './db'
 
 export type AccessLevel = 'all' | 'organization_only' | 'own' | 'none' | 'soft'
 
+export type FieldType = 
+  | 'text'
+  | 'textarea'
+  | 'number'
+  | 'decimal'
+  | 'date'
+  | 'time'
+  | 'timestamp'
+  | 'boolean'
+  | 'checkbox'
+  | 'radio'
+  | 'select'
+  | 'multi-select'
+  | 'tags'
+  | 'rich-text'
+  | 'json'
+  | 'workflow_status'
+
+export interface FieldValidation {
+  min?: number
+  max?: number
+  min_length?: number
+  max_length?: number
+  pattern?: string
+  items?: { type: string; max_length?: number }
+}
+
 export interface FieldSchema {
-  type: string
-  options?: string[]
+  type: FieldType
   required?: boolean
   default?: any
+  options?: string[]
+  rich_text_format?: 'markdown' | 'html' | 'prosemirror'
+  validation?: FieldValidation
+  display_label?: string
+  description?: string
+  group_name?: string
   permissions?: Record<string, { read?: AccessLevel; update?: AccessLevel }>
 }
 
@@ -82,29 +114,22 @@ export class ItemsDAL {
   }
 
   static validateUpdateData(newData: any, existingData: any, schema: ItemTypeSchema, userRole: string): { valid: boolean; error?: string } {
-    if (!schema.fields && !schema.base_fields) return { valid: true }
-
-    const baseUpdateAccess = this.evaluateRecordAccess(schema, userRole, 'update') as AccessLevel
+    const { FieldValidator } = require('./field-validator')
+    const result = FieldValidator.validateMetadata(newData, schema, userRole)
     
-    for (const key of Object.keys(newData)) {
-      // Check base fields (title, description) - no field-level overrides
-      if (schema.base_fields[key]) {
-        if (baseUpdateAccess === 'none') {
-          return { valid: false, error: `Cannot update ${key}: insufficient permissions` }
-        }
-        continue
-      }
-      
-      // Check custom fields with possible overrides
-      if (schema.fields[key]) {
-        const fieldAccess = this.evaluateFieldAccess(schema.fields[key], userRole, schema.record_permissions, 'update')
-        
-        if (fieldAccess === 'none' && JSON.stringify(newData[key]) !== JSON.stringify(existingData?.[key])) {
-          return { valid: false, error: `Role '${userRole}' is not permitted to update field '${key}'` }
-        }
-      }
+    if (!result.valid) {
+      const errorMessages = Object.values(result.errors).join('; ')
+      return { valid: false, error: errorMessages }
     }
 
     return { valid: true }
+  }
+
+  /**
+   * Package metadata safely using schema validation
+   */
+  static packageMetadata(body: Record<string, any>, schema: ItemTypeSchema, userRole: string): { valid: boolean; metadata?: Record<string, any>; error?: string } {
+    const { FieldValidator } = require('./field-validator')
+    return FieldValidator.packageMetadata(body, schema, userRole)
   }
 }

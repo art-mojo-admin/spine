@@ -168,70 +168,41 @@ async function createKnowledgeDraft(accountId: string, personId: string, support
     summary,
   }
 
-  const validatedData = ItemsDAL.validateUpdateData(articleData, {}, schema, callerRole)
-  if (!validatedData) {
-    return error('Invalid article data provided', 400)
-  }
-
-  // Sanitize metadata according to schema
-  const sanitizedMetadata = ItemsDAL.sanitizeItemData({
-    article_kind: validatedData.article_kind,
-    visibility: validatedData.visibility,
-    audience: validatedData.audience,
-    tags: validatedData.tags,
-    content: validatedData.content,
+  // Package metadata safely using schema validation
+  const articleBody = {
+    title: articleData.title,
+    summary: articleData.summary,
+    article_kind: articleData.article_kind,
+    visibility: articleData.visibility,
+    audience: articleData.audience,
+    tags: articleData.tags,
+    content: articleData.content,
     source_case_id: supportCase.id,
     source_case_title: supportCase.title,
     created_from_case: true,
-  }, schema, callerRole)
+  }
+
+  const { valid, metadata, error: packageError } = ItemsDAL.packageMetadata(articleBody, schema, callerRole)
+  if (!valid || !metadata) {
+    return error(packageError || 'Invalid article data provided', 400)
+  }
 
   // Create the knowledge article
   const { data: article, error: createErr } = await db
     .from('items')
     .insert({
       account_id: accountId,
-      item_type_id: itemType?.id,
-      workflow_definition_id: (await db.from('workflow_definitions').select('id').eq('name', 'Knowledge Lifecycle').eq('account_id', accountId).single()).data?.id,
-      stage_definition_id: draftStage?.id,
-      title: validatedData.title,
-      description: validatedData.summary,
-      metadata: sanitizedMetadata,
-      status: 'active',
-      created_by: personId,
+      item_type: 'knowledge_article',
+      title: articleData.title,
+      description: articleData.summary,
+      metadata: metadata,
+      is_active: true,
+      created_by_principal_id: personId,
     })
     .select()
     .single()
 
   if (createErr) throw createErr
-
-  // Create field values with schema validation
-  const fieldValues = [
-    { field_key: 'article_kind', value: validatedData.article_kind },
-    { field_key: 'visibility', value: validatedData.visibility },
-    { field_key: 'audience', value: validatedData.audience },
-    { field_key: 'tags', value: validatedData.tags },
-    { field_key: 'summary', value: validatedData.summary },
-    { field_key: 'content', value: validatedData.content },
-  ]
-
-  // Validate each field value against schema
-  for (const fv of fieldValues) {
-    if (schema.fields && schema.fields[fv.field_key]) {
-      const fieldSchema = schema.fields[fv.field_key]
-      const fieldAccess = ItemsDAL.evaluateFieldAccess(fieldSchema, callerRole, 'all', 'update')
-      if (fieldAccess === 'none') {
-        continue // Skip fields user can't update
-      }
-    }
-
-    await db.from('field_values').insert({
-      account_id: accountId,
-      item_id: article.id,
-      field_key: fv.field_key,
-      value: fv.value,
-      created_by: personId,
-    })
-  }
 
   // Create link from case to new article
   await db

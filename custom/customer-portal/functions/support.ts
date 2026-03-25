@@ -331,10 +331,10 @@ async function createCase(accountId: string, personId: string, body: any, caller
     return error('Insufficient permissions to create support cases', 403)
   }
 
-  // Validate and sanitize input data
-  const validation = ItemsDAL.validateUpdateData(body, {}, schema, callerRole)
-  if (!validation.valid) {
-    return error(validation.error || 'Invalid data provided', 400)
+  // Package metadata safely using schema validation
+  const { valid, metadata, error: packageError } = ItemsDAL.packageMetadata(body, schema, callerRole)
+  if (!valid || !metadata) {
+    return error(packageError || 'Invalid data provided', 400)
   }
 
   // Get workflow and item type
@@ -345,15 +345,6 @@ async function createCase(accountId: string, personId: string, body: any, caller
     .single()
 
   const workflowId = itemType?.default_workflow_id
-
-  // Map fields to metadata according to schema
-  const metadata = {
-    workflow_status: 'open',
-    priority: body.priority || 'medium',
-    category: body.category || 'general',
-    tags: body.tags || [],
-    ai_attempted: false, // Portal users can't set this
-  }
 
   const { data, error: dbErr } = await db
     .from('items')
@@ -407,7 +398,7 @@ async function createCase(accountId: string, personId: string, body: any, caller
 }
 
 async function updateCase(accountId: string, personId: string, itemId: string, body: any) {
-  // Get current case
+  // Get current case and schema
   const { data: current, error: fetchErr } = await db
     .from('items')
     .select('*')
@@ -418,26 +409,26 @@ async function updateCase(accountId: string, personId: string, itemId: string, b
   if (fetchErr) throw fetchErr
   if (!current) return error('Case not found', 404)
 
-  // Prepare update data
-  const updateData: any = {}
-  const metadata = { ...current.metadata }
-
-  if (body.title) updateData.title = body.title
-  if (body.description) updateData.description = body.description
-  if (body.priority) metadata.priority = body.priority
-  if (body.ai_confidence_score !== undefined) metadata.ai_confidence_score = body.ai_confidence_score
-  if (body.escalation_reason) metadata.escalation_reason = body.escalation_reason
-  if (body.ai_summary) metadata.ai_summary = body.ai_summary
-  if (body.resolution_kind) metadata.resolution_kind = body.resolution_kind
-  if (body.resolution_notes) metadata.resolution_notes = body.resolution_notes
-
-  // Handle workflow status transitions
-  if (body.status) {
-    metadata.workflow_status = body.status
+  const schema = await ItemsDAL.getItemTypeSchema('support_case')
+  if (!schema) {
+    return error('Support case item type not found', 404)
   }
 
-  updateData.metadata = metadata
-  updateData.updated_at = new Date().toISOString()
+  // Package metadata safely using schema validation
+  const { valid, metadata, error: packageError } = ItemsDAL.packageMetadata(body, schema, callerRole)
+  if (!valid || !metadata) {
+    return error(packageError || 'Invalid data provided', 400)
+  }
+
+  // Prepare update data
+  const updateData: any = {
+    metadata: { ...current.metadata, ...metadata },
+    updated_at: new Date().toISOString()
+  }
+
+  // Update base fields if provided
+  if (body.title) updateData.title = body.title
+  if (body.description) updateData.description = body.description
 
   const { data, error: dbErr } = await db
     .from('items')
@@ -448,22 +439,7 @@ async function updateCase(accountId: string, personId: string, itemId: string, b
 
   if (dbErr) throw dbErr
 
-  // Update field values
-  for (const [key, value] of Object.entries(body)) {
-    if (value !== undefined && ['priority', 'ai_confidence_score', 'escalation_reason', 'ai_summary', 'resolution_kind', 'resolution_notes'].includes(key)) {
-      await db.from('field_values')
-        .upsert({
-          account_id: accountId,
-          item_id: itemId,
-          field_key: key,
-          value,
-          updated_by: personId,
-        })
-        .eq('item_id', itemId)
-        .eq('field_key', key)
-    }
-  }
-
+  
   // Handle escalation to operator
   if (body.stage === 'Escalated' && body.assigned_to) {
     await db
