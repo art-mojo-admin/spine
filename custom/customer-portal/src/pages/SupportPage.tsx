@@ -73,14 +73,13 @@ export default function SupportPage() {
   const loadSchema = async () => {
     try {
       setSchemaLoading(true)
-      // Fetch the real support_case schema from the API
-      const response = await apiGet('/api/item-types')
-      const supportCaseType = response.find((type: any) => type.slug === 'support_case')
+      // Fetch the real support_case schema from the public API
+      const response = await apiGet('/api/item-schemas?type=support_case')
       
-      if (supportCaseType?.schema) {
+      if (response?.schema) {
         // Transform the schema to include base fields (title, description) + custom fields
         const transformedSchema: ItemTypeSchema = {
-          ...supportCaseType.schema,
+          ...response.schema,
           fields: {
             title: {
               type: "text",
@@ -88,9 +87,9 @@ export default function SupportPage() {
             },
             description: {
               type: "textarea", 
-              required: true
+              required: false
             },
-            ...supportCaseType.schema.fields
+            ...response.schema.fields
           }
         }
         setSchema(transformedSchema)
