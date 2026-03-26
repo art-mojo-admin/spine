@@ -105,11 +105,11 @@ export default function SupportCasesPage() {
       })
       
       setNewMessage('')
-      await loadCase()
     } catch (err) {
       console.error('Failed to send message:', err)
     } finally {
       setSending(false)
+      await loadCase()
     }
   }
 

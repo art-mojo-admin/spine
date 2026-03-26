@@ -53,18 +53,6 @@ export default createHandler({
 
     if (!thread) return error('Thread not found', 404)
 
-    // Allocate next sequence number
-    const { data: maxSeq } = await db
-      .from('messages')
-      .select('sequence')
-      .eq('thread_id', body.thread_id)
-      .eq('is_active', true)
-      .order('sequence', { ascending: false })
-      .limit(1)
-      .maybeSingle()
-
-    const nextSequence = (maxSeq?.sequence || 0) + 1
-
     const { data, error: dbErr } = await db
       .from('messages')
       .insert({
@@ -72,7 +60,6 @@ export default createHandler({
         actor_principal_id: body.actor_principal_id || ctx.personId,
         direction: body.direction || 'internal',
         body: body.body,
-        sequence: nextSequence,
         visibility: body.visibility || 'inherit',
         metadata: body.metadata || {},
       })
