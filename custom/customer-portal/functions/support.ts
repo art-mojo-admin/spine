@@ -47,16 +47,7 @@ export default createHandler({
     const tenantCheck = requireTenant(ctx)
     if (tenantCheck) return tenantCheck
 
-    // Check if this is a message post to an existing case
-    // URL path: /.netlify/functions/support/{item_id}/message
-    const pathParts = new URL(req.url).pathname.split('/').filter(Boolean)
-    const fnIdx = pathParts.indexOf('support')
-    const itemIdFromPath = (fnIdx !== -1 && pathParts[fnIdx + 2] === 'message') ? pathParts[fnIdx + 1] : null
-    if (itemIdFromPath) {
-      return await postMessage(ctx, itemIdFromPath, await parseBody(req))
-    }
-
-    // Otherwise, it's a new case creation
+    // New case creation
     const body = await parseBody<{
       title: string
       description: string
@@ -196,12 +187,12 @@ async function getCase(accountId: string, personId: string, itemId: string, call
     .select(`
       id,
       status,
-      messages!inner(content, direction, created_at, created_by)
+      messages(body, direction, created_at, actor_principal_id, persons:actor_principal_id(id, full_name))
     `)
     .eq('target_type', 'item')
     .eq('target_id', itemId)
     .eq('account_id', accountId)
-    .single()
+    .maybeSingle()
 
   // Get referenced knowledge articles
   const { data: references } = await db
@@ -473,107 +464,3 @@ async function updateCase(accountId: string, personId: string, itemId: string, b
   return json(data)
 }
 
-async function postMessage(ctx: any, itemId: string, body: any) {
-  const accountId = ctx.accountId!
-  const personId = ctx.personId!
-
-  // Validate input
-  if (!body.content || !body.direction) {
-    return error('content and direction required')
-  }
-
-  // Get the case to verify access
-  const { data: caseData, error: caseErr } = await db
-    .from('items')
-    .select('id, created_by_principal_id')
-    .eq('account_id', accountId)
-    .eq('id', itemId)
-    .eq('item_type', 'support_case')
-    .eq('is_active', true)
-    .single()
-
-  if (caseErr) throw caseErr
-  if (!caseData) return error('Case not found', 404)
-
-  // Check access permissions (portal users can only message their own cases)
-  const effectiveRole = 'portal' // Customer portal always uses portal role
-  if (effectiveRole === 'portal' && caseData.created_by_principal_id !== personId) {
-    return error('Access denied', 403)
-  }
-
-  // Find or create thread for this case
-  let { data: thread } = await db
-    .from('threads')
-    .select('id')
-    .eq('target_type', 'item')
-    .eq('target_id', itemId)
-    .eq('account_id', accountId)
-    .eq('is_active', true)
-    .maybeSingle()
-
-  // Create thread if it doesn't exist
-  if (!thread) {
-    const { data: newThread, error: threadErr } = await db
-      .from('threads')
-      .insert({
-        account_id: accountId,
-        target_type: 'item',
-        target_id: itemId,
-        thread_type: 'support',
-        visibility: 'portal',
-        status: 'open',
-        is_active: true,
-      })
-      .select()
-      .single()
-
-    if (threadErr) throw threadErr
-    thread = newThread
-  }
-
-  // Get next sequence number
-  const { data: lastMessage } = await db
-    .from('messages')
-    .select('sequence')
-    .eq('thread_id', thread.id)
-    .eq('is_active', true)
-    .order('sequence', { ascending: false })
-    .limit(1)
-    .maybeSingle()
-
-  const nextSequence = (lastMessage?.sequence || 0) + 1
-
-  // Add message to thread
-  const { data: message, error: messageErr } = await db
-    .from('messages')
-    .insert({
-      thread_id: thread.id,
-      person_id: personId,
-      actor_principal_id: personId,
-      body: body.content,
-      direction: body.direction,
-      sequence: nextSequence,
-      visibility: 'private',
-      content_type: 'text/plain',
-      is_active: true,
-      metadata: {},
-      attachments: [],
-      reactions: [],
-      edit_history: [],
-    })
-    .select()
-    .single()
-
-  if (messageErr) throw messageErr
-
-  // Emit activity
-  await emitActivity(
-    ctx, 
-    'support.message_posted', 
-    `Posted message to support case`, 
-    'item', 
-    itemId
-  )
-
-  return json(message)
-}

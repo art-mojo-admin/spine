@@ -26,13 +26,12 @@ interface SupportCase {
   thread: {
     id: string
     messages: Array<{
-      content: string
+      body: string
       direction: string
       created_at: string
-      created_by?: string
+      actor_principal_id?: string
       persons?: {
         full_name: string
-        email: string
       }
       metadata?: {
         ai_generated?: boolean
@@ -83,9 +82,26 @@ export default function SupportCasesPage() {
 
     try {
       setSending(true)
-      await apiPost(`/custom/support/${caseId}/message`, {
-        content: newMessage,
-        direction: 'outbound'
+      
+      let threadId = caseDetail?.thread?.id
+      
+      // Create thread if it doesn't exist
+      if (!threadId) {
+        const newThread = await apiPost('/threads', {
+          target_type: 'item',
+          target_id: caseId,
+          thread_type: 'support',
+          visibility: 'portal'
+        })
+        threadId = newThread.id
+      }
+      
+      // Post message to thread
+      await apiPost('/messages', {
+        thread_id: threadId,
+        body: newMessage,
+        direction: 'outbound',
+        visibility: 'portal'
       })
       
       setNewMessage('')
@@ -254,7 +270,7 @@ export default function SupportCasesPage() {
                         "p-3 rounded-lg",
                         message.direction === 'inbound' ? "bg-muted" : "bg-primary text-primary-foreground"
                       )}>
-                        <p className="text-sm">{message.content}</p>
+                        <p className="text-sm">{message.body}</p>
                       </div>
                       <div className="text-xs text-muted-foreground mt-1">
                         {new Date(message.created_at).toLocaleString()}
