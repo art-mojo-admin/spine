@@ -539,7 +539,7 @@ async function postMessage(ctx: any, itemId: string, body: any) {
     .eq('is_active', true)
     .order('sequence', { ascending: false })
     .limit(1)
-    .single()
+    .maybeSingle()
 
   const nextSequence = (lastMessage?.sequence || 0) + 1
 
