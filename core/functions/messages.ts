@@ -24,7 +24,7 @@ export default createHandler({
     const limit = clampLimit(params, 100)
     const { data } = await db
       .from('messages')
-      .select('*, persons:person_id(id, full_name)')
+      .select('*, persons:actor_principal_id(id, full_name)')
       .eq('thread_id', threadId)
       .eq('is_active', true)
       .order('sequence', { ascending: true })
@@ -53,14 +53,15 @@ export default createHandler({
 
     if (!thread) return error('Thread not found', 404)
 
-    // Allocate next sequence number with a locked read
+    // Allocate next sequence number
     const { data: maxSeq } = await db
       .from('messages')
       .select('sequence')
       .eq('thread_id', body.thread_id)
+      .eq('is_active', true)
       .order('sequence', { ascending: false })
       .limit(1)
-      .single()
+      .maybeSingle()
 
     const nextSequence = (maxSeq?.sequence || 0) + 1
 
@@ -68,7 +69,7 @@ export default createHandler({
       .from('messages')
       .insert({
         thread_id: body.thread_id,
-        person_id: body.person_id || ctx.personId,
+        actor_principal_id: body.actor_principal_id || ctx.personId,
         direction: body.direction || 'internal',
         body: body.body,
         sequence: nextSequence,
