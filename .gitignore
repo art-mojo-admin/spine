@@ -21,7 +21,7 @@ query-*.ts
 get-tiptap-docs.js
 deno.lock
 model-guide.md
-index.html
+/index.html
 
 # Quarantined legacy files
 _quarantine/
