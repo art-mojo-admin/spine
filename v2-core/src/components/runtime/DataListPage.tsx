@@ -10,7 +10,7 @@ export function DataListPage() {
   const { entity, typeSlug } = useParams<{ entity: string; typeSlug?: string }>()
   
   const { schema, view, loading: schemaLoading, error: schemaError } = useListSchema({
-    entity,
+    entity: entity || '',
     viewSlug: 'default_list'
   })
   
@@ -45,8 +45,7 @@ export function DataListPage() {
     filters, 
     setFilters, 
     sort, 
-    setSort,
-    pagination
+    setSort
   } = useEntityList(entity!, config)
   
   if (schemaLoading) {

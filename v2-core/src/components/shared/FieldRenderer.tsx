@@ -5,6 +5,7 @@ interface FieldRendererProps {
   field: FieldDefinition
   value: any
   onChange?: (value: any) => void
+  onBlur?: () => void
   readonly?: boolean
   error?: string
   displayType?: string // From view config — controls rendering without polluting field data contract

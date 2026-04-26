@@ -18,7 +18,7 @@ import { adminDb } from './_shared/db'
 import { emitAudit } from './_shared/audit'
 
 // Internal API key for scheduler access (configured in environment)
-const SCHEDULER_API_KEY = process.env.SCHEDULER_API_KEY
+const SCHEDULER_API_KEY: string | undefined = (globalThis as any).process?.env?.SCHEDULER_API_KEY || (globalThis as any).Deno?.env?.get?.('SCHEDULER_API_KEY')
 
 // Handler for system cron execution
 export const handler = createHandler(async (ctx: RequestContext) => {
@@ -141,10 +141,7 @@ export const handler = createHandler(async (ctx: RequestContext) => {
           db: adminDb,  // Machines use adminDb (RLS checks their ID)
           accountId: machine.account_id,
           appId: null,
-          query: {},
-          personId: null,
-          systemRole: null,
-          roles: []
+          query: {}
         }
         
         // Check machine has required scope for this action

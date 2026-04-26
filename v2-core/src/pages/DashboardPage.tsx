@@ -63,7 +63,7 @@ export function DashboardPage() {
           })
           
           const resolvedStats = await Promise.all(statsPromises)
-          const validStats = resolvedStats.filter(Boolean).slice(0, 8) // Limit to 8 types
+          const validStats = resolvedStats.filter((s): s is NonNullable<typeof s> => s !== null).slice(0, 8) // Limit to 8 types
           setTypeStats(validStats)
         }
       } catch (error) {

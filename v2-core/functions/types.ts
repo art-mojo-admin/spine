@@ -9,7 +9,7 @@ const permissions = PermissionEngine as any
 
 // List types - RLS enforced via ctx.db
 export const list = createHandler(async (ctx, body) => {
-  const { kind, app_id, ownership, limit = 50, offset = 0 } = ctx.query || {}
+  const { kind, app_id, ownership, limit = '50', offset = '0' } = ctx.query || {}
 
   // RLS automatically filters to accessible accounts
   let query = ctx.db

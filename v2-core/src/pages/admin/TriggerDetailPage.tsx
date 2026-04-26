@@ -560,9 +560,9 @@ export function TriggerDetailPage() {
           <Button
             variant="destructive"
             onClick={() => deleteMutation.mutate()}
-            disabled={deleteMutation.isLoading}
+            disabled={deleteMutation.loading}
           >
-            {deleteMutation.isLoading ? 'Deleting...' : 'Delete Trigger'}
+            {deleteMutation.loading ? 'Deleting...' : 'Delete Trigger'}
           </Button>
         </div>
       </Modal>

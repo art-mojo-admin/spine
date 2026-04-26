@@ -7,7 +7,7 @@ interface SchemaDetailFormProps {
   record: any
   isEditing: boolean
   isCreating: boolean
-  permissions: Record<string, string[]>
+  permissions: Record<string, { read: boolean; write: boolean }>
   formData: Record<string, any>
   onFieldChange: (key: string, value: any) => void
 }

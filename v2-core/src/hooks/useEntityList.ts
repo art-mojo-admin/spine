@@ -37,7 +37,7 @@ export function useEntityList(
   config: MinimalEntityListConfig | null
 ): UseEntityListReturn {
   const [filters, setFilters] = useState<Record<string, any>>({})
-  const [sort, setSort] = useState(config?.list?.defaultSort || { field: 'created_at', direction: 'desc' })
+  const [sort, setSort] = useState<{ field: string; direction: 'asc' | 'desc' }>(config?.list?.defaultSort || { field: 'created_at', direction: 'desc' })
   const [page, setPage] = useState(1)
   const [pageSize, setPageSize] = useState(50)
   
@@ -87,8 +87,7 @@ export function useEntityList(
   }, [entity, config?.api.endpoint, config?.api.listAction, config?.typeSlug, filters, sort, page, pageSize])
   
   const { data, loading, error, refetch } = useApi<any[]>(fetchData, {
-    immediate: true,
-    dependencies: [entity, filters, sort, page, pageSize]
+    immediate: true
   })
   
   // Reset page when filters change

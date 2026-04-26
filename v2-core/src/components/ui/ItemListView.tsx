@@ -57,17 +57,18 @@ export function ItemListView({
       title: 'Item',
       sortable: true,
       render: (value: Record<string, any>, item: Item & { item_type: ItemType }) => {
-        const primaryField = item.item_type.schema.fields.find(field => 
-          field.type === 'text' || field.type === 'textarea'
-        )
-        const fieldName = primaryField?.name || 'name'
+        const primaryField = item.item_type.design_schema?.fields ? Object.entries(item.item_type.design_schema.fields).find(([_, f]: [string, any]) => 
+          f.data_type === 'text' || f.data_type === 'textarea'
+        ) : null
+        const fieldEntry = primaryField ? primaryField : null
+        const fieldName = fieldEntry ? fieldEntry[0] : 'name'
         const displayValue = value[fieldName] || 'Untitled Item'
         
         return (
           <div>
             <div className="font-medium text-slate-900">{displayValue}</div>
             <div className="text-sm text-slate-500">
-              <Badge variant={item.item_type.is_system ? 'info' : 'success'} size="sm">
+              <Badge variant={item.item_type.is_active ? 'success' : 'default'} size="sm">
                 {item.item_type.name}
               </Badge>
             </div>
@@ -81,7 +82,7 @@ export function ItemListView({
       filterable: true,
       filterOptions: types,
       render: (value: ItemType) => (
-        <Badge variant={value.is_system ? 'info' : 'success'}>
+        <Badge variant={value.is_active ? 'success' : 'default'}>
           {value.name}
         </Badge>
       )
@@ -99,7 +100,7 @@ export function ItemListView({
       render: (value: string) => formatDateTime(value)
     },
     {
-      key: 'actions' as const,
+      key: 'id' as const,
       title: 'Actions',
       render: (_: any, item: Item & { item_type: ItemType }) => (
         <div className="flex items-center space-x-2">
@@ -186,7 +187,7 @@ export function ItemListView({
       ) : (
         <DataTable
           data={items}
-          columns={tableColumns}
+          columns={tableColumns as any}
           loading={loading}
           searchable={searchable}
           filterable={filterable}

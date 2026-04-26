@@ -3,7 +3,7 @@ import { cn } from '../../lib/utils'
 
 interface BadgeProps {
   children: React.ReactNode
-  variant?: 'default' | 'success' | 'warning' | 'error' | 'info'
+  variant?: 'default' | 'success' | 'warning' | 'error' | 'info' | 'primary' | 'secondary'
   size?: 'sm' | 'md'
   className?: string
 }
@@ -19,7 +19,9 @@ export function Badge({
     success: 'bg-[#f8fafc] text-[#5b7bb5]',
     warning: 'bg-[#f8fafc] text-[#7ba0d4]',
     error: 'bg-[#f8fafc] text-slate-600',
-    info: 'bg-[#f8fafc] text-[#5b7bb5]'
+    info: 'bg-[#f8fafc] text-[#5b7bb5]',
+    primary: 'bg-blue-100 text-blue-700',
+    secondary: 'bg-slate-100 text-slate-600'
   }
 
   const sizeClasses = {

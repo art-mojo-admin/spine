@@ -234,9 +234,9 @@ export const getStats = createHandler(async (ctx, body) => {
   const rows = data || []
   return {
     total: rows.length,
-    completed: rows.filter(r => r.status === 'completed').length,
-    failed: rows.filter(r => r.status === 'failed').length,
-    running: rows.filter(r => r.status === 'running').length,
+    completed: rows.filter((r: any) => r.status === 'completed').length,
+    failed: rows.filter((r: any) => r.status === 'failed').length,
+    running: rows.filter((r: any) => r.status === 'running').length,
   }
 })
 

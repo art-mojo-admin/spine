@@ -93,7 +93,7 @@ export function PromptConfigDetailPage() {
       })
       if (!response.ok) throw new Error('Failed to save')
       const result = await response.json()
-      navigate(isCreateMode ? `/admin/configs/prompts/${result.config_id || result.id}` : -1)
+      if (isCreateMode) { navigate(`/admin/configs/prompts/${result.config_id || result.id}`) } else { navigate(-1) }
     } catch (err: any) {
       alert(err.message)
     } finally {

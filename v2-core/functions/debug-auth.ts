@@ -1,19 +1,17 @@
 import { createHandler } from './_shared/middleware'
-import { createClient } from '@supabase/supabase-js'
 
 // Debug authentication token validation
 const debug = createHandler(async (ctx, _body) => {
-  const authHeader = ctx.event?.headers?.authorization || ctx.event?.headers?.Authorization
-  
+  const envObj = (globalThis as any).process?.env || {}
   return {
     data: {
       message: 'Debug auth endpoint',
-      authHeader: authHeader ? 'Bearer [REDACTED]' : 'None',
-      hasAuthHeader: !!authHeader,
+      hasPrincipal: !!ctx.principal,
+      principalType: ctx.principal?.type || 'none',
       requestId: ctx.requestId,
       envVars: {
-        supabaseUrl: process.env.SUPABASE_URL ? 'SET' : 'NOT_SET',
-        supabaseAnonKey: process.env.SUPABASE_ANON_KEY ? 'SET' : 'NOT_SET',
+        supabaseUrl: envObj.SUPABASE_URL ? 'SET' : 'NOT_SET',
+        supabaseAnonKey: envObj.SUPABASE_ANON_KEY ? 'SET' : 'NOT_SET',
       }
     }
   }
@@ -21,50 +19,22 @@ const debug = createHandler(async (ctx, _body) => {
 
 // Test JWT validation directly
 const testJwt = createHandler(async (ctx, _body) => {
-  const authHeader = ctx.event?.headers?.authorization || ctx.event?.headers?.Authorization
-  
-  if (!authHeader) {
+  const envObj = (globalThis as any).process?.env || {}
+  if (!ctx.principal) {
     return {
       data: null,
-      error: 'No authorization header'
+      error: 'No principal resolved from token'
     }
   }
   
-  const token = authHeader.replace('Bearer ', '')
-  
-  // Test Supabase JWT validation
-  const supabase = createClient(
-    process.env.SUPABASE_URL!,
-    process.env.SUPABASE_ANON_KEY!,
-    {
-      auth: {
-        autoRefreshToken: false,
-        persistSession: false
+  return {
+    data: {
+      tokenValid: true,
+      principal: {
+        type: ctx.principal.type,
+        id: ctx.principal.id,
+        accountId: ctx.accountId
       }
-    }
-  )
-  
-  try {
-    const { data: { user }, error } = await supabase.auth.getUser(token)
-    
-    return {
-      data: {
-        tokenValid: !error,
-        user: user ? {
-          id: user.id,
-          email: user.email,
-          aud: user.aud,
-        } : null,
-        error: error ? {
-          message: error.message,
-          status: error.status
-        } : null
-      }
-    }
-  } catch (e: any) {
-    return {
-      data: null,
-      error: e.message
     }
   }
 })

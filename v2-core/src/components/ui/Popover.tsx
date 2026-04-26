@@ -5,7 +5,7 @@ interface PopoverProps {
   trigger: React.ReactNode
   children: React.ReactNode
   className?: string
-  placement?: 'bottom-right' | 'bottom-left' | 'bottom-center'
+  placement?: 'bottom-right' | 'bottom-left' | 'bottom-center' | 'top-end' | 'top-start'
 }
 
 export function Popover({ trigger, children, className, placement = 'bottom-right' }: PopoverProps) {
@@ -16,7 +16,9 @@ export function Popover({ trigger, children, className, placement = 'bottom-righ
   const placementClasses = {
     'bottom-right': 'right-0',
     'bottom-left': 'left-0',
-    'bottom-center': 'left-1/2 transform -translate-x-1/2'
+    'bottom-center': 'left-1/2 transform -translate-x-1/2',
+    'top-end': 'right-0 bottom-full mb-1 mt-0',
+    'top-start': 'left-0 bottom-full mb-1 mt-0'
   }
 
   useEffect(() => {

@@ -389,7 +389,7 @@ export function EmbeddingsPage() {
                   </div>
                 </td>
                 <td className="px-6 py-4 whitespace-nowrap">
-                  <Badge variant="bg-green-100 text-green-800">
+                  <Badge variant="success">
                     Active
                   </Badge>
                 </td>

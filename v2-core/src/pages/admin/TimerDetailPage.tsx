@@ -144,7 +144,7 @@ export function TimerDetailPage() {
       })
       if (!response.ok) throw new Error('Failed to save timer')
       const result = await response.json()
-      navigate(isCreateMode ? `/admin/configs/timers/${result.timer_id || result.id}` : -1)
+      if (isCreateMode) { navigate(`/admin/configs/timers/${result.timer_id || result.id}`) } else { navigate(-1) }
     } catch (error: any) {
       alert(error.message || 'Failed to save timer')
     } finally {

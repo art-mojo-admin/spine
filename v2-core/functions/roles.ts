@@ -8,7 +8,7 @@ const permissions = PermissionEngine as any
 
 // List roles - RLS enforced via ctx.db
 export const list = createHandler(async (ctx, _body) => {
-  const { app_id, is_system, limit = 50, offset = 0 } = ctx.query || {}
+  const { app_id, is_system, limit = '50', offset = '0' } = ctx.query || {}
 
   // RLS automatically filters to accessible roles
   let query = ctx.db

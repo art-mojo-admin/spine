@@ -36,17 +36,20 @@ export function SchemaFields({
 
   return (
     <div className={twoColumn ? 'grid grid-cols-1 md:grid-cols-2 gap-4' : 'space-y-4'}>
-      {fields.map((field) => (
-        <SchemaField
-          key={field.name}
-          field={field}
-          value={field.system ? data[field.name] : (data.data?.[field.name] ?? data[field.name])}
-          onChange={onChange}
-          readonly={readonly || field.readonly}
-          error={errors[field.name]}
-          displayType={displayTypes[field.name]}
-        />
-      ))}
+      {fields.filter(f => !!f.name).map((field) => {
+        const name = field.name!
+        return (
+          <SchemaField
+            key={name}
+            field={field}
+            value={field.system ? data[name] : (data.data?.[name] ?? data[name])}
+            onChange={onChange}
+            readonly={readonly || field.readonly}
+            error={errors[name]}
+            displayType={displayTypes[name]}
+          />
+        )
+      })}
     </div>
   )
 }
@@ -65,7 +68,7 @@ function SchemaField({ field, value, onChange, readonly, error, displayType }: S
     <FieldRenderer
       field={field}
       value={value}
-      onChange={readonly ? undefined : (val) => onChange?.(field.name, val)}
+      onChange={readonly ? undefined : (val) => field.name && onChange?.(field.name, val)}
       readonly={readonly}
       error={error}
       displayType={displayType}
@@ -123,15 +126,15 @@ function formatFieldValue(field: FieldDefinition, value: any): React.ReactNode {
       }
 
     case 'select': {
-      const option = field.options?.find(o => o.value === value)
-      return option ? option.label : String(value)
+      const option = field.options?.find(o => typeof o === 'object' && o.value === value)
+      return option && typeof option === 'object' ? option.label : String(value)
     }
 
     case 'multiselect': {
       if (!Array.isArray(value)) return String(value)
       return value.map(v => {
-        const option = field.options?.find(o => o.value === v)
-        return option ? option.label : v
+        const option = field.options?.find(o => typeof o === 'object' && o.value === v)
+        return option && typeof option === 'object' ? option.label : v
       }).join(', ')
     }
 

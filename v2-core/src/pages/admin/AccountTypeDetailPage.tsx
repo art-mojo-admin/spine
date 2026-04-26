@@ -227,6 +227,9 @@ export function AccountTypeDetailPage() {
     )
   }
 
+  // After the guard above, accountType is non-null in non-create mode
+  const at = accountType!
+
   return (
     <div className="space-y-6">
       {/* Header */}
@@ -240,7 +243,7 @@ export function AccountTypeDetailPage() {
           </button>
           <div>
             <h1 className="text-2xl font-bold text-slate-900">
-              {isCreateMode ? 'Create Account Type' : accountType.name}
+              {isCreateMode ? 'Create Account Type' : at.name}
             </h1>
             <p className="text-sm text-slate-600">
               {isCreateMode ? 'Account Type Configuration' : 'Account Type Details'}
@@ -275,7 +278,7 @@ export function AccountTypeDetailPage() {
               <Button
                 variant="destructive"
                 onClick={() => setIsDeleteModalOpen(true)}
-                disabled={accountType.ownership === 'system'}
+                disabled={at.ownership === 'system'}
               >
                 <TrashIcon className="h-4 w-4 mr-2" />
                 Delete
@@ -298,7 +301,7 @@ export function AccountTypeDetailPage() {
                 {!isCreateMode && (
                   <div className="flex justify-between">
                     <dt className="text-sm text-slate-600">ID:</dt>
-                    <dd className="text-sm text-slate-900 font-mono">{accountType.id}</dd>
+                    <dd className="text-sm text-slate-900 font-mono">{at.id}</dd>
                   </div>
                 )}
                 
@@ -312,7 +315,7 @@ export function AccountTypeDetailPage() {
                       className="text-sm text-slate-900 border border-slate-300 rounded px-2 py-1 focus:outline-none focus:ring-2 focus:ring-blue-500"
                     />
                   ) : (
-                    <dd className="text-sm text-slate-900">{isCreateMode ? editData.name : accountType.name}</dd>
+                    <dd className="text-sm text-slate-900">{isCreateMode ? editData.name : at.name}</dd>
                   )}
                 </div>
                 
@@ -326,7 +329,7 @@ export function AccountTypeDetailPage() {
                       className="text-sm text-slate-900 border border-slate-300 rounded px-2 py-1 focus:outline-none focus:ring-2 focus:ring-blue-500"
                     />
                   ) : (
-                    <dd className="text-sm text-slate-900 font-mono">{isCreateMode ? editData.slug : accountType.slug}</dd>
+                    <dd className="text-sm text-slate-900 font-mono">{isCreateMode ? editData.slug : at.slug}</dd>
                   )}
                 </div>
                 
@@ -341,7 +344,7 @@ export function AccountTypeDetailPage() {
                       placeholder="Enter description"
                     />
                   ) : (
-                    <dd className="text-sm text-slate-900">{isCreateMode ? (editData.description || 'No description') : (accountType.description || 'No description')}</dd>
+                    <dd className="text-sm text-slate-900">{isCreateMode ? (editData.description || 'No description') : (at.description || 'No description')}</dd>
                   )}
                 </div>
                 
@@ -356,7 +359,7 @@ export function AccountTypeDetailPage() {
                       placeholder="Enter icon name"
                     />
                   ) : (
-                    <dd className="text-sm text-slate-900">{isCreateMode ? (editData.icon || 'No icon') : (accountType.icon || 'No icon')}</dd>
+                    <dd className="text-sm text-slate-900">{isCreateMode ? (editData.icon || 'No icon') : (at.icon || 'No icon')}</dd>
                   )}
                 </div>
                 
@@ -381,8 +384,8 @@ export function AccountTypeDetailPage() {
                     </select>
                   ) : (
                     <dd className="text-sm text-slate-900">
-                      <span className={`inline-block w-3 h-3 rounded-full mr-2`} style={{backgroundColor: isCreateMode ? editData.color : accountType.color}}></span>
-                      {isCreateMode ? (editData.color || 'No color') : (accountType.color || 'No color')}
+                      <span className={`inline-block w-3 h-3 rounded-full mr-2`} style={{backgroundColor: isCreateMode ? editData.color : at.color}}></span>
+                      {isCreateMode ? (editData.color || 'No color') : (at.color || 'No color')}
                     </dd>
                   )}
                 </div>
@@ -391,8 +394,8 @@ export function AccountTypeDetailPage() {
                   <div className="flex justify-between">
                     <dt className="text-sm text-slate-600">Category:</dt>
                     <dd className="text-sm text-slate-900">
-                      <Badge variant={getTypeBadgeColor(accountType.ownership === 'system')}>
-                        {accountType.ownership === 'system' ? 'System' : 'Custom'}
+                      <Badge variant={getTypeBadgeColor(at.ownership === 'system')}>
+                        {at.ownership === 'system' ? 'System' : 'Custom'}
                       </Badge>
                     </dd>
                   </div>
@@ -411,8 +414,8 @@ export function AccountTypeDetailPage() {
                     </select>
                   ) : (
                     <dd className="text-sm text-slate-900">
-                      <Badge variant={(isCreateMode ? editData.is_active : accountType.is_active) ? 'success' : 'default'}>
-                        {(isCreateMode ? editData.is_active : accountType.is_active) ? 'Active' : 'Inactive'}
+                      <Badge variant={(isCreateMode ? editData.is_active : at.is_active) ? 'success' : 'default'}>
+                        {(isCreateMode ? editData.is_active : at.is_active) ? 'Active' : 'Inactive'}
                       </Badge>
                     </dd>
                   )}
@@ -426,15 +429,15 @@ export function AccountTypeDetailPage() {
                 <dl className="mt-2 space-y-1">
                   <div className="flex justify-between">
                     <dt className="text-sm text-slate-600">Fields:</dt>
-                    <dd className="text-sm text-slate-900">{Object.keys(accountType.schema?.fields || {}).length}</dd>
+                    <dd className="text-sm text-slate-900">{Object.keys(at.schema?.fields || {}).length}</dd>
                   </div>
                   <div className="flex justify-between">
                     <dt className="text-sm text-slate-600">Created:</dt>
-                    <dd className="text-sm text-slate-900">{formatDateTime(accountType.created_at)}</dd>
+                    <dd className="text-sm text-slate-900">{formatDateTime(at.created_at)}</dd>
                   </div>
                   <div className="flex justify-between">
                     <dt className="text-sm text-slate-600">Updated:</dt>
-                    <dd className="text-sm text-slate-900">{formatDateTime(accountType.updated_at)}</dd>
+                    <dd className="text-sm text-slate-900">{formatDateTime(at.updated_at)}</dd>
                   </div>
                 </dl>
               </div>
@@ -475,11 +478,11 @@ export function AccountTypeDetailPage() {
             <div>
               <div className="bg-slate-50 rounded-lg p-4 overflow-x-auto">
                 <pre className="text-sm font-mono text-slate-800 whitespace-pre-wrap">
-                  {JSON.stringify(accountType.schema, null, 2)}
+                  {JSON.stringify(at.schema, null, 2)}
                 </pre>
               </div>
               <p className="mt-2 text-xs text-slate-500">
-                Schema contains {Object.keys(accountType.schema?.fields || {}).length} field definitions
+                Schema contains {Object.keys(at.schema?.fields || {}).length} field definitions
               </p>
             </div>
           )}
@@ -504,9 +507,9 @@ export function AccountTypeDetailPage() {
           <Button
             variant="destructive"
             onClick={() => deleteMutation.mutate()}
-            disabled={deleteMutation.isLoading}
+            disabled={deleteMutation.loading}
           >
-            {deleteMutation.isLoading ? 'Deleting...' : 'Delete Account Type'}
+            {deleteMutation.loading ? 'Deleting...' : 'Delete Account Type'}
           </Button>
         </div>
       </Modal>

@@ -13,9 +13,10 @@ import { getUserDb, adminDb } from './db'
 import { createClient } from '@supabase/supabase-js'
 
 // Supabase client for JWT validation
+const env = (globalThis as any).process?.env || {}
 const supabase = createClient(
-  process.env.SUPABASE_URL!,
-  process.env.SUPABASE_ANON_KEY!,
+  env.SUPABASE_URL!,
+  env.SUPABASE_ANON_KEY!,
   {
     auth: {
       autoRefreshToken: false,

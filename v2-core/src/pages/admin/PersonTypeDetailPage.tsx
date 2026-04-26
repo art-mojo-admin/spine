@@ -490,9 +490,9 @@ export function PersonTypeDetailPage() {
           <Button
             variant="destructive"
             onClick={() => deleteMutation.mutate()}
-            disabled={deleteMutation.isLoading}
+            disabled={deleteMutation.loading}
           >
-            {deleteMutation.isLoading ? 'Deleting...' : 'Delete Person Type'}
+            {deleteMutation.loading ? 'Deleting...' : 'Delete Person Type'}
           </Button>
         </div>
       </Modal>

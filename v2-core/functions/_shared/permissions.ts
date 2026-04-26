@@ -173,11 +173,12 @@ class _PermissionEngineInternal {
         .eq('is_active', true)
         .single()
 
-      if (!person?.role?.slug) {
+      const roleSlug = (person?.role as any)?.slug || Array.isArray(person?.role) && (person.role as any)[0]?.slug
+      if (!roleSlug) {
         return defaultResult
       }
 
-      const userRoles = [person.role.slug]
+      const userRoles = [roleSlug]
 
       // 3. Evaluate record permissions for each role
       const recordPermissions = schema.record_permissions || {}
@@ -536,7 +537,7 @@ class _PermissionEngineInternal {
       
       case 'first':
       default:
-        return this.sanitizeFirstSurfaceRecordData(ctx, record, typeSlug)
+        return this.sanitizeFirstSurfaceRecordData(ctx, record, typeSlug || '')
     }
   }
 
@@ -642,7 +643,7 @@ class _PermissionEngineInternal {
   ): Promise<{ valid: boolean; error?: string }> {
     // System admin can update anything — pass data through unsanitized
     if (this.isSystemAdmin(ctx)) {
-      return { valid: true, sanitizedData: updateData }
+      return { valid: true, sanitizedData: updateData } as any
     }
 
     // Extract table name to determine surface
@@ -659,7 +660,7 @@ class _PermissionEngineInternal {
       
       case 'first':
       default:
-        return this.validateFirstSurfaceUpdatePermissions(ctx, updateData, existingRecord, typeSlug)
+        return this.validateFirstSurfaceUpdatePermissions(ctx, updateData, existingRecord, typeSlug || '')
     }
   }
 
@@ -808,11 +809,8 @@ class _PermissionEngineInternal {
           db: null as any,
           accountId: principal.accountId,
           appId: null,
-          query: {},
-          personId: principal.id,
-          systemRole: principal.roles?.includes('system_admin') ? 'system_admin' : null,
-          roles: principal.roles || []
-        },
+          query: {}
+        } as any,
         record,
         action
       )

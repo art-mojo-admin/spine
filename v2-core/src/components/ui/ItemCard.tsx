@@ -47,7 +47,7 @@ export function ItemCard({
 
   const getTypeBadgeColor = () => {
     if (!item.item_type || typeof item.item_type === 'string') return 'info'
-    return (item.item_type as ItemType).is_system ? 'info' : 'success'
+    return (item.item_type as ItemType).is_active ? 'success' : 'default'
   }
 
   if (compact) {

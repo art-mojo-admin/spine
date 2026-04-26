@@ -58,8 +58,8 @@ export function useSchemaRecord(
     // Seed defaults for fields that have no value
     if (schemaType?.design_schema?.fields) {
       for (const [name, field] of Object.entries(schemaType.design_schema.fields)) {
-        if (base[name] === undefined && field.defaultValue !== undefined) {
-          base[name] = field.defaultValue
+        if (base[name] === undefined && (field as any).defaultValue !== undefined) {
+          base[name] = (field as any).defaultValue
         }
       }
     }

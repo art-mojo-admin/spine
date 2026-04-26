@@ -130,7 +130,7 @@ export function PromptConfigsPage() {
 
   const typeOptions = [
     { value: 'all', label: 'All Types' },
-    ...promptTypes.map(type => ({ value: type, label: type.charAt(0).toUpperCase() + type.slice(1) }))
+    ...promptTypes.filter((type): type is string => !!type).map(type => ({ value: type, label: type.charAt(0).toUpperCase() + type.slice(1) }))
   ]
 
   const filters = [
@@ -138,13 +138,13 @@ export function PromptConfigsPage() {
       label: 'Status',
       value: selectedStatus,
       options: statusOptions,
-      onChange: setSelectedStatus
+      onChange: (v: string) => setSelectedStatus(v)
     },
     {
       label: 'Type',
       value: selectedType,
       options: typeOptions,
-      onChange: setSelectedType
+      onChange: (v: string) => setSelectedType(v)
     }
   ]
 

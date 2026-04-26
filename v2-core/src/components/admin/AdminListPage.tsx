@@ -6,8 +6,8 @@ import { AdminStatsCard } from './AdminStatsCard'
 interface AdminListPageProps {
   title: string
   description: string
-  newButtonText: string
-  newButtonHref: string
+  newButtonText?: string
+  newButtonHref?: string
   statsCards: Array<{
     title: string
     value: string | number
@@ -35,7 +35,7 @@ export function AdminListPage({
   title,
   description,
   newButtonText,
-  newButtonHref,
+  newButtonHref = '#',
   statsCards,
   searchPlaceholder = "Search...",
   searchValue = "",
@@ -57,9 +57,11 @@ export function AdminListPage({
           <p className="mt-1 text-sm text-slate-600">{description}</p>
         </div>
         
-        <Button onClick={() => window.location.href = newButtonHref}>
-          {newButtonText}
-        </Button>
+        {newButtonText && (
+          <Button onClick={() => window.location.href = newButtonHref!}>
+            {newButtonText}
+          </Button>
+        )}
       </div>
 
       {/* Stats Cards */}

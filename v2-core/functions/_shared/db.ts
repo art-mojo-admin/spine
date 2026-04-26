@@ -3,9 +3,10 @@ import { createClient } from '@supabase/supabase-js'
 // ============================================
 // Supabase Configuration
 // ============================================
-const supabaseUrl = process.env.SUPABASE_URL!
-const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY!
-const supabaseAnonKey = process.env.SUPABASE_ANON_KEY!
+const _env = (globalThis as any).process?.env || {}
+const supabaseUrl: string = _env.SUPABASE_URL!
+const supabaseServiceKey: string = _env.SUPABASE_SERVICE_ROLE_KEY!
+const supabaseAnonKey: string = _env.SUPABASE_ANON_KEY!
 
 // ============================================
 // Admin Client - For system operations, migrations, machine principals

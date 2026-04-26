@@ -2,7 +2,7 @@ import React from 'react'
 import { cn } from '../../lib/utils'
 
 interface ButtonProps extends React.ButtonHTMLAttributes<HTMLButtonElement> {
-  variant?: 'primary' | 'secondary' | 'outline' | 'ghost'
+  variant?: 'primary' | 'secondary' | 'outline' | 'ghost' | 'destructive' | 'danger'
   size?: 'sm' | 'md' | 'lg'
   loading?: boolean
   icon?: React.ReactNode
@@ -25,7 +25,9 @@ export function Button({
     primary: 'bg-navy text-white hover:bg-navy-600 shadow-sm',
     secondary: 'bg-[#f8fafc] text-slate-700 hover:bg-[#f1f5f9]',
     outline: 'border border-slate-200 bg-white text-slate-700 hover:bg-[#f8fafc]',
-    ghost: 'text-[#5b7bb5] hover:bg-[#f8fafc] hover:text-navy'
+    ghost: 'text-[#5b7bb5] hover:bg-[#f8fafc] hover:text-navy',
+    destructive: 'bg-red-600 text-white hover:bg-red-700 shadow-sm',
+    danger: 'bg-red-600 text-white hover:bg-red-700 shadow-sm'
   }
   
   const sizeClasses = {

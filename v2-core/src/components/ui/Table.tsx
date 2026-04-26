@@ -1,7 +1,7 @@
 import React from 'react'
 import { cn } from '../../lib/utils'
 
-interface TableColumn<T> {
+export interface TableColumn<T> {
   key: keyof T
   title: string
   sortable?: boolean
@@ -34,7 +34,8 @@ export function Table<T extends Record<string, any>>({
   className
 }: TableProps<T>) {
   const handleSort = (column: keyof T) => {
-    if (!onSort || !column.sortable) return
+    const col = columns.find(c => c.key === column)
+    if (!onSort || !col?.sortable) return
 
     const newDirection = sortColumn === column && sortDirection === 'asc' ? 'desc' : 'asc'
     onSort(column, newDirection)

@@ -45,7 +45,7 @@ export function useForm({
 
     // Required validation
     if (fieldDef.required && (!value || value === '')) {
-      return `${fieldDef.label || field.name} is required`
+      return `${fieldDef.label || field} is required`
     }
 
     // Skip validation for empty optional fields
@@ -54,7 +54,7 @@ export function useForm({
     }
 
     // Type-specific validation
-    switch (fieldDef.type) {
+    switch (fieldDef.data_type) {
       case 'email':
         const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
         if (!emailRegex.test(value)) {
@@ -106,9 +106,10 @@ export function useForm({
 
     // Run field-level validation
     fields.forEach(field => {
-      const error = validateField(field.name, values[field.name])
-      if (error) {
-        newErrors[field.name] = error
+      if (!field.name) return
+      const fieldErr = validateField(field.name, values[field.name])
+      if (fieldErr) {
+        newErrors[field.name] = fieldErr
       }
     })
 
@@ -150,7 +151,7 @@ export function useForm({
     const error = validateField(field, data[field])
     setErrors(prev => ({
       ...prev,
-      [field]: error || undefined
+      ...(error ? { [field]: error } : { [field]: '' })
     }))
   }, [data, validateField])
 
@@ -160,7 +161,7 @@ export function useForm({
     
     // Mark all fields as touched
     const allTouched = fields.reduce((acc, field) => {
-      acc[field.name] = true
+      if (field.name) acc[field.name] = true
       return acc
     }, {} as Record<string, boolean>)
     setTouched(allTouched)

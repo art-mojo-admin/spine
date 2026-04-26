@@ -161,7 +161,7 @@ export function requireUserContext(arg: HandlerFunction | RequestContext): Handl
 
   const ctx = arg
   if (!ctx.principal || ctx.principal.id === 'anonymous' || !ctx.accountId) {
-    return error('User context (person and account) required', 403)
+    return error('User context (person and account) required', 403) as any
   }
   return null
 }
@@ -189,10 +189,10 @@ export function requireSystemContextWithAudit(
 
   const ctx = arg
   if (!ctx.principal || ctx.principal.id === 'anonymous') {
-    return error('Authentication required', 401)
+    return error('Authentication required', 401) as any
   }
   if (!isSystemAdmin(ctx.principal)) {
-    return error('System context required', 403)
+    return error('System context required', 403) as any
   }
   ;(ctx as any).triggeredBy = triggeredBy || ctx.principal.id
   return null

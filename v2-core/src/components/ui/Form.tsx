@@ -1,5 +1,5 @@
 import React from 'react'
-import { FieldDefinition, FormState, ValidationError } from '../../types/types'
+import { FieldDefinition } from '../../types/types'
 import { FieldRenderer } from '../shared/FieldRenderer'
 import { Button } from './Button'
 import { cn } from '../../lib/utils'
@@ -52,17 +52,20 @@ export function Form({
 
   return (
     <form onSubmit={handleSubmit} className={cn('space-y-6', className)}>
-      {fields.map((field) => (
-        <FieldRenderer
-          key={field.name}
-          field={field}
-          value={data[field.name]}
-          onChange={(value) => handleFieldChange(field.name, value)}
-          error={touched[field.name] ? errors[field.name] : undefined}
-          onBlur={() => handleFieldBlur(field.name)}
-          readonly={disabled}
-        />
-      ))}
+      {fields.filter(f => !!f.name).map((field) => {
+        const name = field.name!
+        return (
+          <FieldRenderer
+            key={name}
+            field={field}
+            value={data[name]}
+            onChange={(value) => handleFieldChange(name, value)}
+            error={touched[name] ? errors[name] : undefined}
+            onBlur={() => handleFieldBlur(name)}
+            readonly={disabled}
+          />
+        )
+      })}
 
       {/* Form Actions */}
       <div className="flex justify-end space-x-3">

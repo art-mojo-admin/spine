@@ -575,9 +575,9 @@ export function AppDetailPage() {
           </Button>
           <Button
             onClick={() => deleteMutation.mutate()}
-            disabled={deleteMutation.isLoading}
+            disabled={deleteMutation.loading}
           >
-            {deleteMutation.isLoading ? 'Deleting...' : 'Delete App'}
+            {deleteMutation.loading ? 'Deleting...' : 'Delete App'}
           </Button>
         </div>
       </Modal>

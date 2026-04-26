@@ -563,9 +563,9 @@ export function PipelineDetailPage() {
           <Button
             variant="destructive"
             onClick={() => deleteMutation.mutate()}
-            disabled={deleteMutation.isLoading}
+            disabled={deleteMutation.loading}
           >
-            {deleteMutation.isLoading ? 'Deleting...' : 'Delete Pipeline'}
+            {deleteMutation.loading ? 'Deleting...' : 'Delete Pipeline'}
           </Button>
         </div>
       </Modal>
