@@ -1,6 +1,0 @@
-export { default as KnowledgePage } from './pages/KnowledgePage'
-export { default as KnowledgeArticlePage } from './pages/KnowledgeArticlePage'
-export { default as SupportPage } from './pages/SupportPage'
-export { default as SupportCasesPage } from './pages/SupportCasesPage'
-export { default as CommunityPage } from './pages/CommunityPage'
-export { default as CommunityPostPage } from './pages/CommunityPostPage'

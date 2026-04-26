@@ -1,16 +1,22 @@
 [build]
   command = "npm run build"
   publish = "dist"
-  functions = "netlify/functions"
+  functions = "v2-core/functions"
 
   [build.environment]
     # Supabase VITE variables are meant to be public in the browser
     SECRETS_SCAN_OMIT_KEYS = "VITE_SUPABASE_URL,VITE_SUPABASE_ANON_KEY,VITE_DB_SCHEMA,VITE_APP_NAME,SUPABASE_URL,DB_SCHEMA"
 
+# v2 functions configuration - direct from v2-core
+[functions]
+  directory = "v2-core/functions"
+  included_files = ["v2-core/functions/**"]
+  node_bundler = "esbuild"
+
 [dev]
-  command = "npm run dev"
+  command = "bash scripts/netlify-dev-wrapper.sh"
   port = 8888
-  targetPort = 5173
+  targetPort = 3001
   autoLaunch = false
 
 [functions."trigger-scheduler"]
@@ -25,14 +31,3 @@
     Referrer-Policy = "strict-origin-when-cross-origin"
     Permissions-Policy = "camera=(), microphone=(), geolocation=()"
     X-XSS-Protection = "1; mode=block"
-
-[[redirects]]
-  from = "/api/*"
-  to = "/.netlify/functions/:splat"
-  status = 200
-
-
-[[redirects]]
-  from = "/*"
-  to = "/index.html"
-  status = 200

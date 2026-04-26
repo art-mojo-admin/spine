@@ -1,0 +1,255 @@
+import React, { useState } from 'react'
+import { Item, ItemType } from '../../types/types'
+import { DataTable } from './DataTable'
+import { ItemCard, ItemGrid } from './ItemCard'
+import { Badge } from './Badge'
+import { Button } from './Button'
+import { 
+  Squares2X2Icon,
+  ListBulletIcon,
+  PlusIcon
+} from '@heroicons/react/24/outline'
+import { formatDateTime } from '../../lib/utils'
+
+interface ItemListViewProps {
+  items: (Item & { item_type: ItemType })[]
+  loading?: boolean
+  onEdit?: (item: Item) => void
+  onDelete?: (item: Item) => void
+  onView?: (item: Item) => void
+  onCreate?: () => void
+  searchable?: boolean
+  filterable?: boolean
+  emptyMessage?: string
+  showCreateButton?: boolean
+  createButtonText?: string
+}
+
+export function ItemListView({
+  items,
+  loading = false,
+  onEdit,
+  onDelete,
+  onView,
+  onCreate,
+  searchable = true,
+  filterable = true,
+  emptyMessage = 'No items found',
+  showCreateButton = true,
+  createButtonText = 'Create Item'
+}: ItemListViewProps) {
+  const [viewMode, setViewMode] = useState<'grid' | 'table'>('grid')
+
+  // Get unique types for filtering
+  const typesMap = new Map<string, ItemType>()
+  items.forEach(item => {
+    typesMap.set(item.item_type.id, item.item_type)
+  })
+  const types = Array.from(typesMap.values()).map(type => ({
+    value: type.id,
+    label: type.name
+  }))
+
+  // Table columns
+  const tableColumns = [
+    {
+      key: 'data' as const,
+      title: 'Item',
+      sortable: true,
+      render: (value: Record<string, any>, item: Item & { item_type: ItemType }) => {
+        const primaryField = item.item_type.schema.fields.find(field => 
+          field.type === 'text' || field.type === 'textarea'
+        )
+        const fieldName = primaryField?.name || 'name'
+        const displayValue = value[fieldName] || 'Untitled Item'
+        
+        return (
+          <div>
+            <div className="font-medium text-slate-900">{displayValue}</div>
+            <div className="text-sm text-slate-500">
+              <Badge variant={item.item_type.is_system ? 'info' : 'success'} size="sm">
+                {item.item_type.name}
+              </Badge>
+            </div>
+          </div>
+        )
+      }
+    },
+    {
+      key: 'item_type' as const,
+      title: 'Type',
+      filterable: true,
+      filterOptions: types,
+      render: (value: ItemType) => (
+        <Badge variant={value.is_system ? 'info' : 'success'}>
+          {value.name}
+        </Badge>
+      )
+    },
+    {
+      key: 'created_at' as const,
+      title: 'Created',
+      sortable: true,
+      render: (value: string) => formatDateTime(value)
+    },
+    {
+      key: 'updated_at' as const,
+      title: 'Updated',
+      sortable: true,
+      render: (value: string) => formatDateTime(value)
+    },
+    {
+      key: 'actions' as const,
+      title: 'Actions',
+      render: (_: any, item: Item & { item_type: ItemType }) => (
+        <div className="flex items-center space-x-2">
+          {onView && (
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => onView(item)}
+            >
+              View
+            </Button>
+          )}
+          {onEdit && (
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => onEdit(item)}
+            >
+              Edit
+            </Button>
+          )}
+        </div>
+      )
+    }
+  ]
+
+  return (
+    <div className="space-y-4">
+      {/* Header */}
+      <div className="flex items-center justify-between">
+        <div className="flex items-center space-x-4">
+          <h2 className="text-lg font-medium text-slate-900">
+            Items ({items.length})
+          </h2>
+          
+          {/* View Mode Toggle */}
+          <div className="flex items-center bg-slate-100 rounded-lg p-1">
+            <button
+              onClick={() => setViewMode('grid')}
+              className={`
+                px-3 py-1.5 rounded-md text-sm font-medium transition-colors
+                ${viewMode === 'grid'
+                  ? 'bg-white text-slate-900 shadow-sm'
+                  : 'text-slate-600 hover:text-slate-900'
+                }
+              `}
+            >
+              <Squares2X2Icon className="h-4 w-4" />
+            </button>
+            <button
+              onClick={() => setViewMode('table')}
+              className={`
+                px-3 py-1.5 rounded-md text-sm font-medium transition-colors
+                ${viewMode === 'table'
+                  ? 'bg-white text-slate-900 shadow-sm'
+                  : 'text-slate-600 hover:text-slate-900'
+                }
+              `}
+            >
+              <ListBulletIcon className="h-4 w-4" />
+            </button>
+          </div>
+        </div>
+        
+        {showCreateButton && onCreate && (
+          <Button onClick={onCreate}>
+            <PlusIcon className="h-4 w-4 mr-2" />
+            {createButtonText}
+          </Button>
+        )}
+      </div>
+
+      {/* Content */}
+      {viewMode === 'grid' ? (
+        <ItemGrid
+          items={items}
+          loading={loading}
+          onEdit={onEdit}
+          onDelete={onDelete}
+          onView={onView}
+          compact={true}
+          emptyMessage={emptyMessage}
+        />
+      ) : (
+        <DataTable
+          data={items}
+          columns={tableColumns}
+          loading={loading}
+          searchable={searchable}
+          filterable={filterable}
+          emptyMessage={emptyMessage}
+        />
+      )}
+    </div>
+  )
+}
+
+interface ItemListPageProps {
+  items: (Item & { item_type: ItemType })[]
+  loading?: boolean
+  onEdit?: (item: Item) => void
+  onDelete?: (item: Item) => void
+  onView?: (item: Item) => void
+  onCreate?: () => void
+  searchable?: boolean
+  filterable?: boolean
+  emptyMessage?: string
+  showCreateButton?: boolean
+  createButtonText?: string
+  title?: string
+  description?: string
+}
+
+export function ItemListPage({
+  items,
+  loading = false,
+  onEdit,
+  onDelete,
+  onView,
+  onCreate,
+  searchable = true,
+  filterable = true,
+  emptyMessage = 'No items found',
+  showCreateButton = true,
+  createButtonText = 'Create Item',
+  title = 'Items',
+  description = 'Manage and organize your items'
+}: ItemListPageProps) {
+  return (
+    <div className="space-y-6">
+      {/* Page Header */}
+      <div>
+        <h1 className="text-2xl font-bold text-slate-900">{title}</h1>
+        <p className="mt-1 text-sm text-slate-600">{description}</p>
+      </div>
+
+      {/* Item List View */}
+      <ItemListView
+        items={items}
+        loading={loading}
+        onEdit={onEdit}
+        onDelete={onDelete}
+        onView={onView}
+        onCreate={onCreate}
+        searchable={searchable}
+        filterable={filterable}
+        emptyMessage={emptyMessage}
+        showCreateButton={showCreateButton}
+        createButtonText={createButtonText}
+      />
+    </div>
+  )
+}
