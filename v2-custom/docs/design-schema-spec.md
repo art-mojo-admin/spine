@@ -983,11 +983,12 @@ Full field set, multi-section detail view, stats, filters, role permissions, fun
 
 ## 11. Rules & Constraints
 
-### `permissions` is required on every field
-- Every field **must** have a `permissions` object — this is enforced by convention across all system seeds
-- System fields (`system: true`) typically include only `system-admin` with `["read", "write"]`
-- Custom fields (`system: false`) should include all relevant tenant roles (`admin`, `member`, `guest`)
-- A field with no matching role entry is invisible and unwritable to that role
+### Field-level `permissions` — when to set them
+- Field `permissions` are **only needed to restrict access below the record-level grant**
+- If `record_permissions` already grants a role full access, repeating that grant at the field level is redundant — omit it
+- System-only types (all fields `system: true`, `record_permissions` grants `system-admin` only) need **no field-level permissions at all**
+- Custom fields (`system: false`) that should be visible to tenant roles (`admin`, `member`, `guest`) **must** declare those roles in field `permissions`, since the record-level grant alone does not grant field visibility to those roles
+- A field with no matching role entry (and no record-level field override) is invisible and unwritable to that role
 - `validation: null` is acceptable (used in all system seeds) — omitting `validation` entirely is also fine
 
 ### Field names
@@ -1023,3 +1024,814 @@ Full field set, multi-section detail view, stats, filters, role permissions, fun
 ### `functionality`
 - Set to `null` until automation bindings are needed
 - Do not set non-null values unless the runtime enforcement is confirmed active
+
+---
+
+## 12. Runtime Entity — Minimal `design_schema` Examples
+
+Each example below includes **only the user-facing system columns** for that entity's DB table — all marked `system: true`. Since `record_permissions` grants `system-admin` full access, **no field-level `permissions` are set** — they are only needed when restricting access below the record-level grant.
+
+These serve as the starting point for any custom type built on that entity. Add custom fields (with `system: false`) and their field-level `permissions` on top of these.
+
+> Excluded from all examples: `id`, `type_id`, `account_id`, `app_id`, `data`, `design_schema`, `validation_schema`, `created_by`, `updated_by`, `auth_uid`, `role_id`, `owner_account_id` — these are internal FK/system columns not exposed in UI forms.
+
+---
+
+### 12.1 `items`
+
+DB columns: `title`, `description`, `status`, `is_active`, `item_type`, `created_at`, `updated_at`
+
+```json
+{
+  "fields": {
+    "title": {
+      "data_type": "text",
+      "label": "Title",
+      "required": true,
+      "system": true,
+      "validation": null
+    },
+    "description": {
+      "data_type": "textarea",
+      "label": "Description",
+      "required": false,
+      "system": true,
+      "validation": null
+    },
+    "status": {
+      "data_type": "text",
+      "label": "Status",
+      "required": true,
+      "system": true,
+      "validation": null
+    },
+    "is_active": {
+      "data_type": "boolean",
+      "label": "Active",
+      "required": true,
+      "system": true,
+      "validation": null
+    },
+    "item_type": {
+      "data_type": "text",
+      "label": "Item Type",
+      "required": true,
+      "system": true,
+      "validation": null
+    },
+    "created_at": {
+      "data_type": "datetime",
+      "label": "Created",
+      "required": false,
+      "system": true,
+      "readonly": true,
+      "validation": null
+    },
+    "updated_at": {
+      "data_type": "datetime",
+      "label": "Updated",
+      "required": false,
+      "system": true,
+      "readonly": true,
+      "validation": null
+    }
+  },
+  "views": {
+    "default_list": {
+      "type": "list",
+      "display": "table",
+      "label": "Items",
+      "fields": {
+        "title":      { "sortable": true, "display_type": "text" },
+        "status":     { "sortable": true, "display_type": "badge" },
+        "item_type":  { "sortable": true, "display_type": "text" },
+        "is_active":  { "sortable": true, "display_type": "badge" },
+        "created_at": { "sortable": true, "display_type": "timestamp" }
+      },
+      "default_sort": { "field": "created_at", "direction": "desc" }
+    },
+    "default_detail": {
+      "type": "detail",
+      "label": "Item Detail",
+      "sections": [
+        {
+          "title": "Core",
+          "fields": {
+            "title":       { "display_type": "input" },
+            "description": { "display_type": "textarea" },
+            "status":      { "display_type": "input" },
+            "item_type":   { "display_type": "text" },
+            "is_active":   { "display_type": "checkbox" }
+          }
+        },
+        {
+          "title": "System",
+          "fields": {
+            "created_at": { "display_type": "timestamp" },
+            "updated_at": { "display_type": "timestamp" }
+          }
+        }
+      ]
+    }
+  },
+  "record_permissions": {
+    "system-admin": ["create", "read", "update", "delete"]
+  },
+  "functionality": null
+}
+```
+
+---
+
+### 12.2 `people`
+
+DB columns: `full_name`, `email`, `phone`, `avatar_url`, `status`, `is_active`, `created_at`, `updated_at`
+
+```json
+{
+  "fields": {
+    "full_name": {
+      "data_type": "text",
+      "label": "Full Name",
+      "required": true,
+      "system": true,
+      "validation": null
+    },
+    "email": {
+      "data_type": "email",
+      "label": "Email",
+      "required": true,
+      "system": true,
+      "validation": null
+    },
+    "phone": {
+      "data_type": "phone",
+      "label": "Phone",
+      "required": false,
+      "system": true,
+      "validation": null
+    },
+    "avatar_url": {
+      "data_type": "url",
+      "label": "Avatar URL",
+      "required": false,
+      "system": true,
+      "validation": null
+    },
+    "status": {
+      "data_type": "text",
+      "label": "Status",
+      "required": true,
+      "system": true,
+      "validation": null
+    },
+    "is_active": {
+      "data_type": "boolean",
+      "label": "Active",
+      "required": true,
+      "system": true,
+      "validation": null
+    },
+    "created_at": {
+      "data_type": "datetime",
+      "label": "Created",
+      "required": false,
+      "system": true,
+      "readonly": true,
+      "validation": null
+    },
+    "updated_at": {
+      "data_type": "datetime",
+      "label": "Updated",
+      "required": false,
+      "system": true,
+      "readonly": true,
+      "validation": null
+    }
+  },
+  "views": {
+    "default_list": {
+      "type": "list",
+      "display": "table",
+      "label": "People",
+      "fields": {
+        "full_name":  { "sortable": true, "display_type": "text" },
+        "email":      { "sortable": true, "display_type": "text" },
+        "status":     { "sortable": true, "display_type": "badge" },
+        "is_active":  { "sortable": true, "display_type": "badge" },
+        "created_at": { "sortable": true, "display_type": "timestamp" }
+      },
+      "default_sort": { "field": "created_at", "direction": "desc" }
+    },
+    "default_detail": {
+      "type": "detail",
+      "label": "Person Detail",
+      "sections": [
+        {
+          "title": "Identity",
+          "fields": {
+            "full_name":  { "display_type": "input" },
+            "email":      { "display_type": "input" },
+            "phone":      { "display_type": "input" },
+            "avatar_url": { "display_type": "input" }
+          }
+        },
+        {
+          "title": "Status",
+          "fields": {
+            "status":    { "display_type": "input" },
+            "is_active": { "display_type": "checkbox" }
+          }
+        },
+        {
+          "title": "System",
+          "fields": {
+            "created_at": { "display_type": "timestamp" },
+            "updated_at": { "display_type": "timestamp" }
+          }
+        }
+      ]
+    }
+  },
+  "record_permissions": {
+    "system-admin": ["create", "read", "update", "delete"]
+  },
+  "functionality": null
+}
+```
+
+---
+
+### 12.3 `accounts`
+
+DB columns: `slug`, `display_name`, `description`, `is_active`, `created_at`, `updated_at`
+
+```json
+{
+  "fields": {
+    "slug": {
+      "data_type": "text",
+      "label": "Slug",
+      "required": true,
+      "system": true,
+      "validation": null
+    },
+    "display_name": {
+      "data_type": "text",
+      "label": "Display Name",
+      "required": true,
+      "system": true,
+      "validation": null
+    },
+    "description": {
+      "data_type": "textarea",
+      "label": "Description",
+      "required": false,
+      "system": true,
+      "validation": null
+    },
+    "is_active": {
+      "data_type": "boolean",
+      "label": "Active",
+      "required": true,
+      "system": true,
+      "validation": null
+    },
+    "created_at": {
+      "data_type": "datetime",
+      "label": "Created",
+      "required": false,
+      "system": true,
+      "readonly": true,
+      "validation": null
+    },
+    "updated_at": {
+      "data_type": "datetime",
+      "label": "Updated",
+      "required": false,
+      "system": true,
+      "readonly": true,
+      "validation": null
+    }
+  },
+  "views": {
+    "default_list": {
+      "type": "list",
+      "display": "table",
+      "label": "Accounts",
+      "fields": {
+        "display_name": { "sortable": true, "display_type": "text" },
+        "slug":         { "sortable": true, "display_type": "text" },
+        "is_active":    { "sortable": true, "display_type": "badge" },
+        "created_at":   { "sortable": true, "display_type": "timestamp" }
+      },
+      "default_sort": { "field": "created_at", "direction": "desc" }
+    },
+    "default_detail": {
+      "type": "detail",
+      "label": "Account Detail",
+      "sections": [
+        {
+          "title": "Identity",
+          "fields": {
+            "display_name": { "display_type": "input" },
+            "slug":         { "display_type": "input" },
+            "description":  { "display_type": "textarea" },
+            "is_active":    { "display_type": "checkbox" }
+          }
+        },
+        {
+          "title": "System",
+          "fields": {
+            "created_at": { "display_type": "timestamp" },
+            "updated_at": { "display_type": "timestamp" }
+          }
+        }
+      ]
+    }
+  },
+  "record_permissions": {
+    "system-admin": ["create", "read", "update", "delete"]
+  },
+  "functionality": null
+}
+```
+
+---
+
+### 12.4 `threads`
+
+DB columns: `title`, `target_type`, `visibility`, `status`, `created_at`, `updated_at`
+
+```json
+{
+  "fields": {
+    "title": {
+      "data_type": "text",
+      "label": "Title",
+      "required": false,
+      "system": true,
+      "validation": null
+    },
+    "target_type": {
+      "data_type": "text",
+      "label": "Target Type",
+      "required": true,
+      "system": true,
+      "readonly": true,
+      "validation": null
+    },
+    "visibility": {
+      "data_type": "text",
+      "label": "Visibility",
+      "required": true,
+      "system": true,
+      "validation": null
+    },
+    "status": {
+      "data_type": "text",
+      "label": "Status",
+      "required": true,
+      "system": true,
+      "validation": null
+    },
+    "created_at": {
+      "data_type": "datetime",
+      "label": "Created",
+      "required": false,
+      "system": true,
+      "readonly": true,
+      "validation": null
+    },
+    "updated_at": {
+      "data_type": "datetime",
+      "label": "Updated",
+      "required": false,
+      "system": true,
+      "readonly": true,
+      "validation": null
+    }
+  },
+  "views": {
+    "default_list": {
+      "type": "list",
+      "display": "table",
+      "label": "Threads",
+      "fields": {
+        "title":       { "sortable": true, "display_type": "text" },
+        "target_type": { "sortable": true, "display_type": "text" },
+        "visibility":  { "sortable": true, "display_type": "badge" },
+        "status":      { "sortable": true, "display_type": "badge" },
+        "created_at":  { "sortable": true, "display_type": "timestamp" }
+      },
+      "default_sort": { "field": "created_at", "direction": "desc" }
+    },
+    "default_detail": {
+      "type": "detail",
+      "label": "Thread Detail",
+      "sections": [
+        {
+          "title": "Core",
+          "fields": {
+            "title":       { "display_type": "input" },
+            "target_type": { "display_type": "text" },
+            "visibility":  { "display_type": "input" },
+            "status":      { "display_type": "input" }
+          }
+        },
+        {
+          "title": "System",
+          "fields": {
+            "created_at": { "display_type": "timestamp" },
+            "updated_at": { "display_type": "timestamp" }
+          }
+        }
+      ]
+    }
+  },
+  "record_permissions": {
+    "system-admin": ["create", "read", "update", "delete"]
+  },
+  "functionality": null
+}
+```
+
+---
+
+### 12.5 `messages`
+
+DB columns: `content`, `direction`, `sequence`, `visibility`, `created_at`
+
+```json
+{
+  "fields": {
+    "content": {
+      "data_type": "textarea",
+      "label": "Content",
+      "required": true,
+      "system": true,
+      "validation": null
+    },
+    "direction": {
+      "data_type": "text",
+      "label": "Direction",
+      "required": true,
+      "system": true,
+      "readonly": true,
+      "validation": null
+    },
+    "sequence": {
+      "data_type": "number",
+      "label": "Sequence",
+      "required": true,
+      "system": true,
+      "readonly": true,
+      "validation": null
+    },
+    "visibility": {
+      "data_type": "text",
+      "label": "Visibility",
+      "required": true,
+      "system": true,
+      "validation": null
+    },
+    "created_at": {
+      "data_type": "datetime",
+      "label": "Created",
+      "required": false,
+      "system": true,
+      "readonly": true,
+      "validation": null
+    }
+  },
+  "views": {
+    "default_list": {
+      "type": "list",
+      "display": "table",
+      "label": "Messages",
+      "fields": {
+        "content":    { "sortable": false, "display_type": "text" },
+        "direction":  { "sortable": true,  "display_type": "badge" },
+        "sequence":   { "sortable": true,  "display_type": "number" },
+        "visibility": { "sortable": true,  "display_type": "badge" },
+        "created_at": { "sortable": true,  "display_type": "timestamp" }
+      },
+      "default_sort": { "field": "sequence", "direction": "asc" }
+    },
+    "default_detail": {
+      "type": "detail",
+      "label": "Message Detail",
+      "sections": [
+        {
+          "title": "Content",
+          "fields": {
+            "content":    { "display_type": "textarea" },
+            "direction":  { "display_type": "text" },
+            "sequence":   { "display_type": "number" },
+            "visibility": { "display_type": "input" }
+          }
+        },
+        {
+          "title": "System",
+          "fields": {
+            "created_at": { "display_type": "timestamp" }
+          }
+        }
+      ]
+    }
+  },
+  "record_permissions": {
+    "system-admin": ["create", "read", "update", "delete"]
+  },
+  "functionality": null
+}
+```
+
+---
+
+### 12.6 `roles`
+
+DB columns: `slug`, `name`, `description`, `is_system`, `is_active`, `is_protected`, `created_at`, `updated_at`
+
+```json
+{
+  "fields": {
+    "slug": {
+      "data_type": "text",
+      "label": "Slug",
+      "required": true,
+      "system": true,
+      "validation": null
+    },
+    "name": {
+      "data_type": "text",
+      "label": "Name",
+      "required": true,
+      "system": true,
+      "validation": null
+    },
+    "description": {
+      "data_type": "textarea",
+      "label": "Description",
+      "required": false,
+      "system": true,
+      "validation": null
+    },
+    "is_system": {
+      "data_type": "boolean",
+      "label": "System Role",
+      "required": true,
+      "system": true,
+      "readonly": true,
+      "validation": null
+    },
+    "is_active": {
+      "data_type": "boolean",
+      "label": "Active",
+      "required": true,
+      "system": true,
+      "validation": null
+    },
+    "is_protected": {
+      "data_type": "boolean",
+      "label": "Protected",
+      "required": false,
+      "system": true,
+      "readonly": true,
+      "validation": null
+    },
+    "created_at": {
+      "data_type": "datetime",
+      "label": "Created",
+      "required": false,
+      "system": true,
+      "readonly": true,
+      "validation": null
+    },
+    "updated_at": {
+      "data_type": "datetime",
+      "label": "Updated",
+      "required": false,
+      "system": true,
+      "readonly": true,
+      "validation": null
+    }
+  },
+  "views": {
+    "default_list": {
+      "type": "list",
+      "display": "table",
+      "label": "Roles",
+      "fields": {
+        "name":         { "sortable": true, "display_type": "text" },
+        "slug":         { "sortable": true, "display_type": "text" },
+        "is_system":    { "sortable": true, "display_type": "badge" },
+        "is_active":    { "sortable": true, "display_type": "badge" },
+        "created_at":   { "sortable": true, "display_type": "timestamp" }
+      },
+      "default_sort": { "field": "name", "direction": "asc" }
+    },
+    "default_detail": {
+      "type": "detail",
+      "label": "Role Detail",
+      "sections": [
+        {
+          "title": "Identity",
+          "fields": {
+            "name":        { "display_type": "input" },
+            "slug":        { "display_type": "input" },
+            "description": { "display_type": "textarea" }
+          }
+        },
+        {
+          "title": "Flags",
+          "fields": {
+            "is_system":    { "display_type": "checkbox" },
+            "is_active":    { "display_type": "checkbox" },
+            "is_protected": { "display_type": "checkbox" }
+          }
+        },
+        {
+          "title": "System",
+          "fields": {
+            "created_at": { "display_type": "timestamp" },
+            "updated_at": { "display_type": "timestamp" }
+          }
+        }
+      ]
+    }
+  },
+  "record_permissions": {
+    "system-admin": ["create", "read", "update", "delete"]
+  },
+  "functionality": null
+}
+```
+
+---
+
+### 12.7 `apps`
+
+DB columns: `slug`, `name`, `description`, `icon`, `color`, `version`, `app_type`, `source`, `is_active`, `is_system`, `min_role`, `created_at`, `updated_at`
+
+```json
+{
+  "fields": {
+    "slug": {
+      "data_type": "text",
+      "label": "Slug",
+      "required": true,
+      "system": true,
+      "validation": null
+    },
+    "name": {
+      "data_type": "text",
+      "label": "Name",
+      "required": true,
+      "system": true,
+      "validation": null
+    },
+    "description": {
+      "data_type": "textarea",
+      "label": "Description",
+      "required": false,
+      "system": true,
+      "validation": null
+    },
+    "icon": {
+      "data_type": "text",
+      "label": "Icon",
+      "required": false,
+      "system": true,
+      "validation": null
+    },
+    "color": {
+      "data_type": "text",
+      "label": "Color",
+      "required": false,
+      "system": true,
+      "validation": null
+    },
+    "version": {
+      "data_type": "text",
+      "label": "Version",
+      "required": true,
+      "system": true,
+      "validation": null
+    },
+    "app_type": {
+      "data_type": "text",
+      "label": "App Type",
+      "required": true,
+      "system": true,
+      "readonly": true,
+      "validation": null
+    },
+    "source": {
+      "data_type": "text",
+      "label": "Source",
+      "required": true,
+      "system": true,
+      "readonly": true,
+      "validation": null
+    },
+    "is_active": {
+      "data_type": "boolean",
+      "label": "Active",
+      "required": true,
+      "system": true,
+      "validation": null
+    },
+    "is_system": {
+      "data_type": "boolean",
+      "label": "System App",
+      "required": true,
+      "system": true,
+      "readonly": true,
+      "validation": null
+    },
+    "min_role": {
+      "data_type": "text",
+      "label": "Minimum Role",
+      "required": false,
+      "system": true,
+      "validation": null
+    },
+    "created_at": {
+      "data_type": "datetime",
+      "label": "Created",
+      "required": false,
+      "system": true,
+      "readonly": true,
+      "validation": null
+    },
+    "updated_at": {
+      "data_type": "datetime",
+      "label": "Updated",
+      "required": false,
+      "system": true,
+      "readonly": true,
+      "validation": null
+    }
+  },
+  "views": {
+    "default_list": {
+      "type": "list",
+      "display": "table",
+      "label": "Apps",
+      "fields": {
+        "name":      { "sortable": true, "display_type": "text" },
+        "slug":      { "sortable": true, "display_type": "text" },
+        "version":   { "sortable": true, "display_type": "text" },
+        "app_type":  { "sortable": true, "display_type": "badge" },
+        "is_active": { "sortable": true, "display_type": "badge" },
+        "created_at":{ "sortable": true, "display_type": "timestamp" }
+      },
+      "default_sort": { "field": "name", "direction": "asc" }
+    },
+    "default_detail": {
+      "type": "detail",
+      "label": "App Detail",
+      "sections": [
+        {
+          "title": "Identity",
+          "fields": {
+            "name":        { "display_type": "input" },
+            "slug":        { "display_type": "input" },
+            "description": { "display_type": "textarea" },
+            "icon":        { "display_type": "input" },
+            "color":       { "display_type": "input" }
+          }
+        },
+        {
+          "title": "Configuration",
+          "fields": {
+            "version":   { "display_type": "input" },
+            "app_type":  { "display_type": "text" },
+            "source":    { "display_type": "text" },
+            "min_role":  { "display_type": "input" }
+          }
+        },
+        {
+          "title": "Flags",
+          "fields": {
+            "is_active": { "display_type": "checkbox" },
+            "is_system": { "display_type": "checkbox" }
+          }
+        },
+        {
+          "title": "System",
+          "fields": {
+            "created_at": { "display_type": "timestamp" },
+            "updated_at": { "display_type": "timestamp" }
+          }
+        }
+      ]
+    }
+  },
+  "record_permissions": {
+    "system-admin": ["create", "read", "update", "delete"]
+  },
+  "functionality": null
+}
+```
