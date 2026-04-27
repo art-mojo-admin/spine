@@ -101,7 +101,7 @@ The key is the **field name** in `snake_case`. This key is the canonical identif
 | `readonly` | boolean | — | Render as read-only regardless of edit mode |
 | `disabled` | boolean | — | Render as disabled |
 | `options` | `string[] \| {value: string, label: string}[]` | — | Required for `select`, `multiselect`, `radio` |
-| `permissions` | `Record<string, string[]>` | — | Field-level read/write per role |
+| `permissions` | `Record<string, string[]>` | ✅ | Field-level read/write per role — **required on every field** |
 | `validation` | object | — | Structural validation constraints (see §3.3) |
 
 ### 3.2 `data_type` — Full Enum (22 values)
@@ -156,13 +156,33 @@ These are the exact values accepted by `FieldDefinition.data_type` in `types.ts`
 
 ### 3.4 Field Examples
 
-**Minimal field:**
+**Minimal field** — `data_type`, `label`, `required`, and `permissions` are always required:
 ```json
 {
   "title": {
     "data_type": "text",
     "label": "Title",
-    "required": true
+    "required": true,
+    "permissions": {
+      "system-admin": ["read", "write"]
+    }
+  }
+}
+```
+
+**Minimal custom field** — non-system fields always include tenant roles:
+```json
+{
+  "notes": {
+    "data_type": "textarea",
+    "label": "Notes",
+    "required": false,
+    "permissions": {
+      "system-admin": ["read", "write"],
+      "admin": ["read", "write"],
+      "member": ["read", "write"],
+      "guest": ["read"]
+    }
   }
 }
 ```
@@ -962,6 +982,13 @@ Full field set, multi-section detail view, stats, filters, role permissions, fun
 ---
 
 ## 11. Rules & Constraints
+
+### `permissions` is required on every field
+- Every field **must** have a `permissions` object — this is enforced by convention across all system seeds
+- System fields (`system: true`) typically include only `system-admin` with `["read", "write"]`
+- Custom fields (`system: false`) should include all relevant tenant roles (`admin`, `member`, `guest`)
+- A field with no matching role entry is invisible and unwritable to that role
+- `validation: null` is acceptable (used in all system seeds) — omitting `validation` entirely is also fine
 
 ### Field names
 - Must be `snake_case`
