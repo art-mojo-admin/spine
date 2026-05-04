@@ -1,7 +1,34 @@
+/**
+ * @module src/components/runtime/DataStats
+ * @audience installer
+ * @layer frontend-component
+ * @stability stable
+ *
+ * Stat card grid for entity list pages. Calculates and renders summary
+ * statistics from the already-fetched `data` array:
+ * - **`count`** → total record count
+ * - **`filter_count`** → count of records matching `stat.filter` (dotted-path
+ *   keys supported, e.g. `'account.type'`)
+ *
+ * Stats are computed client-side from the current page of results, not from
+ * a separate API call. For accurate counts across all pages, the API should
+ * return aggregated counts in the pagination metadata instead.
+ *
+ * @seeAlso src/types/types.ts (EntityStat)
+ * @seeAlso src/components/runtime/DataListPage.tsx (mounts this component)
+ */
+
 import React from 'react'
 import * as Icons from '@heroicons/react/24/outline'
 import { EntityStat } from '../../types/types'
 
+/**
+ * Props for `DataStats`.
+ *
+ * @prop stats - Stat definitions from the list view config
+ * @prop data - Fetched records array to compute stats against
+ * @prop loading - If true, all values render as `'-'` instead of calculated values
+ */
 interface DataStatsProps {
   stats: EntityStat[]
   data: any[]
@@ -17,6 +44,13 @@ const colorMap: Record<string, string> = {
   gray: 'bg-gray-50 text-gray-600'
 }
 
+/**
+ * Stat card grid computed from the current data page.
+ *
+ * @param props - `DataStatsProps`
+ * @returns Grid of stat cards, or nothing if `stats` is empty
+ * @sideEffects none (pure rendering)
+ */
 export function DataStats({ stats, data, loading }: DataStatsProps) {
   const calculateStat = (stat: EntityStat): number => {
     if (!data) return 0

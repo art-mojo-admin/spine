@@ -1,6 +1,41 @@
+/**
+ * @module src/components/ui/Table
+ * @audience installer
+ * @layer frontend-component
+ * @stability stable
+ *
+ * Low-level sortable HTML table and pagination bar primitives.
+ *
+ * **`Table<T>`** — generic typed table. Accepts a `columns` definition
+ * array (`TableColumn<T>`) and a `data` array. Handles:
+ * - Sortable columns (toggling asc↔desc via `onSort` callback)
+ * - Custom cell rendering via per-column `render` function
+ * - Loading spinner and empty-state message
+ * - Row click navigation via `onRowClick`
+ *
+ * **`TablePagination`** — pagination bar with prev/next buttons, a sliding
+ * 5-page window of page-number buttons, and an items-per-page selector.
+ *
+ * **`TableColumn<T>`** — exported column descriptor type; extend it in
+ * `DataTable.tsx` for filterable column support.
+ *
+ * @seeAlso src/components/ui/DataTable.tsx (higher-level wrapper)
+ * @seeAlso src/lib/utils.ts (cn)
+ */
+
 import React from 'react'
 import { cn } from '../../lib/utils'
 
+/**
+ * Column descriptor for `Table<T>`.
+ *
+ * @prop key - Key of `T` to read the cell value from
+ * @prop title - Column header label
+ * @prop sortable - Enables sort indicator + click handler
+ * @prop render - Custom cell renderer `(value, item) => ReactNode`
+ * @prop width - CSS width string (e.g. `'10%'`, `'120px'`)
+ * @prop align - Text alignment for header and cells
+ */
 export interface TableColumn<T> {
   key: keyof T
   title: string
@@ -10,6 +45,18 @@ export interface TableColumn<T> {
   align?: 'left' | 'center' | 'right'
 }
 
+/**
+ * Props for `Table<T>`.
+ *
+ * @prop data - Array of typed row data
+ * @prop columns - Column descriptors
+ * @prop loading - Shows spinner instead of table when true
+ * @prop onSort - Callback `(column, direction)` when a sortable header is clicked
+ * @prop sortColumn - Currently sorted column key
+ * @prop sortDirection - Current sort direction
+ * @prop onRowClick - Callback when a row is clicked
+ * @prop emptyMessage - Text shown when `data` is empty
+ */
 interface TableProps<T> {
   data: T[]
   columns: TableColumn<T>[]
@@ -22,6 +69,13 @@ interface TableProps<T> {
   className?: string
 }
 
+/**
+ * Generic sortable table.
+ *
+ * @param props - `TableProps<T>`
+ * @returns HTML table, loading spinner, or empty-state message
+ * @sideEffects none (delegates sort to `onSort`, row click to `onRowClick`)
+ */
 export function Table<T extends Record<string, any>>({
   data,
   columns,
@@ -139,6 +193,16 @@ export function Table<T extends Record<string, any>>({
   )
 }
 
+/**
+ * Props for `TablePagination`.
+ *
+ * @prop currentPage - 1-based current page number
+ * @prop totalPages - Total number of pages
+ * @prop totalItems - Total row count (for "Showing X–Y of Z" display)
+ * @prop itemsPerPage - Rows per page
+ * @prop onPageChange - Callback `(page)` on prev/next/page-number click
+ * @prop onItemsPerPageChange - Callback when the per-page selector changes
+ */
 interface TablePaginationProps {
   currentPage: number
   totalPages: number
@@ -148,6 +212,13 @@ interface TablePaginationProps {
   onItemsPerPageChange: (itemsPerPage: number) => void
 }
 
+/**
+ * Pagination bar with sliding page window and items-per-page control.
+ *
+ * @param props - `TablePaginationProps`
+ * @returns Flex bar with "Showing X–Y of Z" label and page buttons
+ * @sideEffects none (delegates navigation to `onPageChange`)
+ */
 export function TablePagination({
   currentPage,
   totalPages,

@@ -1,4 +1,31 @@
-import React, { useState } from 'react'
+/**
+ * @module src/pages/admin/TypeDetailPage
+ * @audience installer
+ * @layer frontend-page
+ * @stability stable
+ *
+ * Create / view / edit / delete page for a single type record.
+ *
+ * **Route params:** `id` (UUID or slug) and optional `kind` (item | account | person).
+ * When `id === 'new'`, the page operates in create mode with kind-specific
+ * defaults. The ID can be either a UUID or a slug — the component detects
+ * which format it is and selects the appropriate query param.
+ *
+ * **Schema editing:** the `design_schema` JSON is exposed in a raw
+ * `<textarea>` and parsed at save time; invalid JSON falls back to
+ * `{ fields: {} }` with a console warning.
+ *
+ * **Constraint:** `(app_id IS NOT NULL) OR (ownership = 'system')` is
+ * enforced client-side before the save request.
+ *
+ * **Items tab:** a `DataTable` below the form shows items currently using
+ * this type, fetched from `/api/admin-data?action=list&entity=items&type_slug=…`.
+ *
+ * @seeAlso src/pages/admin/TypesPage.tsx
+ * @seeAlso src/hooks/useApi.ts (useApi, useMutation)
+ */
+
+import React, { useState, useEffect } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import { useApi } from '../../hooks/useApi'
 import { useMutation } from '../../hooks/useApi'
@@ -120,13 +147,13 @@ export function TypeDetailPage() {
           updated_at: ''
         }
       } else {
-        // Validate UUID format for edit mode
+        if (!id) throw new Error('Type ID or slug is required')
         const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i
-        if (!id || !uuidRegex.test(id)) {
-          throw new Error('Invalid ID format')
-        }
+        const url = uuidRegex.test(id)
+          ? `/api/types?action=get&id=${id}`
+          : `/api/types?action=get&slug=${id}`
         
-        const response = await apiFetch(`/api/types?action=get&id=${id}`)
+        const response = await apiFetch(url)
         if (!response.ok) {
           throw new Error(response.status === 500 ? 'Type not found' : 'Failed to fetch type')
         }
@@ -202,7 +229,7 @@ export function TypeDetailPage() {
         // Navigate to the new type
         const result = await response.json()
         const newId = result.data?.id || result.id
-        navigate(`/admin/configs/${kind || 'types'}/${newId}`)
+        navigate(`/spine-framework/admin/configs/${kind || 'types'}/${newId}`)
       } else {
         await refetch()
         setIsEditing(false)
@@ -217,7 +244,7 @@ export function TypeDetailPage() {
   // Handle cancel
   const handleCancel = () => {
     if (isCreateMode) {
-      navigate('/admin/configs/types')
+      navigate('/spine-framework/admin/configs/types')
       return
     }
     
@@ -245,18 +272,23 @@ export function TypeDetailPage() {
   }
 
   // Fetch items of this type (only in edit mode)
-  const { data: items, loading: itemsLoading } = useApi<TypeItem[]>(
+  const { data: items, loading: itemsLoading, execute: fetchItems } = useApi<TypeItem[]>(
     async () => {
-      if (isCreateMode) {
-        return [] // No items for create mode
+      if (isCreateMode || !type?.id) {
+        return [] // Not ready yet
       }
-      const response = await apiFetch(`/api/admin-data?entity=items&type_id=${id}`)
+      const response = await apiFetch(`/api/admin-data?entity=items&type_id=${type.id}`)
       if (!response.ok) throw new Error('Failed to fetch items')
       const result = await response.json()
       return result.data || []
     },
     { immediate: !isCreateMode }
   )
+
+  // Re-fetch items once type UUID is resolved (e.g. when loaded via slug)
+  useEffect(() => {
+    if (!isCreateMode && type?.id) fetchItems()
+  }, [type?.id])
 
   // Delete mutation
   const deleteMutation = useMutation(
@@ -269,7 +301,7 @@ export function TypeDetailPage() {
     },
     {
       onSuccess: () => {
-        navigate(`/admin/configs/${kind || 'types'}`)
+        navigate(`/spine-framework/admin/configs/${kind || 'types'}`)
       }
     }
   )
@@ -338,7 +370,7 @@ export function TypeDetailPage() {
         <div className="flex items-center gap-4">
           <Button
             variant="ghost"
-            onClick={() => isCreateMode ? navigate('/admin/configs/types') : navigate(-1)}
+            onClick={() => isCreateMode ? navigate('/spine-framework/admin/configs/types') : navigate(-1)}
           >
             <ArrowLeftIcon className="h-5 w-5" />
           </Button>

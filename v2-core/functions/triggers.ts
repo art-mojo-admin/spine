@@ -1,12 +1,97 @@
+/**
+ * @module triggers
+ * @audience core-contributor
+ * @layer api-handler
+ * @stability stable
+ *
+ * CRUD API for the `triggers` table, plus execution history access.
+ * Triggers bind event types to pipelines. When an event fires, the trigger
+ * engine evaluates active triggers via `_shared/trigger-engine.ts`.
+ *
+ * **Routed by:** `GET/POST/PATCH/DELETE /.netlify/functions/triggers`
+ *
+ * **Actions:**
+ * | method | ?action    | handler       |
+ * |--------|------------|---------------|
+ * | GET    | by-event   | listByEvent   |
+ * | GET    | executions | getExecutions |
+ * | POST   | toggle     | toggle        |
+ * | GET    | ?id        | get           |
+ * | GET    | (default)  | list          |
+ * | POST   | —          | create        |
+ * | PATCH  | —          | update        |
+ * | DELETE | —          | remove (soft) |
+ *
+ * **Authorization:** `create` requires system admin OR first-surface `canCreate`
+ * permission. All other operations use `ctx.db` RLS.
+ *
+ * Also exports `AGENT_EVENT_TYPES` constant and `getAgentEventTypes()` helper
+ * for referencing well-known agent event slugs in trigger configuration.
+ *
+ * @seeAlso trigger-engine.ts (checkAndFireTriggers — runtime evaluation)
+ * @seeAlso pipelines.ts (pipeline_id FK on triggers)
+ * @seeAlso audit.ts (emitLog for trigger.* events)
+ */
+
 import { createHandler } from './_shared/middleware'
 import { joins } from './_shared/db'
 import { emitLog } from './_shared/audit'
 import { PermissionEngine, sanitizeRecordData } from './_shared/permissions'
 
-// Type assertion to ensure we're using the instance
 const permissions = PermissionEngine as any
 
-// List triggers by event type - RLS enforced
+// ─── CONSTANTS ─────────────────────────────────────────────────────────────────
+
+/**
+ * Well-known agent event type slugs for use in trigger `event_type` config.
+ * These are emitted by `agent-runner.ts` during inference, tool dispatch,
+ * and escalation workflows.
+ */
+export const AGENT_EVENT_TYPES = {
+  // Inference events
+  INFERENCE_COMPLETED: 'agent.inference.completed',
+  INFERENCE_FAILED: 'agent.inference.failed',
+  LOW_CONFIDENCE: 'agent.inference.low_confidence',
+  
+  // Tool events
+  TOOL_CALLED: 'agent.tool.called',
+  TOOL_COMPLETED: 'agent.tool.completed',
+  TOOL_FAILED: 'agent.tool.failed',
+  
+  // Conversation events
+  MESSAGE_RECEIVED: 'agent.message.received',
+  MESSAGE_SENT: 'agent.message.sent',
+  THREAD_CREATED: 'agent.thread.created',
+  
+  // Escalation events
+  ESCALATION_TRIGGERED: 'agent.escalation.triggered',
+  ESCALATION_RESOLVED: 'agent.escalation.resolved',
+  HUMAN_HANDOFF: 'agent.human.handoff'
+} as const
+
+/**
+ * Returns all agent event type slugs as a flat string array.
+ * Useful for populating trigger event_type dropdowns.
+ *
+ * @returns string[] — all values from AGENT_EVENT_TYPES
+ */
+export function getAgentEventTypes(): string[] {
+  return Object.values(AGENT_EVENT_TYPES)
+}
+
+// ─── HANDLERS ─────────────────────────────────────────────────────────────────
+
+/**
+ * Lists active triggers filtered by `event_type`.
+ *
+ * Query params: `event_type` (required), `app_id`, `include_inactive` ('true')
+ *
+ * @returns Sanitized trigger records ordered by name
+ * @throws Error('event_type is required')
+ * @throws Error('Account context required')
+ * @sideEffects DB read: triggers table
+ * @calledBy handler (GET ?action=by-event)
+ */
 export const listByEvent = createHandler(async (ctx, body) => {
   const { event_type, app_id, include_inactive } = ctx.query || {}
 
@@ -44,7 +129,17 @@ export const listByEvent = createHandler(async (ctx, body) => {
   return sanitized
 })
 
-// List all triggers - RLS enforced
+/**
+ * Lists all triggers for the account, with optional filtering.
+ *
+ * Query params: `app_id`, `event_type`, `include_inactive` ('true')
+ *
+ * @returns Sanitized trigger records ordered by name
+ * @throws Error('Account context required')
+ * @sideEffects DB read: triggers table (with app + createdBy joins)
+ * @calledBy handler (GET, no id)
+ * @testUnit tests/unit/triggers.test.ts — 'list'
+ */
 export const list = createHandler(async (ctx, body) => {
   const { app_id, event_type, include_inactive } = ctx.query || {}
 
@@ -81,7 +176,17 @@ export const list = createHandler(async (ctx, body) => {
   return sanitized
 })
 
-// Get single trigger - RLS enforced
+/**
+ * Returns a single trigger by UUID.
+ *
+ * Query params: `id` (required)
+ *
+ * @returns Sanitized trigger record
+ * @throws Error('Trigger ID is required')
+ * @throws PostgREST error if not found or RLS denied
+ * @sideEffects DB read: triggers table
+ * @calledBy handler (GET ?id)
+ */
 export const get = createHandler(async (ctx, body) => {
   const { id } = ctx.query || {}
 
@@ -101,7 +206,24 @@ export const get = createHandler(async (ctx, body) => {
   return await sanitizeRecordData(ctx, data, 'trigger')
 })
 
-// Create trigger - RLS enforced
+/**
+ * Creates a new trigger. Requires system admin or first-surface `canCreate`.
+ * Audit log emitted on success.
+ *
+ * Body: `name`, `trigger_type` (required), plus optional `app_id`,
+ * `description`, `event_type`, `config`, `pipeline_id`, `metadata`, `is_active`
+ *
+ * @returns Inserted trigger record
+ * @throws Error('name and trigger_type are required')
+ * @throws Error('Insufficient permissions to create triggers')
+ * @inputSpec trigger_type: string — entity lifecycle event slug
+ * @inputSpec config: object — filter conditions for trigger evaluation
+ * @inputSpec pipeline_id: string | null — pipeline to run on match
+ * @sideEffects DB write: triggers table (INSERT)
+ * @sideEffects audit: emitLog('trigger.created')
+ * @calledBy handler (POST)
+ * @testUnit tests/unit/triggers.test.ts — 'create'
+ */
 export const create = createHandler(async (ctx, body) => {
   const { app_id, name, description, trigger_type, event_type, config, pipeline_id, metadata, is_active } = body
 
@@ -155,7 +277,18 @@ export const create = createHandler(async (ctx, body) => {
   return data
 })
 
-// Update trigger - RLS enforced
+/**
+ * Updates a trigger. Authenticated principal required. Audit logged.
+ *
+ * Body/query: `id` (required), plus any updatable fields
+ *
+ * @returns Updated trigger record
+ * @throws Error('Trigger ID is required')
+ * @throws Error('Trigger not found')
+ * @sideEffects DB write: triggers table (UPDATE)
+ * @sideEffects audit: emitLog('trigger.updated', { before, after })
+ * @calledBy handler (PATCH)
+ */
 export const update = createHandler(async (ctx, body) => {
   const id = body?.id || ctx.query?.id
   const { id: _bodyId, app_id, name, description, trigger_type, event_type, config, pipeline_id, metadata, is_active } = body || {}
@@ -207,7 +340,18 @@ export const update = createHandler(async (ctx, body) => {
   return data
 })
 
-// Soft delete trigger - RLS enforced
+/**
+ * Soft-deletes a trigger (sets `is_active = false`). Audit logged.
+ *
+ * Body/query: `id` (required)
+ *
+ * @returns Updated trigger record (with is_active: false)
+ * @throws Error('Trigger ID is required')
+ * @throws Error('Trigger not found')
+ * @sideEffects DB write: triggers table (UPDATE is_active=false)
+ * @sideEffects audit: emitLog('trigger.deleted', { before, after })
+ * @calledBy handler (DELETE)
+ */
 export const remove = createHandler(async (ctx, body) => {
   const id = body?.id || ctx.query?.id
 
@@ -250,7 +394,17 @@ export const remove = createHandler(async (ctx, body) => {
   return data
 })
 
-// Toggle trigger (activate/deactivate) - RLS enforced
+/**
+ * Activates or deactivates a trigger. Emits `trigger.toggled` audit event.
+ *
+ * Body: `id` (required), `is_active` (required, boolean)
+ *
+ * @returns Updated trigger record
+ * @throws Error('Trigger ID and is_active are required')
+ * @sideEffects DB write: triggers table (UPDATE is_active)
+ * @sideEffects audit: emitLog('trigger.toggled')
+ * @calledBy handler (POST ?action=toggle)
+ */
 export const toggle = createHandler(async (ctx, body) => {
   const { id, is_active } = body
 
@@ -278,7 +432,16 @@ export const toggle = createHandler(async (ctx, body) => {
   return data
 })
 
-// Get trigger execution history - RLS enforced
+/**
+ * Returns paginated execution history from `trigger_executions`, newest-first.
+ *
+ * Query params: `trigger_id` (required), `limit` (default 50), `offset` (default 0)
+ *
+ * @returns Array of trigger_executions rows
+ * @throws Error('Trigger ID is required')
+ * @sideEffects DB read: trigger_executions table
+ * @calledBy handler (GET ?action=executions)
+ */
 export const getExecutions = createHandler(async (ctx, body) => {
   const { trigger_id, limit = 50, offset = 0 } = ctx.query || {}
 
@@ -301,7 +464,13 @@ export const getExecutions = createHandler(async (ctx, body) => {
   return data
 })
 
-// Main handler function
+// ─── MAIN HANDLER ────────────────────────────────────────────────────────────
+
+/**
+ * Netlify function entry point. See module dispatch table for full routing.
+ * @throws Error('Invalid action or method') on unmatched combination
+ * @calledBy Netlify function routing
+ */
 export const handler = createHandler(async (ctx, body) => {
   const { action } = ctx.query || {}
   const method = ctx.query?.method || 'GET'

@@ -1,3 +1,18 @@
+/**
+ * @module src/pages/admin/IntegrationsPage
+ * @audience installer
+ * @layer frontend-page
+ * @stability stable
+ *
+ * Admin list page for third-party integrations (integration instances).
+ * Fetches all integration instances via `/api/integrations?action=list`,
+ * applies client-side search, status filter, and sort. Renders inside
+ * `AdminListPage`. Row clicks navigate to
+ * `/spine-framework/admin/configs/integrations/:id`.
+ *
+ * @seeAlso src/pages/admin/IntegrationDetailPage.tsx
+ */
+
 import { useState } from 'react'
 import { 
   LinkIcon,
@@ -92,7 +107,7 @@ export function IntegrationsPage() {
   }
 
   const handleRowClick = (integration: Integration) => {
-    window.location.href = `/admin/configs/integrations/${integration.id}`
+    window.location.href = `/spine-framework/admin/configs/integrations/${integration.id}`
   }
 
   // Sort integrations
@@ -171,7 +186,7 @@ export function IntegrationsPage() {
       title="Integrations"
       description="Configure external service integrations and connections"
       newButtonText="Add Integration"
-      newButtonHref="/admin/configs/integrations/new"
+      newButtonHref="/spine-framework/admin/configs/integrations/new"
       statsCards={statsCards}
       searchPlaceholder="Search integrations..."
       searchValue={searchTerm}

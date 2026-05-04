@@ -1,9 +1,56 @@
+/**
+ * @module integrations
+ * @audience core-contributor
+ * @layer api-handler
+ * @stability stable
+ *
+ * CRUD API for the `integrations` table. Integration records describe
+ * third-party service connections (API credentials, provider, version,
+ * configuration). Each integration is scoped to an account and optionally
+ * to an app. `is_configured` tracks whether credentials have been set.
+ *
+ * **Routed by:** `GET/POST/PATCH/DELETE /.netlify/functions/integrations`
+ *
+ * **Standard CRUD — routes directly by HTTP method (no ?action switch):**
+ * | method | condition | handler |
+ * |--------|-----------|---------|
+ * | GET    | ?id       | get     |
+ * | GET    | (default) | list    |
+ * | POST   | —         | create  |
+ * | PATCH  | —         | update  |
+ * | DELETE | —         | remove (soft) |
+ *
+ * **Authorization:** All operations use `ctx.db` (RLS-scoped). Authenticated
+ * principal required for writes.
+ *
+ * INVARIANT: `remove` is a soft delete (sets `is_active = false`). Hard deletes
+ *   are not supported to preserve audit trails on integration-linked data.
+ * INVARIANT: `update` only patches the explicit allowlist of fields.
+ *
+ * @seeAlso api-keys.ts (api_keys belong to integrations)
+ * @seeAlso trigger-engine.ts (integration webhooks trigger pipelines)
+ * @seeAlso audit.ts (emitLog for integration.* events)
+ */
+
 import { createHandler } from './_shared/middleware'
 import { joins } from './_shared/db'
 import { emitLog } from './_shared/audit'
 import { sanitizeRecordData } from './_shared/permissions'
 
-// List integrations
+// ─── HANDLERS ─────────────────────────────────────────────────────────────────
+
+/**
+ * Lists integrations for the account with optional filtering.
+ *
+ * Query params: `integration_type`, `provider`, `is_active` ('true'/'false'),
+ * `is_configured` ('true'/'false'), `limit` (default 100), `offset` (default 0)
+ *
+ * @returns Sanitized integration records ordered by name
+ * @throws Error('Account context required')
+ * @sideEffects DB read: integrations table (with app + createdBy joins)
+ * @calledBy handler (GET, no id)
+ * @testUnit tests/unit/integrations.test.ts — 'list'
+ */
 export const list = createHandler(async (ctx, _body) => {
   const { integration_type, provider, is_active, is_configured, limit = 100, offset = 0 } = ctx.query || {}
 
@@ -44,7 +91,17 @@ export const list = createHandler(async (ctx, _body) => {
   return sanitized
 })
 
-// Get single integration
+/**
+ * Returns a single integration by UUID.
+ *
+ * Query params: `id` (required)
+ *
+ * @returns Sanitized integration record
+ * @throws Error('Integration ID is required')
+ * @throws PostgREST error if not found or RLS denied
+ * @sideEffects DB read: integrations table
+ * @calledBy handler (GET ?id)
+ */
 export const get = createHandler(async (ctx, _body) => {
   const { id } = ctx.query || {}
 
@@ -63,7 +120,22 @@ export const get = createHandler(async (ctx, _body) => {
   return await sanitizeRecordData(ctx, data, 'integration')
 })
 
-// Create integration
+/**
+ * Creates a new integration record. Authenticated principal required.
+ * Audit logged on success.
+ *
+ * Body: `name`, `integration_type`, `provider` (required), plus optional
+ * `app_id`, `description`, `version` (default '1.0.0'), `config`, `credentials`,
+ * `metadata`
+ *
+ * @returns Inserted integration record
+ * @throws Error('name, integration_type, and provider are required')
+ * @inputSpec credentials: object — sensitive; stored encrypted at rest via DB policy
+ * @inputSpec is_configured: boolean — set to true once credentials are populated
+ * @sideEffects DB write: integrations table (INSERT)
+ * @sideEffects audit: emitLog('integration.created')
+ * @calledBy handler (POST)
+ */
 export const create = createHandler(async (ctx, body) => {
   const { app_id, name, description, integration_type, provider, version, config, credentials, metadata } = body
 
@@ -103,7 +175,19 @@ export const create = createHandler(async (ctx, body) => {
   return data
 })
 
-// Update integration
+/**
+ * Updates an integration. Only allowed fields are patched. Audit logged.
+ *
+ * Body/query: `id` (required), plus any of: name, description,
+ * integration_type, provider, version, config, credentials, metadata,
+ * is_active, is_configured
+ *
+ * @returns Updated integration record
+ * @throws Error('Integration ID is required')
+ * @sideEffects DB write: integrations table (UPDATE)
+ * @sideEffects audit: emitLog('integration.updated')
+ * @calledBy handler (PATCH)
+ */
 export const update = createHandler(async (ctx, body) => {
   const id = body?.id || ctx.query?.id
   const { id: _bodyId, ...updates } = body || {}
@@ -135,7 +219,18 @@ export const update = createHandler(async (ctx, body) => {
   return data
 })
 
-// Delete integration (soft delete — deactivate)
+/**
+ * Soft-deletes an integration (sets `is_active = false`). Audit logged.
+ *
+ * Query params: `id` (required)
+ *
+ * @returns Updated integration record (is_active: false)
+ * @throws Error('Integration ID is required')
+ * @throws Error('Integration not found')
+ * @sideEffects DB write: integrations table (UPDATE is_active=false)
+ * @sideEffects audit: emitLog('integration.deleted', { before, after })
+ * @calledBy handler (DELETE)
+ */
 export const remove = createHandler(async (ctx, _body) => {
   const id = ctx.query?.id
 
@@ -168,7 +263,14 @@ export const remove = createHandler(async (ctx, _body) => {
   return data
 })
 
-// Main handler function
+// ─── MAIN HANDLER ────────────────────────────────────────────────────────────
+
+/**
+ * Netlify function entry point. Routes directly by HTTP method (no ?action).
+ * GET ?id → get | GET → list | POST → create | PATCH → update | DELETE → remove
+ * @throws Error('Unsupported method: <method>')
+ * @calledBy Netlify function routing
+ */
 export const handler = createHandler(async (ctx, body) => {
   const method = ctx.query?.method || 'GET'
 

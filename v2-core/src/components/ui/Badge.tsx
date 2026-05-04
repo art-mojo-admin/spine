@@ -1,6 +1,33 @@
+/**
+ * @module src/components/ui/Badge
+ * @audience installer
+ * @layer frontend-component
+ * @stability stable
+ *
+ * Inline badge and status label primitives.
+ *
+ * **`Badge`** — general-purpose pill with `variant` and `size` props.
+ * Variants: `default`, `success`, `warning`, `error`, `info`, `primary`,
+ * `secondary`. Accepts an optional `className` override.
+ *
+ * **`StatusBadge`** — convenience wrapper that maps a named `status` string
+ * (`'active'` | `'inactive'` | `'pending'` | `'success'` | `'error'` |
+ * `'warning'`) to the appropriate `Badge` variant and default label text.
+ * The label can be overridden via `children`.
+ *
+ * @seeAlso src/lib/utils.ts (cn)
+ */
+
 import React from 'react'
 import { cn } from '../../lib/utils'
 
+/**
+ * Props for `Badge`.
+ *
+ * @prop variant - Colour scheme (default: `'default'`)
+ * @prop size - `'sm'` | `'md'` (default: `'md'`)
+ * @prop className - Additional Tailwind classes
+ */
 interface BadgeProps {
   children: React.ReactNode
   variant?: 'default' | 'success' | 'warning' | 'error' | 'info' | 'primary' | 'secondary'
@@ -8,6 +35,13 @@ interface BadgeProps {
   className?: string
 }
 
+/**
+ * Inline pill badge.
+ *
+ * @param props - `BadgeProps`
+ * @returns `<span>` with appropriate colour and size classes
+ * @sideEffects none (pure rendering)
+ */
 export function Badge({
   children,
   variant = 'default',
@@ -43,12 +77,26 @@ export function Badge({
   )
 }
 
+/**
+ * Props for `StatusBadge`.
+ *
+ * @prop status - Named status value that maps to a variant + default label
+ * @prop children - Optional label override
+ * @prop className - Additional Tailwind classes
+ */
 interface StatusBadgeProps {
   status: 'active' | 'inactive' | 'pending' | 'success' | 'error' | 'warning'
   children?: React.ReactNode
   className?: string
 }
 
+/**
+ * Status-aware badge with sensible defaults per status value.
+ *
+ * @param props - `StatusBadgeProps`
+ * @returns `<Badge>` with variant and text resolved from `status`
+ * @sideEffects none (pure rendering)
+ */
 export function StatusBadge({ status, children, className }: StatusBadgeProps) {
   const statusConfig = {
     active: { variant: 'info' as const, text: 'Active' },

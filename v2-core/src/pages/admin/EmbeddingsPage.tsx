@@ -1,3 +1,18 @@
+/**
+ * @module src/pages/admin/EmbeddingsPage
+ * @audience installer
+ * @layer frontend-page
+ * @stability stable
+ *
+ * Admin list page for embedding model configurations. Fetches all models
+ * via `/api/embeddings?action=list`, applies client-side search, provider
+ * filter (`openai` | `anthropic` | `local` | `custom`), and sort. Renders
+ * inside `AdminListPage`. Row clicks navigate to
+ * `/spine-framework/admin/configs/embeddings/:id`.
+ *
+ * @seeAlso src/pages/admin/EmbeddingDetailPage.tsx
+ */
+
 import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { 
@@ -234,7 +249,7 @@ export function EmbeddingsPage() {
   }
 
   const handleRowClick = (model: EmbeddingModel) => {
-    navigate(`/admin/configs/embeddings/${model.id}`)
+    navigate(`/spine-framework/admin/configs/embeddings/${model.id}`)
   }
 
   // Sort models
@@ -302,7 +317,7 @@ export function EmbeddingsPage() {
       title="Embeddings"
       description="Manage embedding models and document indexes"
       newButtonText="New Model"
-      newButtonHref="/admin/configs/embeddings/new"
+      newButtonHref="/spine-framework/admin/configs/embeddings/new"
       statsCards={statsCards}
       searchPlaceholder="Search models..."
       searchValue={searchTerm}

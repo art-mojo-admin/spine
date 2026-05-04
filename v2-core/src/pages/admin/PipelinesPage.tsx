@@ -1,3 +1,18 @@
+/**
+ * @module src/pages/admin/PipelinesPage
+ * @audience installer
+ * @layer frontend-page
+ * @stability stable
+ *
+ * Admin list page for automation pipelines. Fetches all pipelines via
+ * `/api/pipelines?action=list`, applies client-side search, status filter,
+ * trigger-type filter, and sort. Renders inside `AdminListPage` with stat
+ * cards and a sortable table. Row clicks navigate to
+ * `/spine-framework/admin/configs/pipelines/:id`.
+ *
+ * @seeAlso src/pages/admin/PipelineDetailPage.tsx
+ */
+
 import React, { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useApi } from '../../hooks/useApi'
@@ -200,15 +215,15 @@ export function PipelinesPage() {
   }
 
   const handleViewExecutions = (pipeline: Pipeline) => {
-    navigate(`/admin/configs/pipelines/${pipeline.id}/executions`)
+    navigate(`/spine-framework/admin/configs/pipelines/${pipeline.id}/executions`)
   }
 
   const handleRowClick = (pipeline: Pipeline) => {
-    navigate(`/admin/configs/pipelines/${pipeline.id}`)
+    navigate(`/spine-framework/admin/configs/pipelines/${pipeline.id}`)
   }
 
   const handleEditPipeline = (pipeline: Pipeline) => {
-    navigate(`/admin/configs/pipelines/${pipeline.id}/edit`)
+    navigate(`/spine-framework/admin/configs/pipelines/${pipeline.id}/edit`)
   }
 
   const handleSort = (key: string) => {
@@ -225,7 +240,7 @@ export function PipelinesPage() {
       title="Pipelines"
       description="Manage automated workflows and processes"
       newButtonText="New Pipeline"
-      newButtonHref="/admin/configs/pipelines/new"
+      newButtonHref="/spine-framework/admin/configs/pipelines/new"
       statsCards={[
         {
           title: "Total Pipelines",
@@ -277,7 +292,7 @@ export function PipelinesPage() {
             Get started by creating your first automated workflow.
           </p>
           <div className="mt-6">
-            <Button onClick={() => navigate('/admin/configs/pipelines/new')}>
+            <Button onClick={() => navigate('/spine-framework/admin/configs/pipelines/new')}>
               <PlusIcon className="w-4 h-4 mr-2" />
               Create Your First Pipeline
             </Button>

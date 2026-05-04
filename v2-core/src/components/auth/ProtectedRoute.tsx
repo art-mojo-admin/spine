@@ -1,12 +1,55 @@
+/**
+ * @module src/components/auth/ProtectedRoute
+ * @audience installer
+ * @layer frontend-component
+ * @stability stable
+ *
+ * React Router route guard that enforces authentication and optional
+ * system-admin role checks. Wrap any `<Route>` element that requires
+ * a logged-in user.
+ *
+ * **Auth check:** If `AuthContext.user` is null (not yet logged in or
+ * session expired), redirects to `/login` using `<Navigate replace>`.
+ *
+ * **System-admin check:** When `requireSystemAdmin=true`, verifies that
+ * `user.roles` includes `'system_admin'`. On failure it renders an
+ * access-denied screen rather than redirecting, to avoid redirect loops.
+ *
+ * @example
+ * ```tsx
+ * <Route path="/admin" element={
+ *   <ProtectedRoute requireSystemAdmin>
+ *     <AdminLayout />
+ *   </ProtectedRoute>
+ * } />
+ * ```
+ *
+ * @seeAlso src/contexts/AuthContext.tsx
+ */
+
 import React from 'react'
 import { Navigate } from 'react-router-dom'
 import { useAuth } from '../../contexts/AuthContext'
 
+/**
+ * Props for `ProtectedRoute`.
+ *
+ * @prop children - The protected route content
+ * @prop requireSystemAdmin - If true, also requires the `system_admin` role
+ */
 interface ProtectedRouteProps {
   children: React.ReactNode
   requireSystemAdmin?: boolean
 }
 
+/**
+ * Route guard component.
+ *
+ * @param props - `ProtectedRouteProps`
+ * @returns `children` when authorised, a redirect to `/login` when
+ *   unauthenticated, or an access-denied screen when role check fails
+ * @sideEffects none (navigation is declarative via `<Navigate>`)
+ */
 export function ProtectedRoute({ children, requireSystemAdmin = false }: ProtectedRouteProps) {
   const { user } = useAuth()
 

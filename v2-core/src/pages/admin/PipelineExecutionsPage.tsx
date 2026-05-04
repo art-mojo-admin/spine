@@ -1,3 +1,19 @@
+/**
+ * @module src/pages/admin/PipelineExecutionsPage
+ * @audience installer
+ * @layer frontend-page
+ * @stability stable
+ *
+ * Read-only log of pipeline execution history. Fetches execution records
+ * via `/api/pipelines?action=executions`, applies client-side search,
+ * status filter (`running` | `success` | `failed` | `cancelled`), and
+ * sort. Renders inside `AdminListPage` with a sortable table showing
+ * pipeline name, status, duration, and timestamps.
+ *
+ * @seeAlso src/pages/admin/PipelinesPage.tsx
+ * @seeAlso src/pages/admin/ObservabilityDashboard.tsx
+ */
+
 import React, { useState } from 'react'
 import { 
   PlayIcon,
@@ -82,7 +98,7 @@ export function PipelineExecutionsPage() {
   }
 
   const handleRowClick = (exec: PipelineExecution) => {
-    window.location.href = `/admin/observability/executions/${exec.id}`
+    window.location.href = `/spine-framework/admin/observability/executions/${exec.id}`
   }
 
   const sortedExecutions = [...(filteredExecutions || [])].sort((a, b) => {

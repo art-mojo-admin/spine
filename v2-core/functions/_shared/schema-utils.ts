@@ -1,14 +1,53 @@
-import { FieldDefinition } from '../../src/types/types'
-
 /**
- * Schema Generation and Data Transformation Utilities
- * 
- * This module provides functions for:
- * - Generating validation schemas from design schemas
- * - Sanitizing input data based on data_type
- * - Formatting output data for user-friendly display
+ * @module schema-utils
+ * @audience both
+ * @layer shared-core
+ * @stability stable
+ *
+ * Schema generation and field-level data transformation for all Spine types.
+ *
+ * Three public functions form the core contract:
+ *   - `generateValidationSchema` — derives a runtime validation schema from a
+ *     `design_schema`, stripping display/permission info and keeping only
+ *     structural constraints.
+ *   - `sanitizeFieldData` — coerces and validates a single field value for
+ *     write (create/update) operations. Throws on invalid data.
+ *   - `formatFieldData` — converts a stored field value to a human-readable
+ *     display string for read operations. Never throws.
+ *   - `transformRecordData` — applies sanitize or format to all fields in a
+ *     record using a pre-generated ValidationSchema.
+ *
+ * These are called by `permissions.ts` (`validateFirstSurfaceUpdatePermissions`
+ * and `sanitizeFirstSurfaceRecordData`) — do not call them directly from API
+ * handlers. Use `PermissionEngine.sanitizeRecordData` / `validateUpdatePermissions`.
+ *
+ * INVARIANT: all sanitize functions throw on invalid data. Callers must catch
+ *   errors and convert them to field-level validation error messages.
+ * INVARIANT: all format functions return the raw data unchanged if formatting
+ *   is not applicable (never throw, never return null for non-null input).
+ *
+ * @seeAlso permissions.ts (primary caller of sanitizeFieldData, formatFieldData)
+ * @seeAlso src/types/types.ts (FieldDefinition interface)
+ * @seeAlso index.ts (not re-exported — internal to core; use PermissionEngine)
  */
 
+import { FieldDefinition } from '../../src/types/types'
+
+// ─── TYPES ───────────────────────────────────────────────────────────────
+
+/**
+ * Structural-only validation schema derived from a `design_schema`.
+ *
+ * Contains one entry per field with the field's `data_type` and any explicit
+ * `validation` constraints. Display properties (`display_type`, views, sections)
+ * and permission properties are stripped. Used as input to `sanitizeFieldData`
+ * and `formatFieldData`.
+ *
+ * @inputSpec none — output type of generateValidationSchema
+ * @outputSpec fields: Record<fieldName, { data_type, required?, ...constraints }>
+ * @calledBy generateValidationSchema (producer), transformRecordData,
+ *   permissions.ts validateFirstSurfaceUpdatePermissions (consumer)
+ */
 export interface ValidationSchema {
   fields: Record<string, {
     data_type: string
@@ -17,10 +56,34 @@ export interface ValidationSchema {
   }>
 }
 
+// ─── PUBLIC API ──────────────────────────────────────────────────────────────
+
 /**
- * Generate a validation schema from a design schema
- * Extracts only structural validation rules (no permissions, no display_type, no views, no functionality)
- * Every field's explicit constraints are extracted exactly as declared.
+ * Derives a `ValidationSchema` from a `design_schema` by extracting only
+ * structural constraints (data_type, required, validation.*) and discarding
+ * display, permission, and view configuration.
+ *
+ * The resulting schema is used to drive `sanitizeFieldData` and
+ * `formatFieldData` for every field in a record. It is generated once per
+ * type and passed to `transformRecordData` for bulk field processing.
+ *
+ * @param designSchema - The full design_schema object from a type record
+ * @returns ValidationSchema with one entry per field
+ * @throws never — returns empty schema if designSchema.fields is missing
+ * @inputSpec designSchema.fields: Record<fieldName, FieldDefinition> — must match
+ *   the FieldDefinition interface from src/types/types.ts
+ * @inputSpec designSchema.fields[x].data_type: string — required in every field
+ * @outputSpec ValidationSchema.fields: Record<string, { data_type, required, ...constraints }>
+ * @sideEffects none
+ * @calledBy permissions.ts (validateFirstSurfaceUpdatePermissions), any caller
+ *   needing a validation schema without the full design_schema overhead
+ * @testUnit tests/unit/schema-utils.test.ts — 'generateValidationSchema' describe block
+ *
+ * @example
+ * ```ts
+ * const schema = generateValidationSchema(record.design_schema)
+ * const cleaned = transformRecordData(record.data, schema, 'sanitize')
+ * ```
  */
 export function generateValidationSchema(designSchema: any): ValidationSchema {
   const validationSchema: ValidationSchema = {
@@ -63,7 +126,38 @@ export function generateValidationSchema(designSchema: any): ValidationSchema {
 }
 
 /**
- * Sanitize field data based on data_type and validation rules
+ * Coerces and validates a single field value for a write (create/update) operation.
+ *
+ * Dispatches to a type-specific sanitizer based on `data_type`. Every sanitizer:
+ *   - Coerces the input to the correct type
+ *   - Applies constraint validation (min/max/length/pattern/options)
+ *   - Throws a descriptive `Error` on the first validation failure
+ *   - Returns the cleaned value on success
+ *
+ * Unknown `data_type` values pass through unchanged (no throw).
+ *
+ * @param data - Raw field value from the request body
+ * @param data_type - The field's declared data_type from design_schema.fields[x]
+ * @param validation - Optional validation constraints from the field definition
+ * @returns Sanitized value in the correct type for storage
+ * @throws Error — descriptive message naming the field constraint violated
+ * @inputSpec data: any — null and undefined are returned as-is without sanitization
+ * @inputSpec data_type: string — one of the 21 supported type keys (see switch below)
+ * @inputSpec validation: object | undefined — type-specific constraints
+ * @outputSpec any — coerced value matching the data_type storage format
+ * @sideEffects none
+ * @calledBy permissions.ts (validateFirstSurfaceUpdatePermissions, per-field loop)
+ * @calls sanitizeText | sanitizeTextarea | sanitizeEmail | sanitizeNumber | etc.
+ * @testUnit tests/unit/schema-utils.test.ts — 'sanitizeFieldData' describe block
+ *
+ * @example
+ * ```ts
+ * const clean = sanitizeFieldData('hello@EXAMPLE.COM', 'email')
+ * // → 'hello@example.com'
+ *
+ * sanitizeFieldData('not-a-url', 'url')
+ * // throws Error('Invalid URL format')
+ * ```
  */
 export function sanitizeFieldData(
   data: any, 
@@ -125,7 +219,37 @@ export function sanitizeFieldData(
 }
 
 /**
- * Format field data for user-friendly display
+ * Converts a stored field value to a human-readable display string.
+ *
+ * Dispatches to a type-specific formatter based on `data_type`. Formatters
+ * never throw — if the data cannot be formatted, the raw value is returned.
+ * Only types with meaningful display transformations have a case; all others
+ * fall through to the default (return data unchanged).
+ *
+ * @param data - Stored field value (from DB, post-sanitization)
+ * @param data_type - The field's declared data_type
+ * @param context - Optional context for type-specific formatting (e.g.
+ *   `context.currency_code` for currency fields, `context.field` for boolean
+ *   contextual labels like 'Active'/'Inactive')
+ * @returns Formatted display value
+ * @throws never
+ * @inputSpec data: any — null and undefined are returned as-is
+ * @inputSpec data_type: string — one of 21 supported keys; unknown → pass-through
+ * @inputSpec context: object | undefined — type-specific display hints
+ * @outputSpec any — display-ready value; string for most types, raw data for pass-through
+ * @sideEffects none
+ * @calledBy permissions.ts (sanitizeFirstSurfaceRecordData, per-field loop)
+ * @calls formatJson | formatDate | formatDatetime | formatCurrency | etc.
+ * @testUnit tests/unit/schema-utils.test.ts — 'formatFieldData' describe block
+ *
+ * @example
+ * ```ts
+ * formatFieldData('2024-01-15', 'date')
+ * // → 'January 15, 2024'
+ *
+ * formatFieldData(1234.5, 'currency', { currency_code: 'USD' })
+ * // → '$1,234.50'
+ * ```
  */
 export function formatFieldData(
   data: any, 
@@ -163,7 +287,34 @@ export function formatFieldData(
 }
 
 /**
- * Transform record data based on validation schema and operation
+ * Applies `sanitizeFieldData` or `formatFieldData` to all fields in a record,
+ * using the ValidationSchema for per-field type and constraint information.
+ *
+ * Fields not present in the schema are passed through unchanged. This is
+ * intentional — unknown fields are not rejected here; the PermissionEngine
+ * handles field-level access control separately.
+ *
+ * @param data - Key/value record of field names to raw or stored values
+ * @param validationSchema - Schema from `generateValidationSchema`
+ * @param operation - 'sanitize' for write path; 'format' for display path
+ * @param context - Optional context passed through to formatFieldData
+ * @returns Transformed record with the same keys
+ * @throws Error (sanitize mode only) — if any field fails validation
+ * @inputSpec data: Record<string, any> — flat field map
+ * @inputSpec validationSchema: ValidationSchema — from generateValidationSchema
+ * @inputSpec operation: 'sanitize' | 'format'
+ * @outputSpec Record<string, any> — same keys, transformed values
+ * @sideEffects none
+ * @calledBy Custom code in v2-custom/ that needs bulk field transformation
+ * @calls sanitizeFieldData | formatFieldData (per field)
+ * @testUnit tests/unit/schema-utils.test.ts — 'transformRecordData' describe block
+ *
+ * @example
+ * ```ts
+ * const schema = generateValidationSchema(type.design_schema)
+ * const sanitized = transformRecordData(body.data, schema, 'sanitize')
+ * const formatted = transformRecordData(record.data, schema, 'format', ctx)
+ * ```
  */
 export function transformRecordData(
   data: Record<string, any>,
@@ -200,8 +351,14 @@ export function transformRecordData(
   return transformed
 }
 
-// Data Type Specific Sanitization Functions
+// ─── SANITIZE HELPERS ────────────────────────────────────────────────────────────
 
+/**
+ * Trims, strips control characters, HTML-escapes, and applies minLength/
+ * maxLength/pattern constraints. Throws on minLength/pattern violation;
+ * silently truncates on maxLength.
+ * @throws Error on minLength or pattern violation
+ */
 function sanitizeText(data: any, validation?: any): string {
   let text = String(data).trim()
   
@@ -235,6 +392,11 @@ function sanitizeText(data: any, validation?: any): string {
   return text
 }
 
+/**
+ * Same as sanitizeText but preserves newlines. Strips control chars,
+ * HTML-escapes, applies minLength/maxLength.
+ * @throws Error on minLength violation
+ */
 function sanitizeTextarea(data: any, validation?: any): string {
   let text = String(data).trim()
   
@@ -260,6 +422,12 @@ function sanitizeTextarea(data: any, validation?: any): string {
   return text
 }
 
+/**
+ * Allowlist-based HTML sanitizer for rich text. Strips all tags not in the
+ * allowed set (`p br strong em u ol ul li a h1-h6`), removes script tags and
+ * `on*` event attributes, applies minLength/maxLength.
+ * @throws Error on minLength violation
+ */
 function sanitizeRichText(data: any, validation?: any): string {
   let html = String(data).trim()
   
@@ -289,6 +457,10 @@ function sanitizeRichText(data: any, validation?: any): string {
   return html
 }
 
+/**
+ * Lowercases, trims, and validates basic `name@domain.tld` format.
+ * @throws Error('Invalid email format') on invalid input
+ */
 function sanitizeEmail(data: any, validation?: any): string {
   let email = String(data).toLowerCase().trim()
   
@@ -301,6 +473,10 @@ function sanitizeEmail(data: any, validation?: any): string {
   return email
 }
 
+/**
+ * Strips all non-digit/non-`+` characters. Applies optional pattern validation.
+ * @throws Error on pattern mismatch
+ */
 function sanitizePhone(data: any, validation?: any): string {
   let phone = String(data).trim()
   
@@ -318,6 +494,10 @@ function sanitizePhone(data: any, validation?: any): string {
   return phone
 }
 
+/**
+ * Parses via `new URL()` and validates `http:` or `https:` protocol.
+ * @throws Error on invalid URL or disallowed protocol
+ */
 function sanitizeUrl(data: any, validation?: any): string {
   let url = String(data).trim()
   
@@ -334,6 +514,11 @@ function sanitizeUrl(data: any, validation?: any): string {
   }
 }
 
+/**
+ * Coerces to Number, applies min/max constraints, rounds down to nearest
+ * step if `validation.step` is set.
+ * @throws Error on NaN or out-of-range
+ */
 function sanitizeNumber(data: any, validation?: any): number {
   let num = Number(data)
   
@@ -360,6 +545,10 @@ function sanitizeNumber(data: any, validation?: any): number {
   return num
 }
 
+/**
+ * Coerces to Number, rounds to 2 decimal places, applies min/max.
+ * @throws Error on NaN or out-of-range
+ */
 function sanitizeCurrency(data: any, validation?: any): number {
   let num = Number(data)
   
@@ -381,10 +570,16 @@ function sanitizeCurrency(data: any, validation?: any): number {
   return num
 }
 
+/** Delegates to `sanitizeNumber`. @throws same as sanitizeNumber */
 function sanitizeRange(data: any, validation?: any): number {
   return sanitizeNumber(data, validation)
 }
 
+/**
+ * Parses via `new Date()`, returns ISO date string (`YYYY-MM-DD`). Applies
+ * min/max date constraints.
+ * @throws Error on invalid date or out-of-range
+ */
 function sanitizeDate(data: any, validation?: any): string {
   let dateStr = String(data).trim()
   
@@ -414,6 +609,11 @@ function sanitizeDate(data: any, validation?: any): string {
   return isoDate
 }
 
+/**
+ * Parses via `new Date()`, returns full ISO datetime string. Applies
+ * min/max datetime constraints.
+ * @throws Error on invalid datetime or out-of-range
+ */
 function sanitizeDatetime(data: any, validation?: any): string {
   let dateStr = String(data).trim()
   
@@ -443,6 +643,11 @@ function sanitizeDatetime(data: any, validation?: any): string {
   return isoDatetime
 }
 
+/**
+ * Accepts `true/false` booleans or truthy/falsy strings
+ * (`'true','1','yes','on'` / `'false','0','no','off'`).
+ * @throws Error on unrecognised value
+ */
 function sanitizeBoolean(data: any, validation?: any): boolean {
   if (typeof data === 'boolean') {
     return data
@@ -458,10 +663,15 @@ function sanitizeBoolean(data: any, validation?: any): boolean {
   throw new Error('Invalid boolean value')
 }
 
+/** Delegates to `sanitizeBoolean`. */
 function sanitizeCheckbox(data: any, validation?: any): boolean {
   return sanitizeBoolean(data, validation)
 }
 
+/**
+ * Validates the value against `validation.options` (string[]). 
+ * @throws Error('Invalid option selected') if value not in allowed list
+ */
 function sanitizeSelect(data: any, validation?: any): string {
   let value = String(data).trim()
   
@@ -477,6 +687,11 @@ function sanitizeSelect(data: any, validation?: any): string {
   return value
 }
 
+/**
+ * Accepts array or comma-separated string. Deduplicates. Validates each
+ * value against `validation.options`. Truncates to `validation.max`.
+ * @throws Error on invalid option or non-array/string input
+ */
 function sanitizeMultiselect(data: any, validation?: any): string[] {
   let values: string[]
   
@@ -510,10 +725,15 @@ function sanitizeMultiselect(data: any, validation?: any): string[] {
   return values
 }
 
+/** Delegates to `sanitizeSelect`. */
 function sanitizeRadio(data: any, validation?: any): string {
   return sanitizeSelect(data, validation)
 }
 
+/**
+ * Validates `#RGB` or `#RRGGBB` hex format. Normalizes 3-digit to 6-digit.
+ * Returns uppercase. @throws Error on invalid hex format
+ */
 function sanitizeColor(data: any, validation?: any): string {
   let color = String(data).trim()
   
@@ -531,6 +751,11 @@ function sanitizeColor(data: any, validation?: any): string {
   return color.toUpperCase()
 }
 
+/**
+ * Validates `data.name` presence, optional maxSize and allowedTypes.
+ * Sanitizes filename to `[a-zA-Z0-9.-_]` characters only.
+ * @throws Error on invalid file data, size, or type
+ */
 function sanitizeFile(data: any, validation?: any): any {
   // Basic file validation - would need more sophisticated handling in practice
   if (typeof data !== 'object' || !data.name) {
@@ -553,6 +778,11 @@ function sanitizeFile(data: any, validation?: any): any {
   return data
 }
 
+/**
+ * Delegates to `sanitizeFile`. Image dimension validation is a stub
+ * (noted for future implementation).
+ * @throws same as sanitizeFile
+ */
 function sanitizeImage(data: any, validation?: any): any {
   const file = sanitizeFile(data, validation)
   
@@ -565,6 +795,11 @@ function sanitizeImage(data: any, validation?: any): any {
   return file
 }
 
+/**
+ * Parses JSON strings. Rejects payloads containing `'function'`, `'eval'`,
+ * or `'script'` strings as a basic code-injection guard.
+ * @throws Error on invalid JSON or dangerous content
+ */
 function sanitizeJson(data: any, validation?: any): any {
   if (typeof data === 'string') {
     try {
@@ -583,6 +818,10 @@ function sanitizeJson(data: any, validation?: any): any {
   return data
 }
 
+/**
+ * Validates UUID v1–v5 format. DB-level FK constraints enforce existence.
+ * @throws Error('Invalid reference format') on non-UUID input
+ */
 function sanitizeReference(data: any, validation?: any): string {
   let ref = String(data).trim()
   
@@ -598,6 +837,11 @@ function sanitizeReference(data: any, validation?: any): string {
   return ref
 }
 
+/**
+ * Sanitizes each string field of an address object via `sanitizeText`.
+ * Passes non-string fields through unchanged.
+ * @throws Error if input is not an object
+ */
 function sanitizeAddress(data: any, validation?: any): any {
   if (typeof data !== 'object' || data === null) {
     throw new Error('Address must be an object')
@@ -616,12 +860,14 @@ function sanitizeAddress(data: any, validation?: any): any {
   return sanitized
 }
 
-// Data Type Specific Formatting Functions
+// ─── FORMAT HELPERS ────────────────────────────────────────────────────────────
 
+/** Formats an object as a 2-space indented JSON string. */
 function formatJson(data: any): string {
   return JSON.stringify(data, null, 2)
 }
 
+/** Formats an ISO date string as locale date ('January 15, 2024'). Returns raw data on invalid input. */
 function formatDate(data: string): string {
   const date = new Date(data)
   if (isNaN(date.getTime())) {
@@ -635,6 +881,7 @@ function formatDate(data: string): string {
   })
 }
 
+/** Formats an ISO datetime string as locale date+time ('January 15, 2024, 02:30 PM'). Returns raw on invalid. */
 function formatDatetime(data: string): string {
   const date = new Date(data)
   if (isNaN(date.getTime())) {
@@ -650,6 +897,7 @@ function formatDatetime(data: string): string {
   })
 }
 
+/** Formats a number as currency using Intl.NumberFormat. Defaults to USD. context.currency_code overrides. */
 function formatCurrency(data: number, context?: any): string {
   const currency = context?.currency_code || 'USD'
   return new Intl.NumberFormat('en-US', {
@@ -658,6 +906,7 @@ function formatCurrency(data: number, context?: any): string {
   }).format(data)
 }
 
+/** Formats 10-digit US numbers as '(NXX) NXX-XXXX'. 11-digit with leading 1 as '+1 (NXX) NXX-XXXX'. Returns raw otherwise. */
 function formatPhone(data: string): string {
   // Basic US phone formatting
   const phone = data.replace(/\D/g, '')
@@ -670,16 +919,19 @@ function formatPhone(data: string): string {
   return data
 }
 
+/** Pass-through — URLs are already display-ready. */
 function formatUrl(data: string): string {
   return data
 }
 
+/** Pass-through — UUID returned as-is; display resolution requires a DB lookup (not done here). */
 function formatReference(data: string, context?: any): string {
   // Would need to look up the referenced entity
   // For now, return the UUID
   return data
 }
 
+/** Joins address components (street, city, state, postal_code, country) into a comma-separated string. */
 function formatAddress(data: any): string {
   if (typeof data !== 'object' || data === null) {
     return String(data)
@@ -696,6 +948,7 @@ function formatAddress(data: any): string {
   return parts.join(', ')
 }
 
+/** Joins a string array with ', '. Returns String(data) for non-arrays. */
 function formatMultiselect(data: string[]): string {
   if (!Array.isArray(data)) {
     return String(data)
@@ -704,6 +957,7 @@ function formatMultiselect(data: string[]): string {
   return data.join(', ')
 }
 
+/** Returns 'Active'/'Inactive' when context.field is 'is_active'; otherwise 'Yes'/'No'. */
 function formatBoolean(data: boolean, context?: any): string {
   if (context?.field === 'is_active') {
     return data ? 'Active' : 'Inactive'

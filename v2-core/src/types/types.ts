@@ -1,3 +1,49 @@
+/**
+ * @module src/types/types
+ * @audience installer
+ * @layer frontend-hook
+ * @stability stable
+ *
+ * Core TypeScript type definitions for the Spine v2 frontend. These types
+ * mirror the `design_schema` and API response shapes used across hooks,
+ * components, and pages.
+ *
+ * **Type hierarchy:**
+ * ```
+ * DesignSchema
+ *   ├── fields: Record<string, FieldDefinition>
+ *   ├── views: Record<string, View>   ← ListView | DetailView
+ *   ├── record_permissions
+ *   └── functionality?: FunctionalityBindings
+ * ItemType  ← row in v2.types table
+ * Item       ← row in v2.items table
+ * ```
+ *
+ * **`system` flag on `FieldDefinition`:** When `system: true`, the field
+ * maps to a real DB column (e.g. `title`, `status`). When absent or false,
+ * the field value lives in the `data` JSONB column.
+ *
+ * @seeAlso src/hooks/useSchemaRecord.ts (consumes FieldDefinition[])
+ * @seeAlso src/hooks/useForm.ts (consumes FieldDefinition[] for validation)
+ * @seeAlso src/hooks/useListSchema.ts (consumes DesignSchema + View)
+ * @seeAlso functions/_shared/schema-utils.ts (server-side schema generation)
+ */
+
+// ─── FIELD DEFINITIONS ───────────────────────────────────────────────────────────
+
+/**
+ * Definition of a single field in a `design_schema`. Drives both UI rendering
+ * and client-side validation in `useForm`.
+ *
+ * @prop data_type - Controls rendering widget and validation rules
+ * @prop label - Human-readable display label
+ * @prop required - Whether the field must be non-empty on save
+ * @prop system - If true, maps to a top-level DB column; false/absent → `data` JSONB
+ * @prop name - Injected at runtime by hooks; not stored in the schema itself
+ * @prop validation - Type-specific constraint overrides
+ * @prop options - Choice list for select/multiselect/radio fields
+ * @prop permissions - Role-based read/write access map; absent = all roles allowed
+ */
 export interface FieldDefinition {
   data_type: 'text' | 'textarea' | 'rich_text' | 'email' | 'phone' | 'url' | 
              'number' | 'currency' | 'range' | 'date' | 'datetime' | 'boolean' | 
@@ -41,6 +87,16 @@ export interface FieldDefinition {
   }
 }
 
+// ─── VIEW TYPES ─────────────────────────────────────────────────────────────────
+
+/**
+ * Per-field display/behaviour config within a view. Stored as
+ * `design_schema.views[viewSlug].fields[fieldName]`.
+ *
+ * @prop display_type - Override the default widget for this field in this view
+ * @prop sortable - Whether the column header shows a sort toggle in list views
+ * @prop searchable - Whether the field is included in free-text search
+ */
 export interface ViewFieldConfig {
   display_type: 'input' | 'textarea' | 'rich_text' | 'select' | 'multiselect' | 
                  'radio' | 'checkbox' | 'switch' | 'date_picker' | 'datetime_picker' | 
@@ -51,6 +107,16 @@ export interface ViewFieldConfig {
   searchable?: boolean
 }
 
+/**
+ * A list view definition. Rendered by `DataListPage` as a table, card grid,
+ * or Kanban board depending on `display`.
+ *
+ * @prop fields - Ordered map of field name → `ViewFieldConfig`
+ * @prop default_sort - Initial sort applied before user interaction
+ * @prop filters - Field names to expose as filter controls
+ * @prop stats - Summary stat cards shown above the list
+ * @prop group_by - Field to use as board column grouping (`display: 'board'` only)
+ */
 export interface ListView {
   type: 'list'
   display: 'table' | 'card' | 'board'
@@ -71,20 +137,41 @@ export interface ListView {
   group_by?: string // For board display
 }
 
+/**
+ * A single section within a `DetailView`. Groups related fields under
+ * an optional title. Field permissions from the schema still apply —
+ * there are no section-level permission overrides.
+ */
 export interface DetailViewSection {
   title: string
   fields: Record<string, ViewFieldConfig>
   // Note: No view-level permissions - field permissions from schema apply
 }
 
+/**
+ * A detail view definition. Rendered by `DataDetailPage` as a sectioned
+ * record form.
+ */
 export interface DetailView {
   type: 'detail'
   label: string
   sections: DetailViewSection[]
 }
 
+/** Discriminated union of all supported view types. */
 export type View = ListView | DetailView
 
+// ─── FUNCTIONALITY BINDINGS ──────────────────────────────────────────────────────────
+
+/**
+ * Optional automation and integration bindings attached to a `DesignSchema`.
+ * Each array entry describes a trigger condition and the target pipeline,
+ * agent, embedding, integration, or constraint.
+ *
+ * These bindings are evaluated by API handlers and the system cron — not
+ * by the frontend. They are included here as a type contract so the frontend
+ * can read and display binding metadata without making blind `any` casts.
+ */
 export interface FunctionalityBindings {
   pipelines?: Array<{
     pipeline_id: string
@@ -126,6 +213,17 @@ export interface FunctionalityBindings {
   }>
 }
 
+// ─── DESIGN SCHEMA ────────────────────────────────────────────────────────────────
+
+/**
+ * The complete design schema for a `types` record. Stored as a JSONB column
+ * (`design_schema`) and stamp-copied onto records at create time.
+ *
+ * @prop record_permissions - Role → allowed CRUD actions map for the entire record
+ * @prop fields - All field definitions keyed by field name
+ * @prop views - Named view definitions (`list`, `detail`, etc.)
+ * @prop functionality - Optional automation bindings (pipelines, agents, etc.)
+ */
 export interface DesignSchema {
   record_permissions: {
     [role: string]: string[] // Array of actions: ["create", "read", "update", "delete"]
@@ -135,6 +233,17 @@ export interface DesignSchema {
   functionality?: FunctionalityBindings
 }
 
+// ─── RECORD SHAPES ─────────────────────────────────────────────────────────────────
+
+/**
+ * A row from the `v2.types` table. Represents a type definition (item type,
+ * account type, person type, etc.) including its full `design_schema`.
+ *
+ * @prop kind - Discriminator: `'item'` | `'account'` | `'person'` | etc.
+ * @prop design_schema - Full schema defining fields, views, and functionality
+ * @prop validation_schema - Auto-generated JSON Schema used for server-side validation
+ * @prop ownership - `'pack'` | `'tenant'` (pack-ownership tracking)
+ */
 export interface ItemType {
   id: string
   name: string
@@ -159,6 +268,14 @@ export interface ItemType {
   updated_at: string
 }
 
+/**
+ * A row from the `v2.items` table. The `data` JSONB column holds all
+ * custom field values; system fields (`title`, `status`, etc.) are top-level.
+ *
+ * @prop design_schema - Stamp of the type's schema at create time (for resilience
+ *   to schema changes; may be stale relative to `types` table)
+ * @prop validation_schema - Stamp of the validation schema at create time
+ */
 export interface Item {
   id: string
   item_type_id: string
@@ -177,11 +294,15 @@ export interface Item {
   validation_schema?: Record<string, any> // Validation schema snapshot at creation time
 }
 
+// ─── FORM & QUERY TYPES ───────────────────────────────────────────────────────────
+
+/** A field-level validation failure from `useForm` or server-side validation. */
 export interface ValidationError {
   field: string
   message: string
 }
 
+/** Snapshot of form state — used as a shared type between `useForm` and form components. */
 export interface FormState {
   data: Record<string, any>
   errors: Record<string, string>
@@ -190,27 +311,34 @@ export interface FormState {
   isValid: boolean
 }
 
+/** Pagination query parameters for list endpoints. */
 export interface PaginationParams {
   limit?: number
   offset?: number
   page?: number
 }
 
+/** Sort order specification for list endpoints. */
 export interface SortParams {
   field: string
   direction: 'asc' | 'desc'
 }
 
+/** Arbitrary key→value filter map for list endpoints. */
 export interface FilterParams {
   [key: string]: any
 }
 
+/** Combined search, sort, filter, and pagination params for list queries. */
 export interface SearchParams extends PaginationParams {
   search?: string
   sort?: SortParams
   filters?: FilterParams
 }
 
+// ─── UI DISPLAY TYPES ────────────────────────────────────────────────────────────────
+
+/** A rendered column descriptor for list/table UI components. */
 export interface EntityColumn {
   key: string
   label: string
@@ -221,6 +349,7 @@ export interface EntityColumn {
   maxLength?: number
 }
 
+/** A stat card shown above entity list pages (count or filtered count). */
 export interface EntityStat {
   title: string
   type: 'count' | 'filter_count'
@@ -229,6 +358,7 @@ export interface EntityStat {
   filter?: Record<string, any>
 }
 
+/** A filter control definition for entity list pages. */
 export interface EntityFilter {
   key: string
   label: string

@@ -1,3 +1,19 @@
+/**
+ * @module src/pages/admin/TypesPage
+ * @audience installer
+ * @layer frontend-page
+ * @stability stable
+ *
+ * Admin list page for item/account/person types. Fetches all types via
+ * `/api/types?action=list`, then applies client-side search, category
+ * filter (`all` | `system` | `custom` | `active`), and sort. Renders
+ * inside `AdminListPage` with four stat cards and a sortable table.
+ * Row clicks navigate to `/spine-framework/admin/configs/types/:id`.
+ *
+ * @seeAlso src/components/admin/AdminListPage.tsx
+ * @seeAlso src/pages/admin/TypeDetailPage.tsx
+ */
+
 import React, { useState } from 'react'
 import { useApi } from '../../hooks/useApi'
 import { apiFetch } from '../../lib/api'
@@ -103,7 +119,7 @@ export function TypesPage() {
   }
 
   const handleRowClick = (type: Type) => {
-    window.location.href = `/admin/configs/types/${type.id}`
+    window.location.href = `/spine-framework/admin/configs/types/${type.id}`
   }
 
   // Sort types
@@ -165,7 +181,7 @@ export function TypesPage() {
       title="Types"
       description="Manage item types and their schemas"
       newButtonText="New Type"
-      newButtonHref="/admin/configs/types/new"
+      newButtonHref="/spine-framework/admin/configs/types/new"
       statsCards={statsCards}
       searchPlaceholder="Search types..."
       searchValue={searchTerm}

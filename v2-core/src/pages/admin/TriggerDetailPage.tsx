@@ -1,3 +1,18 @@
+/**
+ * @module src/pages/admin/TriggerDetailPage
+ * @audience installer
+ * @layer frontend-page
+ * @stability stable
+ *
+ * Create / view / edit / delete page for a single trigger. Route param:
+ * `id` (UUID). Trigger types: `schedule` | `webhook` | `event` | `manual`.
+ * The `config` object is exposed as a raw JSON textarea. Supports inline
+ * enable/disable toggle. Delete is gated behind a confirmation modal.
+ *
+ * @seeAlso src/pages/admin/TriggersPage.tsx
+ * @seeAlso src/hooks/useApi.ts (useApi, useMutation)
+ */
+
 import React, { useState, useEffect } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import { useApi } from '../../hooks/useApi'
@@ -144,7 +159,7 @@ export function TriggerDetailPage() {
         // Navigate to the new trigger
         const result = await response.json()
         const newId = result.data?.id || result.id
-        navigate(`/admin/configs/triggers/${newId}`)
+        navigate(`/spine-framework/admin/configs/triggers/${newId}`)
       } else {
         await refetch()
         setIsEditing(false)
@@ -157,7 +172,7 @@ export function TriggerDetailPage() {
   // Handle cancel
   const handleCancel = () => {
     if (isCreateMode) {
-      navigate('/admin/configs/triggers')
+      navigate('/spine-framework/admin/configs/triggers')
       return
     }
     
@@ -193,7 +208,7 @@ export function TriggerDetailPage() {
     },
     {
       onSuccess: () => {
-        navigate('/admin/configs/triggers')
+        navigate('/spine-framework/admin/configs/triggers')
       }
     }
   )
@@ -221,7 +236,7 @@ export function TriggerDetailPage() {
         <h3 className="text-lg font-medium text-slate-900">Trigger not found</h3>
         <p className="mt-2 text-sm text-slate-500">The trigger you're looking for doesn't exist.</p>
         <button
-          onClick={() => navigate('/admin/configs/triggers')}
+          onClick={() => navigate('/spine-framework/admin/configs/triggers')}
           className="mt-4 inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md text-white bg-blue-600 hover:bg-blue-700"
         >
           Go Back
@@ -266,7 +281,7 @@ export function TriggerDetailPage() {
       <div className="flex items-center justify-between">
         <div className="flex items-center space-x-4">
           <button
-            onClick={() => navigate('/admin/configs/triggers')}
+            onClick={() => navigate('/spine-framework/admin/configs/triggers')}
             className="p-2 text-slate-400 hover:text-slate-600"
           >
             <ArrowLeftIcon className="h-5 w-5" />

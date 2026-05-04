@@ -1,12 +1,55 @@
+/**
+ * @module apps
+ * @audience core-contributor
+ * @layer api-handler
+ * @stability stable
+ *
+ * CRUD API for the `apps` table. Apps are the installable units of functionality
+ * in Spine v2. They group types, roles, integrations, and nav configuration.
+ *
+ * **Routed by:** `GET/POST/PATCH/DELETE /.netlify/functions/apps`
+ *
+ * **Authorization model:**
+ * - `list` / `get` / `getSchema` / `checkAvailability`: any authenticated principal
+ *   (RLS-scoped via `ctx.db`). Returns sanitized records.
+ * - `create`: requires `isSystemAdmin` or first-surface `canCreate` permission.
+ * - `update` / `remove`: requires authenticated principal + field-level permission
+ *   check via `validateUpdatePermissions`.
+ * - `updateVersion`: authenticated principal via RPC.
+ *
+ * INVARIANT: app slugs are globally unique across the `apps` table.
+ * INVARIANT: `is_system` apps can only be manipulated by system admins.
+ *
+ * @seeAlso middleware.ts (createHandler)
+ * @seeAlso permissions.ts (PermissionEngine, sanitizeRecordData)
+ * @seeAlso audit.ts (emitLog for app.created / app.updated / app.deleted)
+ * @seeAlso types.ts (types reference apps via app_id)
+ */
+
 import { createHandler } from './_shared/middleware'
 import { joins } from './_shared/db'
 import { emitLog } from './_shared/audit'
 import { PermissionEngine, sanitizeRecordData } from './_shared/permissions'
 
-// Type assertion to ensure we're using the instance
 const permissions = PermissionEngine as any
 
-// List apps - RLS enforced via ctx.db
+// ─── HANDLERS ─────────────────────────────────────────────────────────────────
+
+/**
+ * Lists apps accessible to the account via the `get_account_apps` RPC.
+ * RLS is enforced by the RPC function.
+ *
+ * Query params:
+ *   - `account_id` (default: ctx.accountId)
+ *   - `include_system` (default: true)
+ *   - `include_inactive` (default: false)
+ *
+ * @returns Sanitized app records
+ * @throws Error('Account context required')
+ * @sideEffects DB read: get_account_apps RPC
+ * @calledBy handler (GET, no id/slug)
+ * @testUnit tests/unit/apps.test.ts — 'list'
+ */
 export const list = createHandler(async (ctx, body) => {
   const { include_system, include_inactive, account_id } = ctx.query || {}
 
@@ -35,7 +78,17 @@ export const list = createHandler(async (ctx, body) => {
   return sanitized
 })
 
-// Get single app - RLS enforced
+/**
+ * Returns a single active app by UUID or slug. Fetches with owner account join.
+ *
+ * Query params: `id` OR `slug` (one required)
+ *
+ * @returns Sanitized app record with ownerAccount join
+ * @throws Error('App ID or slug is required')
+ * @throws PostgREST error if not found or RLS denied
+ * @sideEffects DB read: apps table
+ * @calledBy handler (GET ?id or ?slug)
+ */
 export const get = createHandler(async (ctx, body) => {
   const { id, slug } = ctx.query || {}
   
@@ -62,7 +115,17 @@ export const get = createHandler(async (ctx, body) => {
   return await sanitizeRecordData(ctx, data, 'app')
 })
 
-// Get app schema - RLS enforced via RPC
+/**
+ * Returns the full app schema (types, roles, views, integrations) via the
+ * `get_app_schema` RPC. RLS enforced by RPC.
+ *
+ * Query params: `slug` (required)
+ *
+ * @returns App schema object
+ * @throws Error('App slug is required')
+ * @sideEffects DB read: get_app_schema RPC
+ * @calledBy handler (GET ?action=schema)
+ */
 export const getSchema = createHandler(async (ctx, body) => {
   const { slug } = ctx.query || {}
 
@@ -78,9 +141,28 @@ export const getSchema = createHandler(async (ctx, body) => {
   return data
 })
 
-// Create app - RLS enforced
+/**
+ * Creates a new app. Requires system admin or first-surface `canCreate` permission.
+ * Audit log emitted on success.
+ *
+ * Body: `slug`, `name` (required), plus optional `description`, `icon`, `color`,
+ * `version`, `app_type`, `source`, `owner_account_id`, `config`, `nav_items`,
+ * `min_role`, `integration_deps`, `metadata`
+ *
+ * @returns Inserted app record
+ * @throws Error('slug and name are required')
+ * @throws Error('Insufficient permissions to create apps')
+ * @throws Error('App slug already exists')
+ * @inputSpec slug: string — globally unique
+ * @inputSpec version: string (default '1.0.0')
+ * @sideEffects DB write: apps table (INSERT)
+ * @sideEffects audit: emitLog('app.created')
+ * @calledBy handler (POST)
+ * @calls emitLog
+ * @testUnit tests/unit/apps.test.ts — 'create'
+ */
 export const create = createHandler(async (ctx, body) => {
-  const { slug, name, description, icon, color, version, app_type, source, owner_account_id, config, nav_items, min_role, integration_deps, metadata } = body
+  const { slug, name, description, icon, color, version, app_type, source, owner_account_id, config, nav_items, min_role, integration_deps, metadata, route_prefix, renderer } = body
 
   if (!slug || !name) {
     throw new Error('slug and name are required')
@@ -132,6 +214,8 @@ export const create = createHandler(async (ctx, body) => {
       min_role: min_role || 'member',
       integration_deps: integration_deps || [],
       metadata: metadata || {},
+      route_prefix: route_prefix !== undefined ? route_prefix : ('/' + slug),
+      renderer: renderer || 'generic',
       is_active: true,
       is_system: false
     })
@@ -145,7 +229,21 @@ export const create = createHandler(async (ctx, body) => {
   return data
 })
 
-// Update app - RLS enforced
+/**
+ * Updates an app. Requires authenticated principal. Field-level permissions
+ * validated via `validateUpdatePermissions`. Audit log emitted on success.
+ *
+ * Body/query: `id` (required), plus any updatable fields
+ *
+ * @returns Updated app record
+ * @throws Error('App ID is required')
+ * @throws Error('App not found')
+ * @throws Error from validateUpdatePermissions
+ * @sideEffects DB write: apps table (UPDATE)
+ * @sideEffects audit: emitLog('app.updated', { before, after })
+ * @calledBy handler (PATCH)
+ * @calls emitLog, validateUpdatePermissions
+ */
 export const update = createHandler(async (ctx, body) => {
   const id = body?.id || ctx.query?.id
   const { id: _bodyId, ...updates } = body || {}
@@ -198,7 +296,18 @@ export const update = createHandler(async (ctx, body) => {
   return data
 })
 
-// Soft delete app - RLS enforced
+/**
+ * Soft-deletes an app (sets `is_active = false`). Audit log emitted on success.
+ *
+ * Body/query: `id` (required)
+ *
+ * @returns Updated app record (with is_active: false)
+ * @throws Error('App ID is required')
+ * @throws Error('App not found')
+ * @sideEffects DB write: apps table (UPDATE is_active=false)
+ * @sideEffects audit: emitLog('app.deleted', { before })
+ * @calledBy handler (DELETE)
+ */
 export const remove = createHandler(async (ctx, body) => {
   const id = body?.id || ctx.query?.id
 
@@ -238,7 +347,18 @@ export const remove = createHandler(async (ctx, body) => {
   return data
 })
 
-// Check if app is available - RLS enforced via RPC
+/**
+ * Checks whether an app is available (installed and active) for an account
+ * via the `is_app_available` RPC.
+ *
+ * Query params: `slug` (required)
+ *
+ * @returns `{ available: boolean }`
+ * @throws Error('App slug is required')
+ * @throws Error('Account context required')
+ * @sideEffects DB read: is_app_available RPC
+ * @calledBy handler (GET ?action=available)
+ */
 export const checkAvailability = createHandler(async (ctx, body) => {
   const { slug } = ctx.query || {}
 
@@ -261,7 +381,18 @@ export const checkAvailability = createHandler(async (ctx, body) => {
   return { available: data }
 })
 
-// Update app version - RLS enforced via RPC
+/**
+ * Updates the version string for an app via the `update_app_version` RPC.
+ * Emits audit log on success.
+ *
+ * Body: `id` (required), `version` (required, semver string)
+ *
+ * @returns `{ success: true }`
+ * @throws Error('App ID and version are required')
+ * @sideEffects DB write: update_app_version RPC
+ * @sideEffects audit: emitLog('app.version_updated')
+ * @calledBy handler (POST ?action=version)
+ */
 export const updateVersion = createHandler(async (ctx, body) => {
   const { id, version } = body
 
@@ -282,7 +413,25 @@ export const updateVersion = createHandler(async (ctx, body) => {
   return { success: true }
 })
 
-// Main handler function
+// ─── MAIN HANDLER ────────────────────────────────────────────────────────────
+
+/**
+ * Netlify function entry point. Routes by HTTP method + action/id/slug params:
+ * | method | condition               | handler          |
+ * |--------|-------------------------|------------------|
+ * | GET    | ?action=get or ?id      | get              |
+ * | GET    | ?slug                   | get (by slug)    |
+ * | GET    | ?action=schema          | getSchema        |
+ * | GET    | ?action=available       | checkAvailability|
+ * | GET    | (default)               | list             |
+ * | POST   | ?action=version         | updateVersion    |
+ * | POST   | (default)               | create           |
+ * | PATCH  | —                       | update           |
+ * | DELETE | —                       | remove           |
+ *
+ * @throws Error('Unsupported method')
+ * @calledBy Netlify function routing
+ */
 export const handler = createHandler(async (ctx, body) => {
   const method = ctx.query?.method || 'GET'
 

@@ -1,13 +1,56 @@
+/**
+ * @module src/components/admin/AdminListPage
+ * @audience installer
+ * @layer frontend-component
+ * @stability stable
+ *
+ * Reusable shell for hardcoded admin list pages (non-runtime entities
+ * such as Types, Apps, Roles, Pipelines, etc.). Provides:
+ * - Page title + description + optional "New" button
+ * - Stats card row (`AdminStatsCard` instances)
+ * - Search input + dropdown filter controls
+ * - Loading spinner / error+retry overlay
+ * - A content slot (`children`) for the caller's table or card list
+ *
+ * **Differences from `DataListPage`:** This component is used by
+ * explicitly-coded admin pages where the schema is not driven by
+ * `DesignSchema`; it accepts structured props rather than resolving
+ * a view from an API.
+ *
+ * @seeAlso src/components/admin/AdminStatsCard.tsx
+ * @seeAlso src/components/runtime/DataListPage.tsx (schema-driven alternative)
+ */
+
 import React, { ReactNode } from 'react'
 import { Button } from '../ui/Button'
 import { LucideIcon } from 'lucide-react'
 import { AdminStatsCard } from './AdminStatsCard'
 
+/**
+ * Props for `AdminListPage`.
+ *
+ * @prop title - Page heading
+ * @prop description - Subtitle text
+ * @prop newButtonText - Label for the create button; omit to hide the button
+ * @prop newButtonHref - Navigation URL for the create button (default: `'#'`)
+ * @prop statsCards - Array of stat card configs rendered above the table
+ * @prop searchPlaceholder - Placeholder for the search input
+ * @prop searchValue - Controlled search input value
+ * @prop onSearchChange - Callback when search text changes; omit to hide search
+ * @prop filters - Dropdown filter definitions
+ * @prop children - Table / card list content rendered in the white panel
+ * @prop loading - Shows spinner overlay when true
+ * @prop error - Shows error + retry when set
+ * @prop onRetry - Callback for the retry button
+ * @prop emptyMessage - Text shown when the list is empty
+ * @prop emptyIcon - Lucide icon for the empty state
+ */
 interface AdminListPageProps {
   title: string
   description: string
   newButtonText?: string
   newButtonHref?: string
+  onNewClick?: () => void
   statsCards: Array<{
     title: string
     value: string | number
@@ -31,11 +74,19 @@ interface AdminListPageProps {
   emptyIcon?: LucideIcon
 }
 
+/**
+ * Reusable admin list page shell.
+ *
+ * @param props - `AdminListPageProps`
+ * @returns Full page layout with header, stats, filters, and content slot
+ * @sideEffects Navigates via `window.location.href` on new-button click
+ */
 export function AdminListPage({
   title,
   description,
   newButtonText,
   newButtonHref = '#',
+  onNewClick,
   statsCards,
   searchPlaceholder = "Search...",
   searchValue = "",
@@ -58,7 +109,7 @@ export function AdminListPage({
         </div>
         
         {newButtonText && (
-          <Button onClick={() => window.location.href = newButtonHref!}>
+          <Button onClick={() => onNewClick ? onNewClick() : (window.location.href = newButtonHref!)}>
             {newButtonText}
           </Button>
         )}

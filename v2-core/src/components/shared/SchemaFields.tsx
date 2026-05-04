@@ -1,7 +1,47 @@
+/**
+ * @module src/components/shared/SchemaFields
+ * @audience installer
+ * @layer frontend-component
+ * @stability stable
+ *
+ * Schema-driven field grid. Renders an ordered list of `FieldDefinition`
+ * entries via `FieldRenderer`, managing the name→value mapping and
+ * propagating `onChange` calls back to the parent.
+ *
+ * **Value source resolution** (per field):
+ * - `system` flag set → `data[name]` (top-level column)
+ * - `system` flag unset → `data.data?.[name] ?? data[name]` (JSONB field
+ *   with column fallback)
+ *
+ * **Layout:** two-column responsive grid by default (`twoColumn=true`);
+ * pass `twoColumn=false` for a single-column stacked layout.
+ *
+ * **Exports:**
+ * - `SchemaFields` — full editable/read-only field grid
+ * - `SchemaFieldDisplay` — read-only single-field key:value display row
+ * - `SchemaField` (unexported) — internal wrapper binding name to value
+ *
+ * @seeAlso src/components/shared/FieldRenderer.tsx
+ * @seeAlso src/types/types.ts (FieldDefinition)
+ * @seeAlso src/components/runtime/SchemaDetailForm.tsx (primary consumer)
+ */
+
 import React from 'react'
 import { FieldDefinition } from '../../types/types'
 import { FieldRenderer } from './FieldRenderer'
 
+/**
+ * Props for `SchemaFields`.
+ *
+ * @prop fields - Ordered array of field definitions to render
+ * @prop data - Record containing current field values; may be flat or
+ *   nested under a `.data` key for JSONB fields
+ * @prop onChange - `(name, value)` callback; omit for pure read-only display
+ * @prop readonly - Passes read-only mode down to every `FieldRenderer`
+ * @prop errors - Per-field validation error messages
+ * @prop twoColumn - Two-column responsive grid (default: `true`)
+ * @prop displayTypes - Widget override map keyed by field name (from view config)
+ */
 interface SchemaFieldsProps {
   fields: FieldDefinition[]
   data: Record<string, any>
@@ -15,9 +55,11 @@ interface SchemaFieldsProps {
 }
 
 /**
- * Renders all fields from a design_schema as a form section.
- * Each field is rendered by FieldRenderer using data_type / display_type.
- * When readonly=true, shows values as read-only display.
+ * Renders a full schema field grid.
+ *
+ * @param props - `SchemaFieldsProps`
+ * @returns Two-column (or single-column) field grid, or an empty-state message
+ * @sideEffects none (delegates changes to `onChange`)
  */
 export function SchemaFields({
   fields,
@@ -54,6 +96,7 @@ export function SchemaFields({
   )
 }
 
+/** Internal props for the `SchemaField` name-binding wrapper. */
 interface SchemaFieldProps {
   field: FieldDefinition
   value: any
@@ -77,8 +120,13 @@ function SchemaField({ field, value, onChange, readonly, error, displayType }: S
 }
 
 /**
- * Read-only display of a single schema field value.
- * Used in detail pages when not in edit mode.
+ * Read-only display of a single schema field value as a label:value row.
+ * Useful for compact detail views outside the full form layout.
+ *
+ * @param field - Field definition (used for label and data_type formatting)
+ * @param value - Raw value to display
+ * @returns A `<div>` with label on the left and formatted value on the right
+ * @sideEffects none (pure rendering)
  */
 export function SchemaFieldDisplay({
   field,
@@ -101,6 +149,21 @@ export function SchemaFieldDisplay({
   )
 }
 
+/**
+ * Formats a raw field value for read-only display, applying type-specific
+ * transformations:
+ * - `boolean`/`checkbox` → `'Yes'` / `'No'`
+ * - `date` / `datetime` → locale string
+ * - `select` → resolves option label from `field.options`
+ * - `multiselect` → comma-joined option labels
+ * - `json` → `<pre>` code block
+ * - `url` → `<a>` link
+ * - Null/undefined/empty → em-dash placeholder
+ *
+ * @param field - Field definition
+ * @param value - Raw value
+ * @returns Formatted `ReactNode`
+ */
 function formatFieldValue(field: FieldDefinition, value: any): React.ReactNode {
   if (value === null || value === undefined || value === '') {
     return <span className="text-slate-400 italic">—</span>

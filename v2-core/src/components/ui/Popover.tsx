@@ -1,6 +1,35 @@
+/**
+ * @module src/components/ui/Popover
+ * @audience installer
+ * @layer frontend-component
+ * @stability stable
+ *
+ * Lightweight click-triggered floating panel. Toggles open/closed on
+ * trigger click and closes when a click is detected outside both the
+ * trigger and the panel (via `mousedown` listener on `document`).
+ *
+ * **Placement options:** `bottom-right`, `bottom-left`, `bottom-center`,
+ * `top-end`, `top-start`.
+ *
+ * **Usage note:** The panel is absolutely positioned relative to the
+ * trigger wrapper. Ensure the parent has a non-`static` position or the
+ * panel has sufficient `z-index` for your stacking context.
+ *
+ * @seeAlso src/lib/utils.ts (cn)
+ * @seeAlso src/components/layout/Sidebar.tsx (primary consumer for sign-out menu)
+ */
+
 import React, { useState, useRef, useEffect } from 'react'
 import { cn } from '../../lib/utils'
 
+/**
+ * Props for `Popover`.
+ *
+ * @prop trigger - The element that toggles the panel when clicked
+ * @prop children - Panel content
+ * @prop placement - Anchor position of the floating panel (default: `'bottom-right'`)
+ * @prop className - Additional Tailwind classes applied to the panel `<div>`
+ */
 interface PopoverProps {
   trigger: React.ReactNode
   children: React.ReactNode
@@ -8,6 +37,13 @@ interface PopoverProps {
   placement?: 'bottom-right' | 'bottom-left' | 'bottom-center' | 'top-end' | 'top-start'
 }
 
+/**
+ * Click-triggered floating popover panel.
+ *
+ * @param props - `PopoverProps`
+ * @returns Wrapper div containing trigger + conditionally rendered panel
+ * @sideEffects Adds/removes a `mousedown` listener on `document` while mounted
+ */
 export function Popover({ trigger, children, className, placement = 'bottom-right' }: PopoverProps) {
   const [isOpen, setIsOpen] = useState(false)
   const triggerRef = useRef<HTMLDivElement>(null)

@@ -1,3 +1,18 @@
+/**
+ * @module src/pages/admin/AppDetailPage
+ * @audience installer
+ * @layer frontend-page
+ * @stability stable
+ *
+ * Create / view / edit / delete page for a single Spine app record.
+ * Route param: `id` (UUID). When `id === 'new'`, operates in create mode.
+ * Supports toggling active/public status inline. Delete is gated behind a
+ * confirmation modal and disabled for system-owned apps.
+ *
+ * @seeAlso src/pages/admin/AppsPage.tsx
+ * @seeAlso src/hooks/useApi.ts (useApi, useMutation)
+ */
+
 import React, { useState, useEffect } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import { useApi } from '../../hooks/useApi'
@@ -170,7 +185,7 @@ export function AppDetailPage() {
         // Navigate to the new app
         const result = await response.json()
         const newId = result.data?.id || result.id
-        navigate(`/admin/configs/apps/${newId}`)
+        navigate(`/spine-framework/admin/configs/apps/${newId}`)
       } else {
         await refetch()
         setIsEditing(false)
@@ -183,7 +198,7 @@ export function AppDetailPage() {
   // Handle cancel
   const handleCancel = () => {
     if (isCreateMode) {
-      navigate('/admin/configs/apps')
+      navigate('/spine-framework/admin/configs/apps')
       return
     }
     
@@ -227,7 +242,7 @@ export function AppDetailPage() {
     },
     {
       onSuccess: () => {
-        navigate('/admin/configs/apps')
+        navigate('/spine-framework/admin/configs/apps')
       }
     }
   )
@@ -255,7 +270,7 @@ export function AppDetailPage() {
         <h3 className="text-lg font-medium text-slate-900">App not found</h3>
         <p className="mt-2 text-sm text-slate-500">The app you're looking for doesn't exist.</p>
         <Button
-          onClick={() => navigate('/admin/configs/apps')}
+          onClick={() => navigate('/spine-framework/admin/configs/apps')}
           className="mt-4"
         >
           Back to Apps
@@ -270,7 +285,7 @@ export function AppDetailPage() {
         <div className="flex items-center gap-4">
           <Button
             variant="ghost"
-            onClick={() => isCreateMode ? navigate('/admin/configs/apps') : navigate(-1)}
+            onClick={() => isCreateMode ? navigate('/spine-framework/admin/configs/apps') : navigate(-1)}
           >
             <ArrowLeftIcon className="h-5 w-5" />
           </Button>

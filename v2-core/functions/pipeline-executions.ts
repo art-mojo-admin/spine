@@ -1,9 +1,45 @@
+/**
+ * @module pipeline-executions
+ * @audience core-contributor
+ * @layer api-handler
+ * @stability stable
+ *
+ * Lifecycle management API for the `pipeline_executions` table. Records
+ * track individual pipeline runs: status progression (pending → running →
+ * completed/failed/cancelled), timing, trigger data, and result payloads.
+ *
+ * **Routed by:** `GET/POST/PATCH /.netlify/functions/pipeline-executions`
+ *
+ * **Actions:**
+ * | method | ?action  | handler    |
+ * |--------|----------|------------|
+ * | GET    | list     | list       |
+ * | GET    | running  | getRunning |
+ * | GET    | stats    | getStats   |
+ * | POST   | cleanup  | cleanup    |
+ * | GET    | ?id      | get        |
+ * | GET    | (default)| list       |
+ * | POST   | —        | create     |
+ * | PATCH  | start    | start      |
+ * | PATCH  | complete | complete   |
+ * | PATCH  | cancel   | cancel     |
+ *
+ * **Status FSM:** pending → running → completed | failed | cancelled
+ *
+ * **Authorization:** All operations use `ctx.db` (RLS-scoped to account).
+ * Account context required.
+ *
+ * **Column reference:**
+ * `id`, `pipeline_id`, `status`, `trigger_data`, `result`, `error_message`,
+ * `started_at`, `completed_at`, `duration_ms`, `created_by`, `account_id`, `created_at`
+ *
+ * @seeAlso pipelines.ts (pipeline_id FK source)
+ * @seeAlso pipeline-runner.ts (runPipeline — calls create/start/complete)
+ * @seeAlso audit.ts (emitLog for pipeline_execution.* events)
+ */
+
 import { createHandler, json, error, parseBody } from './_shared/middleware'
 import { emitLog } from './_shared/audit'
-
-// v2.pipeline_executions columns: id, pipeline_id, status, trigger_data, result,
-//   error_message, started_at, completed_at, duration_ms, created_by, account_id, created_at
-// FKs: pipeline_id → pipelines, created_by → people, account_id → accounts
 
 const SELECT_WITH_JOINS = `
   *,
@@ -11,7 +47,19 @@ const SELECT_WITH_JOINS = `
   triggered_by_person:people!pipeline_executions_created_by_fkey(id, full_name, email)
 `
 
-// ── List executions ──────────────────────────────────────
+// ─── HANDLERS ─────────────────────────────────────────────────────────────────
+
+/**
+ * Lists pipeline executions for the account, newest-first.
+ *
+ * Query params: `pipeline_id`, `status` ('pending'|'running'|'completed'|
+ * 'failed'|'cancelled'), `limit` (default 100), `offset` (default 0)
+ *
+ * @returns Array of execution records with pipeline + person joins
+ * @throws Error('Account context required')
+ * @sideEffects DB read: pipeline_executions table
+ * @calledBy handler (GET ?action=list or GET default)
+ */
 export const list = createHandler(async (ctx, body) => {
   const { pipeline_id, status, limit = 100, offset = 0 } = ctx.query || {}
 
@@ -38,7 +86,17 @@ export const list = createHandler(async (ctx, body) => {
   return data
 })
 
-// ── Get single execution ─────────────────────────────────
+/**
+ * Returns a single pipeline execution by UUID.
+ *
+ * Query params: `id` (required)
+ *
+ * @returns Execution record with pipeline + person joins
+ * @throws Error('Execution ID is required')
+ * @throws PostgREST error if not found or RLS denied
+ * @sideEffects DB read: pipeline_executions table
+ * @calledBy handler (GET ?id)
+ */
 export const get = createHandler(async (ctx, body) => {
   const { id } = ctx.query || {}
 
@@ -57,7 +115,21 @@ export const get = createHandler(async (ctx, body) => {
   return data
 })
 
-// ── Create execution ─────────────────────────────────────
+/**
+ * Creates a new execution record in `pending` status. Does not run the
+ * pipeline — call `start` to transition to `running` and then invoke
+ * `pipeline-runner.ts` separately (or let the runner manage state directly).
+ *
+ * Body: `pipeline_id` (required), `trigger_data` (optional object)
+ *
+ * @returns `{ execution_id: string }`
+ * @throws Error('Pipeline ID is required')
+ * @throws Error('Account context required')
+ * @sideEffects DB write: pipeline_executions table (INSERT status='pending')
+ * @sideEffects audit: emitLog('pipeline_execution.created')
+ * @calledBy handler (POST)
+ * @calledBy pipeline-runner.ts runPipeline
+ */
 export const create = createHandler(async (ctx, body) => {
   const { pipeline_id, trigger_data } = body
 
@@ -91,7 +163,18 @@ export const create = createHandler(async (ctx, body) => {
   return { execution_id: data?.id }
 })
 
-// ── Start execution ──────────────────────────────────────
+/**
+ * Transitions an execution from `pending` to `running` and stamps `started_at`.
+ *
+ * Body: `id` (required)
+ *
+ * @returns `{ success: true }`
+ * @throws Error('Execution ID is required')
+ * @sideEffects DB write: pipeline_executions (UPDATE status='running', started_at)
+ * @sideEffects audit: emitLog('pipeline_execution.started')
+ * @calledBy handler (PATCH ?action=start)
+ * @calledBy pipeline-runner.ts runPipeline
+ */
 export const start = createHandler(async (ctx, body) => {
   const { id } = body
 
@@ -116,7 +199,21 @@ export const start = createHandler(async (ctx, body) => {
   return { success: true }
 })
 
-// ── Complete execution ───────────────────────────────────
+/**
+ * Transitions a `running` execution to `completed` (or `failed` if
+ * `error_message` is provided). Computes `duration_ms` from `started_at`.
+ *
+ * Body: `id` (required), `output_data` (optional), `error_message` (optional —
+ * presence causes status to be set to 'failed')
+ *
+ * @returns `{ success: true }`
+ * @throws Error('Execution ID is required')
+ * @sideEffects DB read: pipeline_executions (fetch started_at for duration)
+ * @sideEffects DB write: pipeline_executions (UPDATE status, result, completed_at, duration_ms)
+ * @sideEffects audit: emitLog('pipeline_execution.completed')
+ * @calledBy handler (PATCH ?action=complete)
+ * @calledBy pipeline-runner.ts runPipeline
+ */
 export const complete = createHandler(async (ctx, body) => {
   const { id, output_data, error_message } = body
 
@@ -161,7 +258,17 @@ export const complete = createHandler(async (ctx, body) => {
   return { success: true }
 })
 
-// ── Cancel execution ─────────────────────────────────────
+/**
+ * Cancels an execution mid-flight by setting status to `cancelled`.
+ *
+ * Body: `id` (required)
+ *
+ * @returns `{ success: true }`
+ * @throws Error('Execution ID is required')
+ * @sideEffects DB write: pipeline_executions (UPDATE status='cancelled', completed_at)
+ * @sideEffects audit: emitLog('pipeline_execution.cancelled')
+ * @calledBy handler (PATCH ?action=cancel)
+ */
 export const cancel = createHandler(async (ctx, body) => {
   const { id } = body
 
@@ -186,7 +293,17 @@ export const cancel = createHandler(async (ctx, body) => {
   return { success: true }
 })
 
-// ── Get running executions ───────────────────────────────
+/**
+ * Returns all currently `running` executions for the account, ordered
+ * by `started_at` desc. Optional filter by `pipeline_id`.
+ *
+ * Query params: `pipeline_id` (optional)
+ *
+ * @returns Array of execution records with joins
+ * @throws Error('Account context required')
+ * @sideEffects DB read: pipeline_executions (WHERE status='running')
+ * @calledBy handler (GET ?action=running)
+ */
 export const getRunning = createHandler(async (ctx, body) => {
   const { pipeline_id } = ctx.query || {}
 
@@ -210,7 +327,17 @@ export const getRunning = createHandler(async (ctx, body) => {
   return data
 })
 
-// ── Get execution statistics ─────────────────────────────
+/**
+ * Returns execution counts by status for the account, optionally filtered
+ * by pipeline and date range.
+ *
+ * Query params: `pipeline_id`, `date_from`, `date_to` (ISO timestamps, optional)
+ *
+ * @returns `{ total, completed, failed, running }` counts
+ * @throws Error('Account context required')
+ * @sideEffects DB read: pipeline_executions (id + status only)
+ * @calledBy handler (GET ?action=stats)
+ */
 export const getStats = createHandler(async (ctx, body) => {
   const { pipeline_id, date_from, date_to } = ctx.query || {}
 
@@ -240,7 +367,17 @@ export const getStats = createHandler(async (ctx, body) => {
   }
 })
 
-// ── Cleanup old executions (admin only) ──────────────────
+/**
+ * Deletes execution records older than `days_to_keep` (default 30).
+ * Optionally restrict by `status_filter`. Scoped by RLS.
+ *
+ * Body: `days_to_keep` (default 30), `status_filter` (optional status string)
+ *
+ * @returns `{ deleted_count: number }`
+ * @sideEffects DB write: pipeline_executions (DELETE WHERE created_at < cutoff)
+ * @sideEffects audit: emitLog('pipeline_executions.cleaned')
+ * @calledBy handler (POST ?action=cleanup)
+ */
 export const cleanup = createHandler(async (ctx, body) => {
   const { days_to_keep = 30, status_filter } = body
 
@@ -266,7 +403,15 @@ export const cleanup = createHandler(async (ctx, body) => {
   return { deleted_count: (data || []).length }
 })
 
-// ── Main handler ─────────────────────────────────────────
+// ─── MAIN HANDLER ────────────────────────────────────────────────────────────
+
+/**
+ * Netlify function entry point. See module dispatch table for full routing.
+ * PATCH actions are sub-dispatched via `?action` (start | complete | cancel).
+ * @throws Error('Invalid action or method') on unmatched combination
+ * @calledBy Netlify function routing
+ * @calledBy pipeline-runner.ts (directly invokes create/start/complete)
+ */
 export const handler = createHandler(async (ctx, body) => {
   const { action } = ctx.query || {}
   const method = ctx.query?.method || 'GET'

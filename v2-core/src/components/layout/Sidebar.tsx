@@ -1,3 +1,31 @@
+/**
+ * @module src/components/layout/Sidebar
+ * @audience installer
+ * @layer frontend-component
+ * @stability stable
+ *
+ * Navigation sidebar with collapsible sections. Exports two components:
+ *
+ * **`Sidebar`** — mobile slide-over drawer shell. Renders `SidebarContent`
+ * inside a fixed overlay when `open=true`. The desktop sidebar is rendered
+ * directly by `Layout` without this wrapper.
+ *
+ * **`SidebarContent`** — the actual nav tree. Contains three collapsible
+ * section groups (Runtime, Configs, Observability) plus main nav, all
+ * gated on `user.roles.includes('system_admin')`. Sections collapse/expand
+ * with local `useState`.
+ *
+ * **Active link detection:** `isActive(href)` checks `location.pathname`
+ * for exact or prefix match, enabling ancestor highlighting.
+ *
+ * **Nav item registry** (`navigation`, `configsNavigation`,
+ * `observabilityNavigation`, `runtimeNavigation`) are module-level
+ * constants. Extend them to add new sidebar entries.
+ *
+ * @seeAlso src/components/layout/Layout.tsx (mounts this component)
+ * @seeAlso src/contexts/AuthContext.tsx (provides `user` and `logout`)
+ */
+
 import { useState } from 'react'
 import { Link, useLocation } from 'react-router-dom'
 import { useAuth } from '../../contexts/AuthContext'
@@ -23,62 +51,72 @@ import {
   ShieldCheckIcon,
   KeyIcon,
   BeakerIcon,
+  ChartBarIcon,
+  BellIcon,
 } from '@heroicons/react/24/outline'
 
+/**
+ * Props for `Sidebar` (mobile drawer shell).
+ *
+ * @prop open - Whether the slide-over is visible
+ * @prop onClose - Callback to close the drawer
+ */
 interface SidebarProps {
   open: boolean
   onClose: () => void
 }
 
 const navigation = [
-  { name: 'Dashboard', href: '/admin/dashboard', icon: HomeIcon },
+  { name: 'Dashboard', href: '/spine-framework/admin/configs/types', icon: HomeIcon },
 ]
 
 const configsNavigation = [
   // Types
-  { name: 'Item Types', href: '/admin/configs/types', icon: CubeIcon },
+  { name: 'Item Types', href: '/spine-framework/admin/configs/types', icon: CubeIcon },
   { divider: true },
   // Core Platform
-  { name: 'Apps', href: '/admin/configs/apps', icon: CogIcon },
-  { name: 'Roles', href: '/admin/configs/roles', icon: ShieldCheckIcon },
+  { name: 'Apps', href: '/spine-framework/admin/configs/apps', icon: CogIcon },
+  { name: 'Roles', href: '/spine-framework/admin/configs/roles', icon: ShieldCheckIcon },
   { divider: true },
   // AI/ML
-  { name: 'AI Agents', href: '/admin/configs/ai-agents', icon: SparklesIcon },
-  { name: 'Prompt Configs', href: '/admin/configs/prompts', icon: DocumentTextIcon },
-  { name: 'Embeddings', href: '/admin/configs/embeddings', icon: DocumentTextIcon },
+  { name: 'AI Agents', href: '/spine-framework/admin/configs/ai-agents', icon: SparklesIcon },
+  { name: 'Prompt Configs', href: '/spine-framework/admin/configs/prompts', icon: DocumentTextIcon },
+  { name: 'Embeddings', href: '/spine-framework/admin/configs/embeddings', icon: DocumentTextIcon },
   { divider: true },
   // Automation
-  { name: 'Pipelines', href: '/admin/configs/pipelines', icon: ArrowPathIcon },
-  { name: 'Triggers', href: '/admin/configs/triggers', icon: BoltIcon },
-  { name: 'Timers', href: '/admin/configs/timers', icon: ClockIcon },
+  { name: 'Pipelines', href: '/spine-framework/admin/configs/pipelines', icon: ArrowPathIcon },
+  { name: 'Triggers', href: '/spine-framework/admin/configs/triggers', icon: BoltIcon },
+  { name: 'Timers', href: '/spine-framework/admin/configs/timers', icon: ClockIcon },
   { divider: true },
   // Integrations
-  { name: 'Integrations', href: '/admin/configs/integrations', icon: LinkIcon },
-  { name: 'API Keys', href: '/admin/configs/api-keys', icon: KeyIcon },
+  { name: 'Integrations', href: '/spine-framework/admin/configs/integrations', icon: LinkIcon },
+  { name: 'API Keys', href: '/spine-framework/admin/configs/api-keys', icon: KeyIcon },
 ] as const
 
 const observabilityNavigation = [
-  { name: 'Executions', href: '/admin/observability/executions', icon: BeakerIcon },
-  { name: 'Logs', href: '/admin/observability/logs', icon: DocumentTextIcon },
+  { name: 'Dashboard', href: '/spine-framework/admin/observability', icon: ChartBarIcon },
+  { name: 'Alerts', href: '/spine-framework/admin/observability/alerts', icon: BellIcon },
+  { name: 'Executions', href: '/spine-framework/admin/observability/executions', icon: BeakerIcon },
+  { name: 'Logs', href: '/spine-framework/admin/observability/logs', icon: DocumentTextIcon },
 ]
 
 // Database entities that should be shown in runtime navigation
 const runtimeNavigation = [
   // Core entities
-  { name: 'Accounts', href: '/admin/runtime/accounts', icon: BuildingOfficeIcon },
-  { name: 'People', href: '/admin/runtime/people', icon: UserGroupIcon },
-  { name: 'Items', href: '/admin/runtime/items', icon: CubeIcon },
+  { name: 'Accounts', href: '/spine-framework/admin/runtime/accounts', icon: BuildingOfficeIcon },
+  { name: 'People', href: '/spine-framework/admin/runtime/people', icon: UserGroupIcon },
+  { name: 'Items', href: '/spine-framework/admin/runtime/items', icon: CubeIcon },
   { divider: true },
   // Communication
-  { name: 'Threads', href: '/admin/runtime/threads', icon: DocumentTextIcon },
-  { name: 'Messages', href: '/admin/runtime/messages', icon: DocumentTextIcon },
+  { name: 'Threads', href: '/spine-framework/admin/runtime/threads', icon: DocumentTextIcon },
+  { name: 'Messages', href: '/spine-framework/admin/runtime/messages', icon: DocumentTextIcon },
   { divider: true },
   // Relationships
-  { name: 'Links', href: '/admin/runtime/links', icon: LinkIcon },
-  { name: 'Attachments', href: '/admin/runtime/attachments', icon: DocumentTextIcon },
+  { name: 'Links', href: '/spine-framework/admin/runtime/links', icon: LinkIcon },
+  { name: 'Attachments', href: '/spine-framework/admin/runtime/attachments', icon: DocumentTextIcon },
   { divider: true },
   // Activity
-  { name: 'Watchers', href: '/admin/runtime/watchers', icon: UserIcon },
+  { name: 'Watchers', href: '/spine-framework/admin/runtime/watchers', icon: UserIcon },
 ] as const
 
 /* ── shared nav item classes ────────────────────────────────── */
@@ -89,6 +127,13 @@ function navClasses(active: boolean) {
 }
 
 /* ── Sidebar shell ──────────────────────────────────────────── */
+/**
+ * Mobile slide-over sidebar shell.
+ *
+ * @param props - `SidebarProps`
+ * @returns Fixed overlay drawer, or null when `open=false`
+ * @sideEffects none (delegates close to `onClose`)
+ */
 export function Sidebar({ open, onClose }: SidebarProps) {
   const location = useLocation()
   const { user, logout } = useAuth()
@@ -120,6 +165,17 @@ export function Sidebar({ open, onClose }: SidebarProps) {
 }
 
 /* ── Sidebar inner content ──────────────────────────────────── */
+/**
+ * Scrollable sidebar navigation content, shared by the mobile drawer and
+ * the desktop fixed sidebar.
+ *
+ * @param isActive - Path-match helper for active-link highlighting
+ * @param user - Current user (role checks gate section visibility)
+ * @param logout - Auth logout callback wired to the sign-out button
+ * @param onClose - Optional callback to close the mobile drawer after navigation
+ * @returns Full sidebar nav tree with brand, sections, and user footer
+ * @sideEffects Calls `logout()` on sign-out click
+ */
 export function SidebarContent({
   isActive,
   user,
@@ -134,6 +190,7 @@ export function SidebarContent({
   const [configsOpen, setConfigsOpen] = useState(false)
   const [observabilityOpen, setObservabilityOpen] = useState(false)
   const [runtimeOpen, setRuntimeOpen] = useState(true)
+  const [testingOpen, setTestingOpen] = useState(false)
 
   return (
     <div className="flex h-full flex-col">
@@ -247,6 +304,27 @@ export function SidebarContent({
                     </div>
                   )
                 })}
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* Testing */}
+        {user?.roles?.includes('system_admin') && (
+          <div className="mb-6">
+            <button
+              onClick={() => setTestingOpen(!testingOpen)}
+              className="mb-2 flex w-full items-center gap-1 px-3 text-[11px] font-semibold uppercase tracking-wider text-slate-400 hover:text-slate-600 transition-colors bg-transparent border-0 p-0 m-0"
+            >
+              {testingOpen ? <ChevronDownIcon className="h-3 w-3" /> : <ChevronRightIcon className="h-3 w-3" />}
+              Testing
+            </button>
+            {testingOpen && (
+              <div className="space-y-0.5">
+                <Link to="/spine-framework/admin/testing" className={navClasses(isActive('/spine-framework/admin/testing'))} onClick={onClose}>
+                  <BeakerIcon className="h-4 w-4 shrink-0" />
+                  Test Runs
+                </Link>
               </div>
             )}
           </div>

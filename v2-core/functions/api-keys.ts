@@ -1,8 +1,56 @@
+/**
+ * @module api-keys
+ * @audience core-contributor
+ * @layer api-handler
+ * @stability stable
+ *
+ * Management and validation API for the `api_keys` table. API keys are
+ * issued per-integration and optionally scoped to specific permissions.
+ * Key material is generated and stored by the `create_api_key` Postgres
+ * RPC, which handles hashing internally. Validation also delegates to the
+ * `validate_api_key` RPC.
+ *
+ * **Routed by:** `GET/POST /.netlify/functions/api-keys`
+ *
+ * **Actions:**
+ * | method | ?action    | handler       |
+ * |--------|------------|---------------|
+ * | POST   | validate   | validate      |
+ * | POST   | revoke     | revoke        |
+ * | GET    | usage-logs | listUsageLogs |
+ * | GET    | ?id        | get           |
+ * | GET    | (default)  | list          |
+ * | POST   | —          | create        |
+ *
+ * **Authorization:** All operations use `ctx.db` (RLS-scoped). Account context
+ * required for creates. No PATCH/DELETE — use `revoke` for deactivation.
+ *
+ * INVARIANT: Raw key material is never stored. Only the hash is persisted.
+ *   `create` returns the plaintext key once via RPC response.
+ * INVARIANT: `revoke` soft-deactivates by setting `is_active = false`.
+ *
+ * @seeAlso integrations.ts (integration_id FK on api_keys)
+ * @seeAlso audit.ts (emitLog for api_key.* events)
+ */
+
 import { createHandler } from './_shared/middleware'
 import { emitLog } from './_shared/audit'
 import { sanitizeRecordData } from './_shared/permissions'
 
-// List API keys
+// ─── HANDLERS ─────────────────────────────────────────────────────────────────
+
+/**
+ * Lists API keys for the account with optional filtering.
+ *
+ * Query params: `integration_id`, `key_type`, `is_active` ('true'/'false'),
+ * `expires_before`, `expires_after` (ISO timestamps),
+ * `limit` (default 100), `offset` (default 0)
+ *
+ * @returns Sanitized api_key records ordered by created_at desc
+ * @throws Error('Account context required')
+ * @sideEffects DB read: api_keys table (with integration + createdBy joins)
+ * @calledBy handler (GET, no id)
+ */
 export const list = createHandler(async (ctx, _body) => {
   const { integration_id, key_type, is_active, expires_before, expires_after, limit = 100, offset = 0 } = ctx.query || {}
 
@@ -50,7 +98,18 @@ export const list = createHandler(async (ctx, _body) => {
   return sanitized
 })
 
-// Get single API key
+/**
+ * Returns a single API key record by UUID. Note: does not return raw key
+ * material — only metadata.
+ *
+ * Query params: `id` (required)
+ *
+ * @returns Sanitized api_key record
+ * @throws Error('API key ID is required')
+ * @throws PostgREST error if not found or RLS denied
+ * @sideEffects DB read: api_keys table
+ * @calledBy handler (GET ?id)
+ */
 export const get = createHandler(async (ctx, _body) => {
   const { id } = ctx.query || {}
 
@@ -73,7 +132,25 @@ export const get = createHandler(async (ctx, _body) => {
   return await sanitizeRecordData(ctx, data, 'api_key')
 })
 
-// Create API key (uses valid DB RPC)
+/**
+ * Creates a new API key via the `create_api_key` Postgres RPC.
+ * The RPC generates and hashes the key material, returning plaintext once.
+ * Audit logged on success.
+ *
+ * Body: `name` (required), plus optional `integration_id`, `key_type`
+ * (default 'private'), `key_prefix` (default 'sk_'), `permissions`,
+ * `rate_limit` (default 1000 req/day), `expires_at`, `metadata`
+ *
+ * @returns RPC result containing `api_key_id` and plaintext `key_value`
+ * @throws Error('name is required')
+ * @throws Error('Account context required')
+ * @inputSpec permissions: object — scoped permission map
+ * @inputSpec rate_limit: number — max requests per day
+ * @outputSpec key_value: string — ONLY returned here; store securely client-side
+ * @sideEffects DB write: api_keys table (via create_api_key RPC)
+ * @sideEffects audit: emitLog('api_key.created')
+ * @calledBy handler (POST)
+ */
 export const create = createHandler(async (ctx, body) => {
   const { integration_id, name, key_type, key_prefix, permissions, rate_limit, expires_at, metadata } = body
 
@@ -109,7 +186,19 @@ export const create = createHandler(async (ctx, body) => {
   return data
 })
 
-// Validate API key (uses valid DB RPC)
+/**
+ * Validates an API key and checks required permissions via the
+ * `validate_api_key` Postgres RPC. Used by external callers and
+ * integration webhook handlers.
+ *
+ * Body: `key_value` (required), `required_permissions` (optional object)
+ *
+ * @returns RPC validation result (is_valid, account_id, permissions, etc.)
+ * @throws Error('key_value is required')
+ * @sideEffects DB read: validate_api_key RPC
+ * @calledBy handler (POST ?action=validate)
+ * @calledBy middleware (bearer token API key resolution)
+ */
 export const validate = createHandler(async (ctx, body) => {
   const { key_value, required_permissions } = body
 
@@ -128,7 +217,18 @@ export const validate = createHandler(async (ctx, body) => {
   return data
 })
 
-// Revoke API key (deactivate via direct query)
+/**
+ * Revokes (soft-deactivates) an API key by UUID. Sets `is_active = false`.
+ * Audit logged.
+ *
+ * Body: `id` (required)
+ *
+ * @returns Updated api_key record (is_active: false)
+ * @throws Error('API key ID is required')
+ * @sideEffects DB write: api_keys table (UPDATE is_active=false)
+ * @sideEffects audit: emitLog('api_key.revoked')
+ * @calledBy handler (POST ?action=revoke)
+ */
 export const revoke = createHandler(async (ctx, body) => {
   const { id } = body
 
@@ -153,7 +253,18 @@ export const revoke = createHandler(async (ctx, body) => {
   return data
 })
 
-// List API key usage logs
+/**
+ * Lists paginated API key usage logs from `api_key_usage_logs`.
+ *
+ * Query params: `api_key_id`, `response_status` (integer), `success`
+ * ('true'/'false'), `date_from`, `date_to` (ISO timestamps),
+ * `limit` (default 100), `offset` (default 0)
+ *
+ * @returns Array of api_key_usage_logs rows with api_key join
+ * @throws Error('Account context required')
+ * @sideEffects DB read: api_key_usage_logs table
+ * @calledBy handler (GET ?action=usage-logs)
+ */
 export const listUsageLogs = createHandler(async (ctx, _body) => {
   const { api_key_id, response_status, success, date_from, date_to, limit = 100, offset = 0 } = ctx.query || {}
 
@@ -195,7 +306,13 @@ export const listUsageLogs = createHandler(async (ctx, _body) => {
   return data
 })
 
-// Main handler function
+// ─── MAIN HANDLER ────────────────────────────────────────────────────────────
+
+/**
+ * Netlify function entry point. See module dispatch table for full routing.
+ * @throws Error('Invalid action or method') on unmatched combination
+ * @calledBy Netlify function routing
+ */
 export const handler = createHandler(async (ctx, body) => {
   const { action } = ctx.query || {}
   const method = ctx.query?.method || 'GET'

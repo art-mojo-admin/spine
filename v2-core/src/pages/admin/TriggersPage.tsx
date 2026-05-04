@@ -1,3 +1,18 @@
+/**
+ * @module src/pages/admin/TriggersPage
+ * @audience installer
+ * @layer frontend-page
+ * @stability stable
+ *
+ * Admin list page for event/schedule/webhook triggers. Fetches all
+ * triggers via `/api/triggers?action=list`, applies client-side search,
+ * trigger-type filter, and sort. Supports inline enable/disable toggle.
+ * Renders inside `AdminListPage`. Row clicks navigate to
+ * `/spine-framework/admin/configs/triggers/:id`.
+ *
+ * @seeAlso src/pages/admin/TriggerDetailPage.tsx
+ */
+
 import React, { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useApi } from '../../hooks/useApi'
@@ -194,15 +209,15 @@ export function TriggersPage() {
   }
 
   const handleViewExecutions = (trigger: Trigger) => {
-    navigate(`/admin/configs/triggers/${trigger.id}/executions`)
+    navigate(`/spine-framework/admin/configs/triggers/${trigger.id}/executions`)
   }
 
   const handleRowClick = (trigger: Trigger) => {
-    navigate(`/admin/configs/triggers/${trigger.id}`)
+    navigate(`/spine-framework/admin/configs/triggers/${trigger.id}`)
   }
 
   const handleEditTrigger = (trigger: Trigger) => {
-    navigate(`/admin/configs/triggers/${trigger.id}/edit`)
+    navigate(`/spine-framework/admin/configs/triggers/${trigger.id}/edit`)
   }
 
   const handleSort = (key: string) => {
@@ -219,7 +234,7 @@ export function TriggersPage() {
       title="Triggers"
       description="Manage automated triggers for workflows"
       newButtonText="New Trigger"
-      newButtonHref="/admin/configs/triggers/new"
+      newButtonHref="/spine-framework/admin/configs/triggers/new"
       statsCards={[
         {
           title: "Total Triggers",
@@ -271,7 +286,7 @@ export function TriggersPage() {
             Get started by creating your first automated trigger.
           </p>
           <div className="mt-6">
-            <Button onClick={() => navigate('/admin/configs/triggers/new')}>
+            <Button onClick={() => navigate('/spine-framework/admin/configs/triggers/new')}>
               <PlusIcon className="w-4 h-4 mr-2" />
               Create Your First Trigger
             </Button>

@@ -1,3 +1,17 @@
+/**
+ * @module src/pages/admin/IntegrationDetailPage
+ * @audience installer
+ * @layer frontend-page
+ * @stability stable
+ *
+ * Create / view / edit / delete page for a single integration instance.
+ * Route param: `id` (UUID). Displays connection status, credentials
+ * config (masked), and lifecycle timestamps. Delete is gated behind a
+ * confirmation modal.
+ *
+ * @seeAlso src/pages/admin/IntegrationsPage.tsx
+ */
+
 import React, { useState, useEffect } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import { apiFetch } from '../../lib/api'
@@ -118,7 +132,7 @@ export function IntegrationDetailPage() {
       if (isCreateMode) {
         const result = await response.json()
         const newId = result.data?.id || result.data?.integration_id || result.id || result.integration_id
-        navigate(`/admin/configs/integrations/${newId}`)
+        navigate(`/spine-framework/admin/configs/integrations/${newId}`)
       } else {
         setIsEditing(false)
         // Refetch data
@@ -141,7 +155,7 @@ export function IntegrationDetailPage() {
 
       if (!response.ok) throw new Error('Failed to delete integration')
       
-      navigate('/admin/configs/integrations')
+      navigate('/spine-framework/admin/configs/integrations')
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to delete integration')
     }
@@ -189,7 +203,7 @@ export function IntegrationDetailPage() {
     return (
       <div className="text-center py-8">
         <p className="text-red-600">{error}</p>
-        <Button onClick={() => navigate('/admin/configs/integrations')} className="mt-4">
+        <Button onClick={() => navigate('/spine-framework/admin/configs/integrations')} className="mt-4">
           Back to Integrations
         </Button>
       </div>
@@ -202,7 +216,7 @@ export function IntegrationDetailPage() {
       <div className="flex items-center justify-between">
         <div className="flex items-center space-x-4">
           <button
-            onClick={() => navigate('/admin/configs/integrations')}
+            onClick={() => navigate('/spine-framework/admin/configs/integrations')}
             className="p-2 text-slate-400 hover:text-slate-600"
           >
             <ArrowLeftIcon className="h-5 w-5" />
@@ -249,7 +263,7 @@ export function IntegrationDetailPage() {
         
         {isCreateMode && (
           <div className="flex space-x-2">
-            <Button variant="outline" onClick={() => navigate('/admin/configs/integrations')}>
+            <Button variant="outline" onClick={() => navigate('/spine-framework/admin/configs/integrations')}>
               Cancel
             </Button>
             <Button onClick={handleSave}>

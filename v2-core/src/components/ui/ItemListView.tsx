@@ -1,3 +1,25 @@
+/**
+ * @module src/components/ui/ItemListView
+ * @audience installer
+ * @layer frontend-component
+ * @stability stable
+ *
+ * Switchable item view widget and page shell.
+ *
+ * **`ItemListView`** — renders items in either a compact `ItemGrid` or a
+ * full `DataTable` view, toggled by icon buttons. Derives unique type
+ * filter options from the items array and builds a fixed table column
+ * set. The primary display field is resolved from the first `text` or
+ * `textarea` field in the item type's `design_schema`.
+ *
+ * **`ItemListPage`** — wraps `ItemListView` with a page-level title and
+ * description header. Use as a standalone page component.
+ *
+ * @seeAlso src/components/ui/ItemCard.tsx
+ * @seeAlso src/components/ui/DataTable.tsx
+ * @seeAlso src/types/types.ts (Item, ItemType)
+ */
+
 import React, { useState } from 'react'
 import { Item, ItemType } from '../../types/types'
 import { DataTable } from './DataTable'
@@ -11,6 +33,19 @@ import {
 } from '@heroicons/react/24/outline'
 import { formatDateTime } from '../../lib/utils'
 
+/**
+ * Props for `ItemListView`.
+ *
+ * @prop items - Typed item array with resolved `item_type`
+ * @prop loading - Shows spinner while fetching
+ * @prop onEdit / onDelete / onView - Row/card action callbacks
+ * @prop onCreate - Create button callback
+ * @prop searchable - Enables search in table view (default: `true`)
+ * @prop filterable - Enables column filters in table view (default: `true`)
+ * @prop emptyMessage - Empty-state label
+ * @prop showCreateButton - Shows the create button (default: `true`)
+ * @prop createButtonText - Create button label (default: `'Create Item'`)
+ */
 interface ItemListViewProps {
   items: (Item & { item_type: ItemType })[]
   loading?: boolean
@@ -25,6 +60,13 @@ interface ItemListViewProps {
   createButtonText?: string
 }
 
+/**
+ * Switchable grid/table item view.
+ *
+ * @param props - `ItemListViewProps`
+ * @returns Header with view-mode toggle + `ItemGrid` or `DataTable`
+ * @sideEffects none (delegates actions and creation to prop callbacks)
+ */
 export function ItemListView({
   items,
   loading = false,
@@ -198,6 +240,13 @@ export function ItemListView({
   )
 }
 
+/**
+ * Props for `ItemListPage`.
+ *
+ * @prop title - Page heading (default: `'Items'`)
+ * @prop description - Page subtitle (default: `'Manage and organize your items'`)
+ * (other props same as `ItemListViewProps`)
+ */
 interface ItemListPageProps {
   items: (Item & { item_type: ItemType })[]
   loading?: boolean
@@ -214,6 +263,13 @@ interface ItemListPageProps {
   description?: string
 }
 
+/**
+ * Full item list page with title header and switchable view.
+ *
+ * @param props - `ItemListPageProps`
+ * @returns Page header + `ItemListView`
+ * @sideEffects none (pure rendering)
+ */
 export function ItemListPage({
   items,
   loading = false,

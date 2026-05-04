@@ -1,5 +1,33 @@
+/**
+ * @module src/components/runtime/DataFilters
+ * @audience installer
+ * @layer frontend-component
+ * @stability stable
+ *
+ * Schema-driven filter bar for entity list pages. Renders a control per
+ * `EntityFilter` entry:
+ * - **`search`** → text input (partial match)
+ * - **`enum`** → `<select>` with `All` option + enum values
+ * - **`boolean`** → `<select>` with All / Yes / No
+ *
+ * When `enum` is selected as `'all'`, the key is passed as `undefined` so
+ * `useEntityList` omits it from the query string.
+ * A "Clear filters" link appears when any filter has a non-empty value.
+ *
+ * @seeAlso src/types/types.ts (EntityFilter)
+ * @seeAlso src/components/runtime/DataListPage.tsx (mounts this component)
+ */
+
 import { EntityFilter } from '../../types/types'
 
+/**
+ * Props for `DataFilters`.
+ *
+ * @prop filters - Filter definitions from the list view config
+ * @prop values - Current active filter values
+ * @prop onChange - Callback with the full updated values map
+ * @prop onClear - Callback to reset all filters to `{}`
+ */
 interface DataFiltersProps {
   filters: EntityFilter[]
   values: Record<string, any>
@@ -7,6 +35,13 @@ interface DataFiltersProps {
   onClear: () => void
 }
 
+/**
+ * Entity list filter bar.
+ *
+ * @param props - `DataFiltersProps`
+ * @returns Filter control bar or null if `filters` is empty
+ * @sideEffects none (delegates to `onChange` / `onClear`)
+ */
 export function DataFilters({ filters, values, onChange, onClear }: DataFiltersProps) {
   const handleFilterChange = (key: string, value: any) => {
     onChange({ ...values, [key]: value })

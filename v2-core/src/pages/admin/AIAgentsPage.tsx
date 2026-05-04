@@ -1,3 +1,18 @@
+/**
+ * @module src/pages/admin/AIAgentsPage
+ * @audience installer
+ * @layer frontend-page
+ * @stability stable
+ *
+ * Admin list page for AI agents. Fetches all agents via
+ * `/api/ai-agents?action=list`, applies client-side search, agent-type
+ * filter (`chat` | `analysis` | `automation` | `custom`), and sort.
+ * Renders inside `AdminListPage` with stat cards and a sortable table.
+ * Row clicks navigate to `/spine-framework/admin/configs/ai-agents/:id`.
+ *
+ * @seeAlso src/pages/admin/AIAgentDetailPage.tsx
+ */
+
 import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { 
@@ -123,7 +138,7 @@ export function AIAgentsPage() {
   }
 
   const handleRowClick = (agent: AIAgent) => {
-    navigate(`/admin/configs/ai-agents/${agent.id}`)
+    navigate(`/spine-framework/admin/configs/ai-agents/${agent.id}`)
   }
 
   // Sort agents
@@ -196,7 +211,7 @@ export function AIAgentsPage() {
       title="AI Agents"
       description="Manage AI agents and their configurations"
       newButtonText="New Agent"
-      newButtonHref="/admin/configs/ai-agents/new"
+      newButtonHref="/spine-framework/admin/configs/ai-agents/new"
       statsCards={statsCards}
       searchPlaceholder="Search agents..."
       searchValue={searchTerm}

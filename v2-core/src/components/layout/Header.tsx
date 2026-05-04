@@ -1,11 +1,41 @@
+/**
+ * @module src/components/layout/Header
+ * @audience installer
+ * @layer frontend-component
+ * @stability stable
+ *
+ * Sticky top bar rendered inside the main content area. Contains:
+ * - **Mobile hamburger** (`Bars3Icon`) — visible below `lg` breakpoint;
+ *   calls `onMenuClick` to open the slide-over sidebar
+ * - **Search input** — hidden on small screens (placeholder only; not wired)
+ * - **Notification bell** — placeholder; not yet wired to a backend
+ * - **User avatar + name** — derived from `user.full_name` / `user.email`
+ *
+ * @seeAlso src/components/layout/Layout.tsx (mounts this component)
+ * @seeAlso src/types/auth.ts (User)
+ */
+
 import { Bars3Icon, BellIcon, MagnifyingGlassIcon, UserIcon } from '@heroicons/react/24/outline'
 import { User } from '../../types/auth'
 
+/**
+ * Props for `Header`.
+ *
+ * @prop onMenuClick - Callback to open the mobile sidebar
+ * @prop user - Currently logged-in user (null while loading)
+ */
 interface HeaderProps {
   onMenuClick: () => void
   user: User | null
 }
 
+/**
+ * Sticky top bar.
+ *
+ * @param props - `HeaderProps`
+ * @returns Header element with menu toggle, search, notifications, and avatar
+ * @sideEffects none (delegates menu open to `onMenuClick`)
+ */
 export function Header({ onMenuClick, user }: HeaderProps) {
   return (
     <header className="sticky top-0 z-20 flex h-14 shrink-0 items-center gap-4 border-b border-slate-200 bg-white/80 backdrop-blur-md px-4 sm:px-6 lg:pl-72 lg:pr-8">

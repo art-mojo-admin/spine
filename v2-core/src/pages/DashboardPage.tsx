@@ -1,3 +1,22 @@
+/**
+ * @module src/pages/DashboardPage
+ * @audience installer
+ * @layer frontend-page
+ * @stability stable
+ *
+ * Admin home page. On mount, fetches all active item types (`kind=item`)
+ * from `/api/types` and then fans out parallel requests to
+ * `/api/admin-data?action=stats&entity=items&type_slug=…` to collect
+ * per-type item counts (capped at 8 types). Renders:
+ * - **Entity overview grid** — one stat card per type + a "Configuration"
+ *   shortcut card
+ * - **Quick Actions row** — "New <Type>" buttons for the first 4 types plus
+ *   a "Configure Types" shortcut
+ *
+ * @seeAlso src/contexts/AuthContext.tsx (provides current user)
+ * @seeAlso src/lib/api.ts (apiFetch)
+ */
+
 import React, { useState, useEffect } from 'react'
 import { useAuth } from '../contexts/AuthContext'
 import { useApi } from '../hooks/useApi'
@@ -77,11 +96,11 @@ export function DashboardPage() {
   }, [apiFetch])
 
   const handleCreateNewItem = (typeSlug: string) => {
-    navigate(`/admin/data/items/create?typeSlug=${typeSlug}`)
+    navigate(`/spine-framework/admin/data/items/create?typeSlug=${typeSlug}`)
   }
 
   const handleViewItems = (typeSlug: string) => {
-    navigate(`/admin/data/items?typeSlug=${typeSlug}`)
+    navigate(`/spine-framework/admin/data/items?typeSlug=${typeSlug}`)
   }
 
   if (loading) {
@@ -122,7 +141,7 @@ export function DashboardPage() {
           {/* Quick Actions Card */}
           <div
             className="rounded-xl border border-slate-200 bg-white p-5 hover:shadow-md transition-shadow cursor-pointer"
-            onClick={() => navigate('/admin/configs/types')}
+            onClick={() => navigate('/spine-framework/admin/configs/types')}
           >
             <div className="flex items-center gap-4">
               <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-green-50 text-green-600">
@@ -156,7 +175,7 @@ export function DashboardPage() {
           ))}
           
           <button 
-            onClick={() => navigate('/admin/configs/types')}
+            onClick={() => navigate('/spine-framework/admin/configs/types')}
             className="flex flex-col items-center gap-2 rounded-lg border border-slate-200 p-5 text-slate-600 hover:border-blue-200 hover:bg-blue-50 hover:text-blue-700 transition-colors focus:outline-none focus:ring-2 focus:ring-blue-500"
           >
             <CogIcon className="h-6 w-6" />

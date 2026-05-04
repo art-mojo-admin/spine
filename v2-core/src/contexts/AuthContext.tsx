@@ -1,8 +1,53 @@
+/**
+ * @module src/contexts/AuthContext
+ * @audience installer
+ * @layer frontend-hook
+ * @stability stable
+ *
+ * React authentication context and provider for the Spine v2 frontend.
+ * Manages the full Supabase auth lifecycle: initial session hydration,
+ * login, logout, auth state change events, and a server-side user context
+ * fetch (principal, account, roles, permissions).
+ *
+ * **Session hydration strategy:**
+ * 1. On mount, restore user from `sessionStorage` (survives page reloads
+ *    without a loading flash)
+ * 2. If no stored user, call `checkAuth` → `fetchUserContext` → `setAccountId`
+ * 3. Subscribe to `supabase.auth.onAuthStateChange` for `SIGNED_IN`,
+ *    `TOKEN_REFRESHED`, and `SIGNED_OUT` events
+ *
+ * **Race-condition guards:**
+ * - `isLoggingIn` flag prevents `onAuthStateChange` from re-fetching context
+ *   while `login()` is already in progress
+ * - `SIGNED_IN` / `TOKEN_REFRESHED` handler skips re-fetch if user is already
+ *   loaded (prevents blocking page data fetches on browser focus)
+ * - `checkAuth` exits early if user is already loaded from `sessionStorage`
+ *
+ * **Account scope:** Calls `setAccountId(userContext.account_id)` after
+ * every successful context fetch, keeping `src/lib/api.ts` in sync.
+ *
+ * @seeAlso src/lib/supabase.ts (supabase client singleton)
+ * @seeAlso src/lib/api.ts (setAccountId, apiFetch)
+ * @seeAlso src/types/auth.ts (User shape)
+ * @seeAlso functions/auth.ts (backend `/api/auth?action=context` endpoint)
+ */
+
 import React, { createContext, useContext, useEffect, useState } from 'react'
 import { supabase } from '../lib/supabase'
 import { setAccountId, apiFetch } from '../lib/api'
 import { User } from '../types/auth'
 
+// ─── TYPES ───────────────────────────────────────────────────────────────────
+
+/**
+ * Shape of the value provided by `AuthContext`.
+ *
+ * @prop user - Resolved server-side user context, or null if unauthenticated
+ * @prop isLoading - True during initial `checkAuth` (prevents premature redirects)
+ * @prop login - Sign in with email/password and hydrate user context
+ * @prop logout - Sign out and clear user + account scope
+ * @prop refreshUser - Re-fetch user context from the server (e.g. after role change)
+ */
 interface AuthContextType {
   user: User | null
   isLoading: boolean
@@ -13,6 +58,16 @@ interface AuthContextType {
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined)
 
+// ─── useAuth ─────────────────────────────────────────────────────────────────
+
+/**
+ * Hook to access the authentication context. Must be called inside `AuthProvider`.
+ *
+ * @returns `AuthContextType` — user, isLoading, login, logout, refreshUser
+ * @throws Error('useAuth must be used within an AuthProvider') if called outside provider
+ * @sideEffects none (read-only context access)
+ * @calledBy every component that needs the current user or auth actions
+ */
 export function useAuth() {
   const context = useContext(AuthContext)
   if (context === undefined) {
@@ -25,7 +80,18 @@ interface AuthProviderProps {
   children: React.ReactNode
 }
 
-// Function to fetch user context from backend API
+// ─── INTERNAL HELPERS ───────────────────────────────────────────────────────────
+
+/**
+ * Fetches the server-side user context from `GET /api/auth`. Returns null on
+ * any error (network, auth, or API) rather than throwing, so callers can
+ * apply fallback logic without try/catch.
+ *
+ * @returns Resolved `User` object or null on failure
+ * @throws never (all errors are caught internally)
+ * @sideEffects Network request via apiFetch; console logging
+ * @calledBy AuthProvider.login, AuthProvider.refreshUser, AuthProvider.checkAuth
+ */
 async function fetchUserContext(): Promise<User | null> {
   try {
     console.log('Fetching user context from backend API')
@@ -66,6 +132,26 @@ async function fetchUserContext(): Promise<User | null> {
   }
 }
 
+// ─── AuthProvider ──────────────────────────────────────────────────────────────
+
+/**
+ * Root authentication provider. Wrap the entire application with this component
+ * to enable `useAuth()` in any descendant.
+ *
+ * @param children - React subtree to wrap
+ * @sideEffects
+ *   - Reads/writes `sessionStorage` key `spine_user` for persistence
+ *   - Calls `setAccountId` (mutates `src/lib/api.ts` module state)
+ *   - Subscribes to `supabase.auth.onAuthStateChange`; unsubscribes on unmount
+ * @calledBy src/main.tsx (app root)
+ *
+ * @example
+ * ```tsx
+ * <AuthProvider>
+ *   <App />
+ * </AuthProvider>
+ * ```
+ */
 export function AuthProvider({ children }: AuthProviderProps) {
   // Initialize user from sessionStorage to survive full page reloads
   const getStoredUser = (): User | null => {

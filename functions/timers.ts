@@ -1,9 +1,55 @@
+/**
+ * @module timers
+ * @audience core-contributor
+ * @layer api-handler
+ * @stability stable
+ *
+ * CRUD API for the `timers` table. Timers are scheduled pipeline triggers
+ * (cron-style). They are evaluated and fired by `system-cron.ts` on each
+ * scheduled invocation.
+ *
+ * **Routed by:** `GET/POST/PATCH/DELETE /.netlify/functions/timers`
+ *
+ * **Actions:**
+ * | method | ?action  | handler  |
+ * |--------|----------|----------|
+ * | POST   | toggle   | toggle   |
+ * | GET    | ?id      | get      |
+ * | GET    | (default)| list     |
+ * | POST   | —        | create   |
+ * | PATCH  | —        | update   |
+ * | DELETE | —        | remove (hard) |
+ *
+ * **Authorization:** All operations use `ctx.db` (RLS-scoped). Authenticated
+ * principal required for writes.
+ *
+ * INVARIANT: `remove` is a hard delete.
+ * INVARIANT: `update` only patches allowed fields: name, description, config,
+ *   pipeline_id, metadata, is_active.
+ *
+ * @seeAlso system-cron.ts (fires timers on schedule)
+ * @seeAlso pipelines.ts (pipeline_id FK on timers)
+ * @seeAlso audit.ts (emitLog for timer.* events)
+ */
+
 import { createHandler } from './_shared/middleware'
 import { joins } from './_shared/db'
 import { emitLog } from './_shared/audit'
 import { sanitizeRecordData } from './_shared/permissions'
 
-// List timers - RLS enforced
+// ─── HANDLERS ─────────────────────────────────────────────────────────────────
+
+/**
+ * Lists timers for the account with optional filtering.
+ *
+ * Query params: `app_id`, `timer_type`, `is_active` ('true'/'false')
+ *
+ * @returns Sanitized timer records ordered by name
+ * @throws Error('Account context required')
+ * @sideEffects DB read: timers table (with app + createdBy joins)
+ * @calledBy handler (GET, no id)
+ * @testUnit tests/unit/timers.test.ts — 'list'
+ */
 export const list = createHandler(async (ctx, _body) => {
   const { app_id, timer_type, is_active } = ctx.query || {}
 
@@ -38,7 +84,17 @@ export const list = createHandler(async (ctx, _body) => {
   return sanitized
 })
 
-// Get single timer - RLS enforced
+/**
+ * Returns a single timer by UUID.
+ *
+ * Query params: `id` (required)
+ *
+ * @returns Sanitized timer record
+ * @throws Error('Timer ID is required')
+ * @throws PostgREST error if not found or RLS denied
+ * @sideEffects DB read: timers table
+ * @calledBy handler (GET ?id)
+ */
 export const get = createHandler(async (ctx, _body) => {
   const { id } = ctx.query || {}
 
@@ -57,7 +113,20 @@ export const get = createHandler(async (ctx, _body) => {
   return await sanitizeRecordData(ctx, data, 'timer')
 })
 
-// Create timer
+/**
+ * Creates a new timer. Authenticated principal required. Audit logged.
+ *
+ * Body: `name`, `timer_type` (required), plus optional `app_id`,
+ * `description`, `config` (cron schedule etc.), `pipeline_id`, `metadata`
+ *
+ * @returns Inserted timer record
+ * @throws Error('name and timer_type are required')
+ * @inputSpec timer_type: string — e.g. 'cron', 'interval'
+ * @inputSpec config: object — schedule config (cron expression, interval)
+ * @sideEffects DB write: timers table (INSERT)
+ * @sideEffects audit: emitLog('timer.created')
+ * @calledBy handler (POST)
+ */
 export const create = createHandler(async (ctx, body) => {
   const { app_id, name, description, timer_type, config, pipeline_id, metadata } = body
 
@@ -95,7 +164,18 @@ export const create = createHandler(async (ctx, body) => {
   return data
 })
 
-// Update timer
+/**
+ * Updates a timer. Only patchable fields: `name`, `description`, `config`,
+ * `pipeline_id`, `metadata`, `is_active`. Audit logged.
+ *
+ * Body/query: `id` (required), plus any allowed fields
+ *
+ * @returns Updated timer record
+ * @throws Error('Timer ID is required')
+ * @sideEffects DB write: timers table (UPDATE)
+ * @sideEffects audit: emitLog('timer.updated')
+ * @calledBy handler (PATCH)
+ */
 export const update = createHandler(async (ctx, body) => {
   const id = body?.id || ctx.query?.id
   const { id: _bodyId, ...updates } = body || {}
@@ -127,7 +207,17 @@ export const update = createHandler(async (ctx, body) => {
   return data
 })
 
-// Toggle timer (activate/deactivate)
+/**
+ * Activates or deactivates a timer. Emits `timer.toggled` audit event.
+ *
+ * Body: `id` (required), `is_active` (required, boolean)
+ *
+ * @returns Updated timer record
+ * @throws Error('Timer ID and is_active are required')
+ * @sideEffects DB write: timers table (UPDATE is_active)
+ * @sideEffects audit: emitLog('timer.toggled')
+ * @calledBy handler (POST ?action=toggle)
+ */
 export const toggle = createHandler(async (ctx, body) => {
   const { id, is_active } = body
 
@@ -152,7 +242,18 @@ export const toggle = createHandler(async (ctx, body) => {
   return data
 })
 
-// Delete timer
+/**
+ * Hard-deletes a timer by UUID. Audit logged.
+ *
+ * Query params: `id` (required)
+ *
+ * @returns `{ success: true }`
+ * @throws Error('Timer ID is required')
+ * @throws Error('Timer not found')
+ * @sideEffects DB write: timers table (DELETE)
+ * @sideEffects audit: emitLog('timer.deleted', { before })
+ * @calledBy handler (DELETE)
+ */
 export const remove = createHandler(async (ctx, _body) => {
   const id = ctx.query?.id
 
@@ -183,7 +284,13 @@ export const remove = createHandler(async (ctx, _body) => {
   return { success: true }
 })
 
-// Main handler function
+// ─── MAIN HANDLER ────────────────────────────────────────────────────────────
+
+/**
+ * Netlify function entry point. See module dispatch table for full routing.
+ * @throws Error('Invalid action or method') on unmatched combination
+ * @calledBy Netlify function routing
+ */
 export const handler = createHandler(async (ctx, body) => {
   const { action } = ctx.query || {}
   const method = ctx.query?.method || 'GET'

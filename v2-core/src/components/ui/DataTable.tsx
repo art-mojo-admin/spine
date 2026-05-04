@@ -1,3 +1,31 @@
+/**
+ * @module src/components/ui/DataTable
+ * @audience installer
+ * @layer frontend-component
+ * @stability stable
+ *
+ * Higher-level table wrapper that adds search, column filters, active-filter
+ * chips, and pagination to the base `Table<T>` primitive.
+ *
+ * **Search:** when `searchable=true`, renders a text input that calls
+ * `onSearch` on each keystroke and shows an active chip while a query
+ * is present.
+ *
+ * **Column filters:** columns with `filterable=true` and `filterOptions`
+ * appear in an expandable filter panel as `<select>` dropdowns. Active
+ * filter chips are shown above the table; each chip has an inline
+ * dismiss button.
+ *
+ * **Pagination:** pass a `pagination` config object to show `TablePagination`
+ * below the table.
+ *
+ * **`DataTableColumn<T>`** extends `TableColumn<T>` with `filterable` and
+ * `filterOptions`.
+ *
+ * @seeAlso src/components/ui/Table.tsx
+ * @seeAlso src/lib/utils.ts (cn)
+ */
+
 import React, { useState } from 'react'
 import { Table, TablePagination, TableColumn } from './Table'
 import { Badge } from './Badge'
@@ -5,11 +33,33 @@ import { Button } from './Button'
 import { MagnifyingGlassIcon, FunnelIcon } from '@heroicons/react/24/outline'
 import { cn } from '../../lib/utils'
 
+/**
+ * Extends `TableColumn<T>` with column-level filter support.
+ *
+ * @prop filterable - Includes this column in the filter panel
+ * @prop filterOptions - Select options for the filter dropdown
+ */
 interface DataTableColumn<T> extends TableColumn<T> {
   filterable?: boolean
   filterOptions?: Array<{ value: string; label: string }>
 }
 
+/**
+ * Props for `DataTable<T>`.
+ *
+ * @prop data - Row data array
+ * @prop columns - Column descriptors (may include filter config)
+ * @prop loading - Shows spinner while true
+ * @prop searchable - Shows search input (default: `true`)
+ * @prop searchPlaceholder - Placeholder text for the search input
+ * @prop filterable - Shows the filter toggle button (default: `true`)
+ * @prop pagination - Pagination config; omit to hide pagination
+ * @prop onSort / sortColumn / sortDirection - Sort state and callback
+ * @prop onRowClick - Row click callback
+ * @prop onSearch - Callback invoked with the current search query
+ * @prop onFilter - Callback invoked with the active filter map
+ * @prop emptyMessage - Empty-state text
+ */
 interface DataTableProps<T> {
   data: T[]
   columns: DataTableColumn<T>[]
@@ -35,6 +85,13 @@ interface DataTableProps<T> {
   className?: string
 }
 
+/**
+ * Full-featured data table with search, filters, sort, and pagination.
+ *
+ * @param props - `DataTableProps<T>`
+ * @returns Search/filter bar + `Table` + optional `TablePagination`
+ * @sideEffects none (all state changes delegated to callbacks)
+ */
 export function DataTable<T extends Record<string, any>>({
   data,
   columns,

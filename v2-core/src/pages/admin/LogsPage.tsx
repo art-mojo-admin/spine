@@ -1,3 +1,18 @@
+/**
+ * @module src/pages/admin/LogsPage
+ * @audience installer
+ * @layer frontend-page
+ * @stability stable
+ *
+ * Admin log viewer. Fetches system audit/activity logs via
+ * `/api/admin-data?action=logs`, applies client-side search, severity
+ * filter, date-range filter, and sort. Renders inside `AdminListPage`
+ * with a sortable table. Useful for debugging pipeline executions,
+ * auth events, and API errors.
+ *
+ * @seeAlso src/pages/admin/ObservabilityDashboard.tsx
+ */
+
 import React, { useState } from 'react'
 import { 
   DocumentTextIcon,

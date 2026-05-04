@@ -1,12 +1,39 @@
+/**
+ * @module src/components/layout/Layout
+ * @audience installer
+ * @layer frontend-component
+ * @stability stable
+ *
+ * Root app shell providing the two-pane admin layout:
+ * - **Desktop (`lg+`):** fixed 60-wide `<Sidebar>` on the left, scrollable
+ *   main content area padded with `lg:pl-60`.
+ * - **Mobile (`< lg`):** top bar with hamburger button that opens a
+ *   slide-over `<Sidebar>` with a backdrop overlay.
+ *
+ * `isActive` is computed from the current `location.pathname` and passed
+ * to `SidebarContent` for active-link highlighting.
+ *
+ * @seeAlso src/components/layout/Sidebar.tsx
+ * @seeAlso src/contexts/AuthContext.tsx (provides `user` and `logout`)
+ */
+
 import React, { useState } from 'react'
 import { Sidebar, SidebarContent } from './Sidebar'
 import { useAuth } from '../../contexts/AuthContext'
 import { useLocation } from 'react-router-dom'
 
+/** Props for `Layout`. */
 interface LayoutProps {
   children: React.ReactNode
 }
 
+/**
+ * Root two-pane admin shell.
+ *
+ * @param props - `LayoutProps`
+ * @returns Full-page layout with sidebar + main content area
+ * @sideEffects none (sidebar open state is local)
+ */
 export function Layout({ children }: LayoutProps) {
   const [sidebarOpen, setSidebarOpen] = useState(false)
   const { user, logout } = useAuth()

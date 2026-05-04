@@ -1,3 +1,18 @@
+/**
+ * @module src/pages/admin/PipelineDetailPage
+ * @audience installer
+ * @layer frontend-page
+ * @stability stable
+ *
+ * Create / view / edit / delete page for a single pipeline. Route param:
+ * `id` (UUID). Supports toggling active state inline. The `stages` array
+ * and `trigger_config` are exposed as raw JSON textareas. Delete is gated
+ * behind a confirmation modal.
+ *
+ * @seeAlso src/pages/admin/PipelinesPage.tsx
+ * @seeAlso src/hooks/useApi.ts (useApi, useMutation)
+ */
+
 import React, { useState, useEffect } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import { useApi } from '../../hooks/useApi'
@@ -146,7 +161,7 @@ export function PipelineDetailPage() {
         // Navigate to the new pipeline
         const result = await response.json()
         const newId = result.data?.id || result.id
-        navigate(`/admin/configs/pipelines/${newId}`)
+        navigate(`/spine-framework/admin/configs/pipelines/${newId}`)
       } else {
         await refetch()
         setIsEditing(false)
@@ -159,7 +174,7 @@ export function PipelineDetailPage() {
   // Handle cancel
   const handleCancel = () => {
     if (isCreateMode) {
-      navigate('/admin/configs/pipelines')
+      navigate('/spine-framework/admin/configs/pipelines')
       return
     }
     
@@ -195,7 +210,7 @@ export function PipelineDetailPage() {
     },
     {
       onSuccess: () => {
-        navigate('/admin/configs/pipelines')
+        navigate('/spine-framework/admin/configs/pipelines')
       }
     }
   )
@@ -223,7 +238,7 @@ export function PipelineDetailPage() {
         <h3 className="text-lg font-medium text-slate-900">Pipeline not found</h3>
         <p className="mt-2 text-sm text-slate-500">The pipeline you're looking for doesn't exist.</p>
         <button
-          onClick={() => navigate('/admin/configs/pipelines')}
+          onClick={() => navigate('/spine-framework/admin/configs/pipelines')}
           className="mt-4 inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md text-white bg-blue-600 hover:bg-blue-700"
         >
           Go Back
@@ -251,7 +266,7 @@ export function PipelineDetailPage() {
       <div className="flex items-center justify-between">
         <div className="flex items-center space-x-4">
           <button
-            onClick={() => navigate('/admin/configs/pipelines')}
+            onClick={() => navigate('/spine-framework/admin/configs/pipelines')}
             className="p-2 text-slate-400 hover:text-slate-600"
           >
             <ArrowLeftIcon className="h-5 w-5" />

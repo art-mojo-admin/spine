@@ -1,3 +1,18 @@
+/**
+ * @module src/pages/admin/PromptConfigsPage
+ * @audience installer
+ * @layer frontend-page
+ * @stability stable
+ *
+ * Admin list page for LLM prompt configurations. Fetches all configs via
+ * `/api/prompt-configs?action=list`, applies client-side search, category
+ * filter, and sort. Highlights the default config with a star badge.
+ * Renders inside `AdminListPage`. Row clicks navigate to
+ * `/spine-framework/admin/configs/prompt-configs/:id`.
+ *
+ * @seeAlso src/pages/admin/PromptConfigDetailPage.tsx
+ */
+
 import React, { useState } from 'react'
 import { 
   PlusIcon,
@@ -75,7 +90,7 @@ export function PromptConfigsPage() {
   }
 
   const handleRowClick = (config: PromptConfig) => {
-    window.location.href = `/admin/configs/prompts/${config.id}`
+    window.location.href = `/spine-framework/admin/configs/prompts/${config.id}`
   }
 
   const sortedConfigs = [...(filteredPromptConfigs || [])].sort((a, b) => {
@@ -153,7 +168,7 @@ export function PromptConfigsPage() {
       title="Prompt Configs"
       description="Manage AI prompt templates and configurations"
       newButtonText="Add Prompt Config"
-      newButtonHref="/admin/configs/prompts/new"
+      newButtonHref="/spine-framework/admin/configs/prompts/new"
       statsCards={statsCards}
       searchPlaceholder="Search prompts..."
       searchValue={searchTerm}

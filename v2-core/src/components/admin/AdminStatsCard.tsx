@@ -1,6 +1,27 @@
+/**
+ * @module src/components/admin/AdminStatsCard
+ * @audience installer
+ * @layer frontend-component
+ * @stability stable
+ *
+ * Single stat card used in admin list page headers. Renders an icon,
+ * a title, and a numeric or string value inside a white rounded panel.
+ * Icon colour defaults to `'text-blue-500'` but can be overridden per card.
+ *
+ * @seeAlso src/components/admin/AdminListPage.tsx (mounts this component)
+ */
+
 import React from 'react'
 import { LucideIcon } from 'lucide-react'
 
+/**
+ * Props for `AdminStatsCard`.
+ *
+ * @prop title - Stat label
+ * @prop value - Numeric or formatted string value to display
+ * @prop icon - Lucide icon component
+ * @prop iconColor - Tailwind text-colour class (default: `'text-blue-500'`)
+ */
 interface AdminStatsCardProps {
   title: string
   value: string | number
@@ -8,6 +29,13 @@ interface AdminStatsCardProps {
   iconColor?: string
 }
 
+/**
+ * Single stat card.
+ *
+ * @param props - `AdminStatsCardProps`
+ * @returns White rounded card with icon and stat value
+ * @sideEffects none (pure rendering)
+ */
 export function AdminStatsCard({ title, value, icon: Icon, iconColor = "text-blue-500" }: AdminStatsCardProps) {
   return (
     <div className="bg-white overflow-hidden shadow rounded-lg">

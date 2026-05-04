@@ -1,3 +1,17 @@
+/**
+ * @module src/pages/admin/TimerDetailPage
+ * @audience installer
+ * @layer frontend-page
+ * @stability stable
+ *
+ * Create / view / edit page for a single timer. Route param: `id` (UUID).
+ * Schedule types: `cron` | `interval` | `once`. Action types:
+ * `webhook` | `function` | `pipeline`. Displays `last_run_at` and
+ * `next_run_at` in the metadata panel. Supports inline enable/disable.
+ *
+ * @seeAlso src/pages/admin/TimersPage.tsx
+ */
+
 import { useState, useEffect } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import { Button } from '../../components/ui/Button'
@@ -144,7 +158,7 @@ export function TimerDetailPage() {
       })
       if (!response.ok) throw new Error('Failed to save timer')
       const result = await response.json()
-      if (isCreateMode) { navigate(`/admin/configs/timers/${result.timer_id || result.id}`) } else { navigate(-1) }
+      if (isCreateMode) { navigate(`/spine-framework/admin/configs/timers/${result.timer_id || result.id}`) } else { navigate(-1) }
     } catch (error: any) {
       alert(error.message || 'Failed to save timer')
     } finally {

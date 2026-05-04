@@ -1,3 +1,18 @@
+/**
+ * @module src/pages/auth/LoginPage
+ * @audience installer
+ * @layer frontend-page
+ * @stability stable
+ *
+ * Unauthenticated login page. Renders a centred card with email/password
+ * inputs. On submit, calls `AuthContext.login(email, password)` and
+ * navigates to `/dashboard` on success. Displays inline error text on
+ * failure. Shows a `LoadingSpinner` inside the submit button while the
+ * auth request is in-flight.
+ *
+ * @seeAlso src/contexts/AuthContext.tsx (login implementation)
+ */
+
 import React, { useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { useAuth } from '../../contexts/AuthContext'

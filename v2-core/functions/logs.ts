@@ -1,11 +1,53 @@
+/**
+ * @module logs
+ * @audience core-contributor
+ * @layer api-handler
+ * @stability stable
+ *
+ * Read API for the `v2.logs` table plus a write endpoint for external log
+ * ingestion. The `logs` table schema uses internal column names
+ * (`level`, `source`, `source_type`, `source_id`, `context`) that differ from
+ * the stable frontend contract. All reads are mapped through `mapLogRow`.
+ *
+ * **Routed by:** `GET/POST /.netlify/functions/logs`
+ *
+ * **Actions:**
+ * | method | ?action | handler      |
+ * |--------|---------|------------------|
+ * | GET    | account | listAccount  |
+ * | GET    | target  | listTarget   |
+ * | GET    | person  | listPerson   |
+ * | GET    | stats   | getStats     |
+ * | GET    | search  | search       |
+ * | POST   | cleanup | cleanup      |
+ * | POST   | (default)| log         |
+ *
+ * **Authorization:** All operations use `ctx.db` (RLS-scoped, always filtered
+ * to `account_id`). No inserts are made by this module — `emitLog` from
+ * `_shared/audit.ts` is the canonical write path.
+ *
+ * **Column mapping (DB → API):**
+ * | DB column    | API field   |
+ * |--------------|-------------|
+ * | level        | event_type  |
+ * | person_id    | actor_id    |
+ * | source_type  | target_type |
+ * | source_id    | target_id   |
+ * | source       | action      |
+ * | context      | details     |
+ *
+ * @seeAlso audit.ts (emitLog — canonical write path for all system events)
+ * @seeAlso observability.ts (aggregated metrics over logs)
+ */
+
 import { createHandler, json, error, parseBody } from './_shared/middleware'
 
-// ── Helpers ──────────────────────────────────────────────
-// v2.logs columns: id, level, message, context, source, source_type, source_id,
-//                  person_id, account_id, metadata, created_at
-// Frontend expects: id, event_type, actor_id, target_type, target_id, action,
-//                   details, metadata, created_at
-// We map at the edge so the UI contract is stable.
+// ─── HELPERS ─────────────────────────────────────────────────────────────────
+
+/**
+ * Maps a raw `v2.logs` row to the stable frontend API contract.
+ * Applied to all list/search results before returning.
+ */
 function mapLogRow(row: any) {
   return {
     id: row.id,
@@ -21,7 +63,20 @@ function mapLogRow(row: any) {
   }
 }
 
-// ── List logs for account ────────────────────────────────
+// ─── HANDLERS ─────────────────────────────────────────────────────────────────
+
+/**
+ * Lists all log entries for the account, newest-first.
+ *
+ * Query params: `event_type` (maps to DB `level`), `target_type` (maps to
+ * `source_type`), `date_from`, `date_to` (ISO timestamps),
+ * `limit` (default 100), `offset` (default 0)
+ *
+ * @returns Array of mapped log rows
+ * @throws Error('Account context required')
+ * @sideEffects DB read: logs table
+ * @calledBy handler (GET ?action=account)
+ */
 export const listAccount = createHandler(async (ctx, body) => {
   const { event_type, target_type, date_from, date_to, limit = 100, offset = 0 } = ctx.query || {}
 
@@ -50,7 +105,18 @@ export const listAccount = createHandler(async (ctx, body) => {
   return (data || []).map(mapLogRow)
 })
 
-// ── List logs for a specific target ──────────────────────
+/**
+ * Lists log entries for a specific target entity, newest-first.
+ *
+ * Query params: `target_type` (required), `target_id` (required),
+ * `event_type`, `limit` (default 100), `offset` (default 0)
+ *
+ * @returns Array of mapped log rows
+ * @throws Error('target_type and target_id are required')
+ * @throws Error('Account context required')
+ * @sideEffects DB read: logs table
+ * @calledBy handler (GET ?action=target)
+ */
 export const listTarget = createHandler(async (ctx, body) => {
   const { target_type, target_id, event_type, limit = 100, offset = 0 } = ctx.query || {}
 
@@ -82,7 +148,19 @@ export const listTarget = createHandler(async (ctx, body) => {
   return (data || []).map(mapLogRow)
 })
 
-// ── Person activity feed ─────────────────────────────────
+/**
+ * Returns activity feed for a person (defaults to the current principal).
+ * Excludes system-level events unless `include_system=true`.
+ *
+ * Query params: `person_id` (optional, defaults to ctx.principal.id),
+ * `include_system` ('true'), `limit` (default 50), `offset` (default 0)
+ *
+ * @returns Array of mapped log rows
+ * @throws Error('Person ID is required')
+ * @throws Error('Account context required')
+ * @sideEffects DB read: logs table
+ * @calledBy handler (GET ?action=person)
+ */
 export const listPerson = createHandler(async (ctx, body) => {
   const { person_id, include_system, limit = 50, offset = 0 } = ctx.query || {}
 
@@ -117,7 +195,17 @@ export const listPerson = createHandler(async (ctx, body) => {
   return (data || []).map(mapLogRow)
 })
 
-// ── Log statistics ───────────────────────────────────────
+/**
+ * Returns log counts by event_type for the account within an optional
+ * date range. Pulls only `id` and `level` columns for efficiency.
+ *
+ * Query params: `date_from`, `date_to` (ISO timestamps, optional)
+ *
+ * @returns `{ total: number, by_type: Record<string, number> }`
+ * @throws Error('Account context required')
+ * @sideEffects DB read: logs table (id + level only)
+ * @calledBy handler (GET ?action=stats)
+ */
 export const getStats = createHandler(async (ctx, body) => {
   const { date_from, date_to } = ctx.query || {}
 
@@ -146,7 +234,18 @@ export const getStats = createHandler(async (ctx, body) => {
   return { total: rows.length, by_type }
 })
 
-// ── Search logs ──────────────────────────────────────────
+/**
+ * Full-text search on log `message` using case-insensitive ILIKE.
+ *
+ * Query params: `query` (required, search term), `event_type`,
+ * `target_type`, `limit` (default 50), `offset` (default 0)
+ *
+ * @returns Array of mapped log rows
+ * @throws Error('Search query is required')
+ * @throws Error('Account context required')
+ * @sideEffects DB read: logs table (ILIKE scan)
+ * @calledBy handler (GET ?action=search)
+ */
 export const search = createHandler(async (ctx, body) => {
   const { query: searchQuery, event_type, target_type, limit = 50, offset = 0 } = ctx.query || {}
 
@@ -178,7 +277,20 @@ export const search = createHandler(async (ctx, body) => {
   return (data || []).map(mapLogRow)
 })
 
-// ── Write a log entry (internal use) ─────────────────────
+/**
+ * Writes a single log entry. Intended for external callers or manual
+ * instrumentation. Prefer `emitLog` from `_shared/audit.ts` for
+ * internal system events.
+ *
+ * Body: `event_type` (required), plus optional `target_type`, `target_id`,
+ * `action`, `message`, `details`, `metadata`
+ *
+ * @returns `{ log_id: string }`
+ * @throws Error('event_type is required')
+ * @throws Error('Account context required')
+ * @sideEffects DB write: logs table (INSERT)
+ * @calledBy handler (POST, default action)
+ */
 export const log = createHandler(async (ctx, body) => {
   const { event_type, target_type, target_id, action, message, details, metadata } = body
 
@@ -211,7 +323,17 @@ export const log = createHandler(async (ctx, body) => {
   return { log_id: data?.id }
 })
 
-// ── Cleanup old logs (admin only) ────────────────────────
+/**
+ * Deletes log entries older than `days_to_keep` (default 90) for the
+ * account. Scoped by RLS — only accessible logs are deleted.
+ *
+ * Body: `days_to_keep` (optional, default 90)
+ *
+ * @returns `{ deleted_count: number }`
+ * @sideEffects DB write: logs table (DELETE WHERE created_at < cutoff)
+ * @calledBy handler (POST ?action=cleanup)
+ * @calledBy system-cron.ts (scheduled log rotation)
+ */
 export const cleanup = createHandler(async (ctx, body) => {
   const { days_to_keep = 90 } = body
 
@@ -229,7 +351,13 @@ export const cleanup = createHandler(async (ctx, body) => {
   return { deleted_count: (data || []).length }
 })
 
-// ── Main handler ─────────────────────────────────────────
+// ─── MAIN HANDLER ────────────────────────────────────────────────────────────
+
+/**
+ * Netlify function entry point. See module dispatch table for full routing.
+ * @throws Error('Invalid action or method') on unmatched combination
+ * @calledBy Netlify function routing
+ */
 export const handler = createHandler(async (ctx, body) => {
   const { action } = ctx.query || {}
   const method = ctx.query?.method || 'GET'

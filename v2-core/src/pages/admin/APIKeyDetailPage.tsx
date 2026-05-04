@@ -1,3 +1,17 @@
+/**
+ * @module src/pages/admin/APIKeyDetailPage
+ * @audience installer
+ * @layer frontend-page
+ * @stability stable
+ *
+ * Create / view page for a single API key. Route param: `id` (UUID).
+ * The `key_value` is shown once on creation then masked as `***`. Supports
+ * regenerate (rotate) and delete (with confirmation). Key types:
+ * `public` | `private`.
+ *
+ * @seeAlso src/pages/admin/APIKeysPage.tsx
+ */
+
 import { useState, useEffect } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import { Button } from '../../components/ui/Button'
@@ -133,7 +147,7 @@ export function APIKeyDetailPage() {
       })
 
       if (!response.ok) throw new Error('Failed to revoke API key')
-      navigate('/admin/configs/api-keys')
+      navigate('/spine-framework/admin/configs/api-keys')
     } catch (err: any) {
       setError(err.message || 'Failed to revoke API key')
     }
@@ -193,7 +207,7 @@ export function APIKeyDetailPage() {
             <Button onClick={() => copyToClipboard(generatedKey)}>
               Copy to Clipboard
             </Button>
-            <Button variant="secondary" onClick={() => navigate('/admin/configs/api-keys')}>
+            <Button variant="secondary" onClick={() => navigate('/spine-framework/admin/configs/api-keys')}>
               Done
             </Button>
           </div>

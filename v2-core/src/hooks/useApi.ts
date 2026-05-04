@@ -1,5 +1,36 @@
+/**
+ * @module src/hooks/useApi
+ * @audience installer
+ * @layer frontend-hook
+ * @stability stable
+ *
+ * Low-level React hooks for async API calls with loading/error state,
+ * AbortController-based cancellation, and optional pagination/mutation
+ * variants. These are the primitives all higher-level data hooks
+ * (`useEntityList`, `useEntityRecord`) build on top of.
+ *
+ * **Exports:**
+ * | Hook              | Purpose                                             |
+ * |-------------------|-----------------------------------------------------|
+ * | `useApi`          | Single async call with abort + route-change re-fetch|
+ * | `usePaginatedApi` | Paginated async call with page/size controls        |
+ * | `useMutation`     | Write operation (create/update/delete) with state   |
+ *
+ * **Abort contract:** `useApi` creates a new `AbortController` per
+ * invocation. On route navigation (`location.pathname` change) or on
+ * unmount, the in-flight request is aborted and state is reset. This
+ * prevents stale responses from a previous route populating the next
+ * route's data.
+ *
+ * @seeAlso src/lib/api.ts (apiFetch — passes AbortSignal through)
+ * @seeAlso src/hooks/useEntityList.ts (uses useApi)
+ * @seeAlso src/hooks/useEntityRecord.ts (uses useApi + useMutation)
+ */
+
 import { useState, useEffect, useCallback, useRef } from 'react'
 import { useLocation } from 'react-router-dom'
+
+// ─── TYPES ───────────────────────────────────────────────────────────────────
 
 interface ApiState<T> {
   data: T | null
@@ -8,13 +39,32 @@ interface ApiState<T> {
   lastFetched: Date | null
 }
 
+/**
+ * Options for `useApi`.
+ *
+ * @prop immediate - If true, executes the function on mount and on route change
+ * @prop onSuccess - Callback fired on successful response
+ * @prop onError - Callback fired on error (with message string)
+ * @prop initialData - Seed value for `data` before first fetch
+ */
 interface UseApiOptions<T> {
   immediate?: boolean
   onSuccess?: (data: T) => void
   onError?: (error: string) => void
   initialData?: T
+  deps?: any[]
 }
 
+/**
+ * Return value of `useApi`.
+ *
+ * @prop data - Response data or null
+ * @prop loading - True while the request is in flight
+ * @prop error - Error message string or null
+ * @prop execute - Imperatively trigger the API call (with optional params)
+ * @prop reset - Cancel in-flight request and restore to initial state
+ * @prop refetch - Alias for `execute()` with no params
+ */
 interface UseApiReturn<T> {
   data: T | null
   loading: boolean
@@ -24,6 +74,33 @@ interface UseApiReturn<T> {
   refetch: () => Promise<T>
 }
 
+// ─── useApi ──────────────────────────────────────────────────────────────────
+
+/**
+ * Generic async API hook with loading/error state and automatic
+ * request cancellation.
+ *
+ * Each call to `execute` cancels any previous in-flight request via
+ * `AbortController`. When `immediate: true`, the hook re-executes
+ * (and aborts the prior request) whenever `location.pathname` changes.
+ *
+ * @param apiFunction - Async function to call; receives `{ ...params, signal }`
+ * @param options - `UseApiOptions<T>` — see type for details
+ * @returns `UseApiReturn<T>` — data, loading, error, execute, reset, refetch
+ *
+ * @inputSpec apiFunction must forward `signal` to any underlying `apiFetch`
+ *   call, otherwise cancellation is a no-op.
+ * @sideEffects React state mutations; aborts in-flight fetch on cleanup
+ * @calledBy useEntityList.ts, useEntityRecord.ts
+ *
+ * @example
+ * ```tsx
+ * const { data, loading, execute } = useApi(
+ *   async () => apiFetch('/api/items?action=list').then(r => r.json()),
+ *   { immediate: true }
+ * )
+ * ```
+ */
 export function useApi<T>(
   apiFunction: (params?: any) => Promise<T>,
   options: UseApiOptions<T> = {}
@@ -66,8 +143,18 @@ export function useApi<T>(
     setState(prev => ({ ...prev, loading: true, error: null }))
 
     try {
+      const startTime = Date.now()
       const result = await apiFunctionRef.current({ ...params, signal })
-      console.log('useApi execute: request completed', { signalAborted: signal.aborted, result })
+      const duration = Date.now() - startTime
+
+      // Structured API call log for agentic IDE consumption
+      console.log(JSON.stringify({
+        type: 'spine_api_call',
+        timestamp: new Date().toISOString(),
+        duration_ms: duration,
+        status: 'success',
+        signal_aborted: signal.aborted
+      }))
       if (signal.aborted) {
         console.log('useApi execute: request was aborted, returning result')
         return result
@@ -138,6 +225,8 @@ export function useApi<T>(
   }
 }
 
+// ─── usePaginatedApi ─────────────────────────────────────────────────────────
+
 interface PaginatedApiState<T> extends ApiState<T[]> {
   pagination: {
     page: number
@@ -147,10 +236,23 @@ interface PaginatedApiState<T> extends ApiState<T[]> {
   }
 }
 
+/**
+ * Options for `usePaginatedApi`. Extends `UseApiOptions` with `itemsPerPage`.
+ */
 interface UsePaginatedApiOptions<T> extends UseApiOptions<T[]> {
   itemsPerPage?: number
 }
 
+/**
+ * Return value of `usePaginatedApi`. Extends `UseApiReturn` with pagination
+ * controls.
+ *
+ * @prop pagination - Current page, totalPages, totalItems, itemsPerPage
+ * @prop setPage - Navigate to a specific page (triggers re-fetch if immediate)
+ * @prop setItemsPerPage - Change page size, resets to page 1
+ * @prop nextPage / prevPage - Convenience page navigation
+ * @prop hasNextPage / hasPrevPage - Boundary guards
+ */
 interface UsePaginatedApiReturn<T> extends UseApiReturn<T[]> {
   pagination: PaginatedApiState<T>['pagination']
   setPage: (page: number) => void
@@ -161,6 +263,18 @@ interface UsePaginatedApiReturn<T> extends UseApiReturn<T[]> {
   hasPrevPage: boolean
 }
 
+/**
+ * Paginated variant of `useApi`. Manages page and itemsPerPage state and
+ * automatically re-fetches when either changes (if `immediate: true`).
+ *
+ * @param apiFunction - Must accept `{ page, itemsPerPage, ...params }` and
+ *   return `{ data: T[], pagination: { page, totalPages, totalItems, itemsPerPage } }`
+ * @param options - `UsePaginatedApiOptions<T>`
+ * @returns `UsePaginatedApiReturn<T>`
+ *
+ * @sideEffects React state mutations
+ * @calledBy admin list pages with server-side pagination
+ */
 export function usePaginatedApi<T>(
   apiFunction: (params: { page: number; itemsPerPage: number; [key: string]: any }) => Promise<{
     data: T[]
@@ -299,18 +413,36 @@ export function usePaginatedApi<T>(
   }
 }
 
+// ─── useMutation ─────────────────────────────────────────────────────────────
+
 interface MutationState<T> {
   data: T | null
   loading: boolean
   error: string | null
 }
 
+/**
+ * Options for `useMutation`.
+ *
+ * @prop onSuccess - Called with the result after a successful mutation
+ * @prop onError - Called with the error message on failure
+ * @prop onSettled - Called after success or failure (always fires)
+ */
 interface UseMutationOptions<T, P> {
   onSuccess?: (data: T) => void
   onError?: (error: string) => void
   onSettled?: () => void
 }
 
+/**
+ * Return value of `useMutation`.
+ *
+ * @prop data - Result of the last successful mutation, or null
+ * @prop loading - True while the mutation is in flight
+ * @prop error - Error message string or null
+ * @prop mutate - Trigger the mutation with typed params
+ * @prop reset - Reset state to null/false/null
+ */
 interface UseMutationReturn<T, P> {
   data: T | null
   loading: boolean
@@ -319,6 +451,25 @@ interface UseMutationReturn<T, P> {
   reset: () => void
 }
 
+/**
+ * Write-operation hook for create, update, and delete calls. Does not
+ * auto-execute — call `mutate(params)` explicitly.
+ *
+ * @param mutationFunction - Async write function taking typed params
+ * @param options - `UseMutationOptions<T, P>`
+ * @returns `UseMutationReturn<T, P>` — data, loading, error, mutate, reset
+ *
+ * @sideEffects React state mutations; triggers `onSuccess/onError/onSettled` callbacks
+ * @calledBy useEntityRecord.ts (save and delete mutations)
+ *
+ * @example
+ * ```tsx
+ * const { mutate, loading } = useMutation(
+ *   async (id: string) => apiFetch(`/api/items?action=delete&id=${id}`, { method: 'DELETE' }),
+ *   { onSuccess: () => navigate('/items') }
+ * )
+ * ```
+ */
 export function useMutation<T, P = void>(
   mutationFunction: (params: P) => Promise<T>,
   options: UseMutationOptions<T, P> = {}

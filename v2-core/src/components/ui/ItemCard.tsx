@@ -1,3 +1,26 @@
+/**
+ * @module src/components/ui/ItemCard
+ * @audience installer
+ * @layer frontend-component
+ * @stability stable
+ *
+ * Item display components for grid-based views.
+ *
+ * **`ItemCard`** — renders a single `Item` in either full (`compact=false`)
+ * or compact (`compact=true`) form. Derives its display values from
+ * `item.title`, `item.description`, and the first 3 entries of `item.data`.
+ * Optional action buttons (`onView`, `onEdit`, `onDelete`) are shown when
+ * `showActions=true`.
+ *
+ * **`ItemGrid`** — renders a responsive grid of `ItemCard` instances.
+ * Shows a spinner on `loading=true` and an empty state with a doc icon
+ * when `items` is empty.
+ *
+ * @seeAlso src/components/ui/ItemListView.tsx (combines with DataTable)
+ * @seeAlso src/types/types.ts (Item, ItemType)
+ * @seeAlso src/lib/utils.ts (formatDateTime, truncateText)
+ */
+
 import React from 'react'
 import { Item, ItemType } from '../../types/types'
 import { Badge } from './Badge'
@@ -11,6 +34,16 @@ import {
 } from '@heroicons/react/24/outline'
 import { formatDateTime, truncateText } from '../../lib/utils'
 
+/**
+ * Props for `ItemCard`.
+ *
+ * @prop item - `Item` with optional resolved `item_type` relation
+ * @prop onEdit - Edit action callback
+ * @prop onDelete - Delete action callback
+ * @prop onView - View action callback
+ * @prop showActions - Shows action buttons (default: `true`)
+ * @prop compact - Condensed single-line layout (default: `false`)
+ */
 interface ItemCardProps {
   item: Item & { item_type?: ItemType | string }
   onEdit?: (item: Item) => void
@@ -20,6 +53,13 @@ interface ItemCardProps {
   compact?: boolean
 }
 
+/**
+ * Item card with optional action buttons.
+ *
+ * @param props - `ItemCardProps`
+ * @returns White rounded card in full or compact layout
+ * @sideEffects none (delegates actions to `onEdit` / `onDelete` / `onView`)
+ */
 export function ItemCard({
   item,
   onEdit,
@@ -191,6 +231,14 @@ export function ItemCard({
   )
 }
 
+/**
+ * Props for `ItemGrid`.
+ *
+ * @prop items - Typed item array with resolved `item_type`
+ * @prop loading - Shows spinner while true
+ * @prop compact - Passes compact mode to each `ItemCard`
+ * @prop emptyMessage - Text shown when `items` is empty
+ */
 interface ItemGridProps {
   items: (Item & { item_type: ItemType })[]
   loading?: boolean
@@ -201,6 +249,13 @@ interface ItemGridProps {
   emptyMessage?: string
 }
 
+/**
+ * Responsive card grid for items.
+ *
+ * @param props - `ItemGridProps`
+ * @returns Responsive grid, loading spinner, or empty state
+ * @sideEffects none (delegates actions to `onEdit` / `onDelete` / `onView`)
+ */
 export function ItemGrid({
   items,
   loading = false,

@@ -1,6 +1,38 @@
+/**
+ * @module src/components/ui/Modal
+ * @audience installer
+ * @layer frontend-component
+ * @stability stable
+ *
+ * Accessible modal dialog with backdrop, optional title/description,
+ * and a close button.
+ *
+ * **Visibility:** rendered only when `isOpen=true`; returns `null`
+ * otherwise (no DOM presence when closed).
+ *
+ * **Backdrop click:** clicking the semi-transparent overlay calls `onClose`.
+ *
+ * **Sizes:** `sm` (448px), `md` (512px), `lg` (672px), `xl` (896px).
+ *
+ * **`ModalFooter`** — companion component that renders a right-aligned
+ * action row with a top border, suitable for Save/Cancel buttons.
+ *
+ * @seeAlso src/lib/utils.ts (cn)
+ */
+
 import React from 'react'
 import { cn } from '../../lib/utils'
 
+/**
+ * Props for `Modal`.
+ *
+ * @prop isOpen - Controls visibility
+ * @prop onClose - Called when backdrop or close button is clicked
+ * @prop title - Optional header title
+ * @prop description - Optional subtitle below the title
+ * @prop size - Max-width preset (default: `'md'`)
+ * @prop showCloseButton - Shows the `×` button in the header (default: `true`)
+ */
 interface ModalProps {
   isOpen: boolean
   onClose: () => void
@@ -11,6 +43,13 @@ interface ModalProps {
   showCloseButton?: boolean
 }
 
+/**
+ * Modal dialog.
+ *
+ * @param props - `ModalProps`
+ * @returns Full-screen overlay with centred dialog, or `null` when closed
+ * @sideEffects none (delegates close to `onClose`)
+ */
 export function Modal({
   isOpen,
   onClose,
@@ -82,11 +121,23 @@ export function Modal({
   )
 }
 
+/**
+ * Props for `ModalFooter`.
+ *
+ * @prop className - Additional Tailwind classes for the footer row
+ */
 interface ModalFooterProps {
   children: React.ReactNode
   className?: string
 }
 
+/**
+ * Right-aligned footer bar for modal action buttons.
+ *
+ * @param props - `ModalFooterProps`
+ * @returns Flex row with top border for Save/Cancel buttons
+ * @sideEffects none (pure rendering)
+ */
 export function ModalFooter({ children, className }: ModalFooterProps) {
   return (
     <div className={cn('flex justify-end space-x-3 border-t px-6 py-4', className)}>

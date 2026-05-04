@@ -1,3 +1,18 @@
+/**
+ * @module src/pages/admin/TimersPage
+ * @audience installer
+ * @layer frontend-page
+ * @stability stable
+ *
+ * Admin list page for scheduled timers. Fetches all timers via
+ * `/api/timers?action=list`, applies client-side search, type filter
+ * (`schedule` | `delay` | `recurring` | `cron`), and sort. Renders
+ * inside `AdminListPage` with stat cards and a sortable table. Row
+ * clicks navigate to `/spine-framework/admin/configs/timers/:id`.
+ *
+ * @seeAlso src/pages/admin/TimerDetailPage.tsx
+ */
+
 import React, { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useApi } from '../../hooks/useApi'
@@ -180,7 +195,7 @@ export function TimersPage() {
   }
 
   const handleRowClick = (timer: Timer) => {
-    navigate(`/admin/configs/timers/${timer.id}`)
+    navigate(`/spine-framework/admin/configs/timers/${timer.id}`)
   }
 
   // Stats cards
@@ -231,7 +246,7 @@ export function TimersPage() {
       title="Timers"
       description="Manage scheduled and recurring tasks"
       newButtonText="New Timer"
-      newButtonHref="/admin/configs/timers/new"
+      newButtonHref="/spine-framework/admin/configs/timers/new"
       statsCards={statsCards}
       searchPlaceholder="Search timers..."
       searchValue={searchTerm}

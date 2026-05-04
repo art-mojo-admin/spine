@@ -1,6 +1,62 @@
+/**
+ * @module permissions
+ * @audience both
+ * @layer shared-core
+ * @stability stable
+ *
+ * Single source of truth for all authorization in Spine. Exports one singleton —
+ * `PermissionEngine` — that routes every access check to one of three permission
+ * surfaces based on the table being accessed:
+ *
+ *   First surface  — runtime data (items, accounts, people, threads, messages…)
+ *                    Schema-driven: permissions are encoded in `design_schema.record_permissions`
+ *                    and `design_schema.fields[x].permissions` stamped on the record at creation.
+ *
+ *   Second surface — config objects (apps, pipelines, triggers, roles, types…)
+ *                    Role-driven: system_admin full access, machine read, others denied.
+ *
+ *   Third surface  — system metadata (logs, pipeline_executions, link_types…)
+ *                    Ownership-driven: users read their own, system_admin sees all.
+ *
+ * INVARIANT: system_admin bypasses ALL surface checks. No other bypass exists.
+ * INVARIANT: missing or empty `design_schema` on a first-surface record is an
+ *   explicit deny — not a free pass. RLS controls row access; design_schema
+ *   controls what the principal can do with the row.
+ * INVARIANT: never import or instantiate `_PermissionEngineInternal` directly.
+ *   Always import the `PermissionEngine` singleton or the named legacy exports.
+ *
+ * @seeAlso db.ts (adminDb used for schema and person lookups)
+ * @seeAlso principal.ts (Principal interface, isSystemAdmin, getPrincipalDb)
+ * @seeAlso middleware.ts (CoreContext shape, ctx.db, ctx.principal)
+ * @seeAlso schema-utils.ts (formatFieldData, sanitizeFieldData called during sanitization)
+ * @seeAlso index.ts (stable export surface for custom code)
+ */
+
 import { adminDb } from './db'
 import { Principal } from './principal'
+import { CoreContext } from './middleware'
 
+// ─── TYPES ────────────────────────────────────────────────────────────────────
+
+/**
+ * Result of a permission resolution for a principal + record + action combination.
+ *
+ * Returned by `resolveFirstSurfacePermissions`. Captures both record-level CRUD
+ * flags and per-field read/write flags derived from `design_schema`.
+ *
+ * All flags default to `false` on any error or missing schema — never assume
+ * a missing flag means "allowed".
+ *
+ * @inputSpec none — this is a pure output type
+ * @outputSpec canCreate: boolean — principal may create records of this type
+ * @outputSpec canRead: boolean — principal may read this record
+ * @outputSpec canUpdate: boolean — principal may update this record
+ * @outputSpec canDelete: boolean — principal may delete this record
+ * @outputSpec fieldPermissions: Record<fieldName, {read, write}> — per-field flags
+ *   derived from design_schema.fields[x].permissions merged across all roles
+ * @calledBy resolveFirstSurfacePermissions (producer), sanitizeFirstSurfaceRecordData,
+ *   validateFirstSurfaceUpdatePermissions, canAccessFirstSurfaceRecord (consumers)
+ */
 export interface PermissionResult {
   canCreate: boolean
   canRead: boolean
@@ -9,33 +65,32 @@ export interface PermissionResult {
   fieldPermissions: Record<string, { read: boolean; write: boolean }>
 }
 
-export interface RequestContext {
-  requestId: string
-  
-  principal?: Principal
-  db?: any
-  
-  accountId: string | null
-  appId: string | null
-  query: Record<string, string>
-  
-}
+type RequestContext = CoreContext
+
+// ─── ENGINE CLASS ────────────────────────────────────────────────────────────
 
 /**
- * SINGLE PERMISSION ENGINE - The one source of truth for all authorization
- * 
- * All APIs and eventually all UIs should import and use this single instance.
- * No other permission logic should exist in the codebase.
- * 
- * @example
- * import { PermissionEngine } from './_shared/permissions'
- * 
- * // In any API
- * const canRead = await PermissionEngine.canAccessRecord(ctx, record, 'read')
- * const sanitized = await PermissionEngine.sanitizeRecordData(ctx, record, typeSlug)
+ * The single permission engine for all authorization in Spine.
+ *
+ * Instantiated once as a module-level singleton (`PermissionEngine`). Routes
+ * every check through one of three surfaces based on table classification.
+ * All public methods are async and never throw — on any internal error they
+ * fall back to a deny result to avoid accidental permission grants.
+ *
+ * Do not instantiate directly. Import `PermissionEngine` or use the named
+ * legacy exports (`sanitizeRecordData`, `validateUpdatePermissions`, etc.).
+ *
+ * @audience both
+ * @stability stable
+ * @calledBy All 19 API handlers via sanitizeRecordData / validateUpdatePermissions
+ * @calledBy admin-data.ts (primary consumer for runtime data)
+ * @testUnit tests/unit/permissions.test.ts
+ * @testIntegration tests/integration/isolation.test.ts, admin-data-accounts.test.ts
  */
 class _PermissionEngineInternal {
   private static instance: _PermissionEngineInternal
+
+  // ─── SURFACE CLASSIFICATION ───────────────────────────────────────────────
 
   // Surface classification tables
   private readonly SECOND_SURFACE_TABLES = new Set([
@@ -51,10 +106,20 @@ class _PermissionEngineInternal {
   private constructor() {}
 
   /**
-   * Detect which permission surface a table belongs to
-   * 
-   * @param tableName - The table name to classify
-   * @returns 'first' | 'second' | 'third' - The permission surface
+   * Classifies a table name into one of Spine's three permission surfaces.
+   *
+   * Surface membership is determined by static set membership — if a table is
+   * not in SECOND_SURFACE_TABLES or THIRD_SURFACE_TABLES, it defaults to first.
+   * This is intentionally conservative: unknown tables get the most restrictive
+   * surface (first), which requires a valid design_schema to grant any access.
+   *
+   * @param tableName - Table name string (e.g. 'items', 'pipelines', 'logs')
+   * @returns 'first' | 'second' | 'third' — surface classification
+   * @throws never
+   * @inputSpec tableName: string — any string; unknown names → 'first'
+   * @outputSpec 'first' | 'second' | 'third'
+   * @sideEffects none
+   * @calledBy canAccessRecord, sanitizeRecordData, validateUpdatePermissions
    */
   private detectSurface(tableName: string): 'first' | 'second' | 'third' {
     if (this.SECOND_SURFACE_TABLES.has(tableName)) {
@@ -67,11 +132,21 @@ class _PermissionEngineInternal {
   }
 
   /**
-   * Extract table name from record or context
-   * 
-   * @param record - The record to extract table name from
-   * @param typeSlug - Optional type slug fallback
-   * @returns string - The table name
+   * Extracts a table/type name from a record to use for surface classification.
+   *
+   * Tries multiple fields in priority order: `record.table_name` (explicitly
+   * set by some handlers), `record.type`, `record.item_type`, then the
+   * `typeSlug` param. Falls back to `'unknown'` which routes to first surface.
+   *
+   * @param record - The record object being classified
+   * @param typeSlug - Optional caller-provided type slug (used as last resort)
+   * @returns string — table name used to classify the permission surface
+   * @throws never
+   * @inputSpec record: object — any record; missing fields are safely ignored
+   * @inputSpec typeSlug: string | undefined — optional fallback
+   * @outputSpec string — one of the known table names, or 'unknown'
+   * @sideEffects none
+   * @calledBy canAccessRecord, sanitizeRecordData, validateUpdatePermissions
    */
   private extractTableName(record: any, typeSlug?: string): string {
     // Try to get table name from record context
@@ -99,7 +174,13 @@ class _PermissionEngineInternal {
   }
 
   /**
-   * Get the singleton instance - this is the only way to get the permission engine
+   * Returns the singleton instance. Called once at module load time to
+   * initialise `PermissionEngine`. Not for direct use outside this file.
+   *
+   * @returns _PermissionEngineInternal — the single shared instance
+   * @throws never
+   * @sideEffects creates instance on first call (subsequent calls return cached)
+   * @calledBy module initialisation (bottom of this file)
    */
   static getInstance(): _PermissionEngineInternal {
     if (!_PermissionEngineInternal.instance) {
@@ -108,24 +189,48 @@ class _PermissionEngineInternal {
     return _PermissionEngineInternal.instance
   }
 
+  // ─── FIRST SURFACE — RUNTIME DATA ──────────────────────────────────────────
+
   /**
-   * Resolve first-surface permissions for a user action
-   * 
-   * @param personId - User's person UUID
-   * @param accountId - Account context for the operation
-   * @param typeSlug - Target type slug for schema lookup
-   * @param action - CRUD action being attempted
-   * @param designSchema - Optional pre-loaded design schema (for performance)
-   * @returns PermissionResult with record and field permissions
-   * 
-   * @example
+   * Resolves record-level and field-level permissions for a human principal
+   * acting on a first-surface (runtime data) record.
+   *
+   * Resolution steps:
+   *   1. Load `design_schema` from the type record if not pre-stamped on the record
+   *   2. Look up the person's role via `people.role_id` FK (single DB query)
+   *   3. Evaluate `design_schema.record_permissions[role]` array for CRUD flags
+   *   4. Evaluate `design_schema.fields[x].permissions[role]` for field flags
+   *   5. Apply `'all'` wildcard role key if present (grants to all authenticated)
+   *   6. For fields with no explicit permission, inherit from record-level flags
+   *
+   * Returns all-deny `PermissionResult` on any error — never throws.
+   *
+   * @param personId - UUID of the person making the request (from principal.id)
+   * @param accountId - UUID of the account context for the operation
+   * @param typeSlug - Slug of the type to look up design_schema if not pre-stamped
+   * @param _action - CRUD action (currently used for context; merge logic is role-based)
+   * @param designSchema - Pre-loaded design_schema object (skips DB lookup if provided)
+   *
+   * @inputSpec personId: string — valid UUID, must exist in people table with is_active=true
+   * @inputSpec accountId: string — valid UUID of accessible account
+   * @inputSpec typeSlug: string — slug of a type in the types table with is_active=true
+   * @inputSpec designSchema: object | undefined — if provided, must have record_permissions
+   * @outputSpec PermissionResult — all flags false on error/missing schema
+   * @throws never — catches all errors, returns defaultResult
+   * @sideEffects DB read: types table (if schema not pre-stamped), people table (role lookup)
+   * @calledBy canAccessFirstSurfaceRecord, sanitizeFirstSurfaceRecordData,
+   *   validateFirstSurfaceUpdatePermissions
+   * @calls adminDb.from('types'), adminDb.from('people')
+   * @testUnit tests/unit/permissions.test.ts — 'resolveFirstSurfacePermissions' describe block
+   *
+   * @example Import usage (v2-custom/)
+   * ```ts
+   * import { PermissionEngine } from '../_shared/index'
    * const perms = await PermissionEngine.resolveFirstSurfacePermissions(
-   *   userPersonId,
-   *   clientAccountId,
-   *   'support_ticket',
-   *   'read'
+   *   ctx.principal.id, ctx.accountId, 'ticket', 'read'
    * )
-   * // Returns: { canRead: true, fieldPermissions: { arr: { read: true } } }
+   * if (!perms.canRead) return { error: 'Forbidden' }
+   * ```
    */
   async resolveFirstSurfacePermissions(
     personId: string,
@@ -173,11 +278,12 @@ class _PermissionEngineInternal {
         .eq('is_active', true)
         .single()
 
-      if (!person?.role?.slug) {
+      const roleSlug = (person?.role as any)?.slug || Array.isArray(person?.role) && (person.role as any)[0]?.slug
+      if (!roleSlug) {
         return defaultResult
       }
 
-      const userRoles = [person.role.slug]
+      const userRoles = [roleSlug]
 
       // 3. Evaluate record permissions for each role
       const recordPermissions = schema.record_permissions || {}
@@ -240,17 +346,26 @@ class _PermissionEngineInternal {
     }
   }
 
-  /**
-   * Second surface permissions for config objects
-   * Simple admin/system role permissions
-   */
+  // ─── SECOND SURFACE — CONFIG OBJECTS ────────────────────────────────────────
 
   /**
-   * Check if user can access a config object (second surface)
-   * 
-   * @param ctx - Request context
-   * @param action - Action being attempted
-   * @returns boolean - True if access is allowed
+   * Checks whether the principal in `ctx` may perform `action` on a second-surface
+   * config object (apps, pipelines, triggers, roles, types, etc.).
+   *
+   * Rules:
+   *   - system_admin: full access to all actions
+   *   - machine principal: read-only
+   *   - all others: denied
+   *
+   * @param ctx - Request context containing principal
+   * @param action - CRUD action being attempted
+   * @returns boolean — true if access is allowed
+   * @throws never
+   * @inputSpec ctx.principal: Principal — must be resolved (not anonymous)
+   * @inputSpec action: 'create' | 'read' | 'update' | 'delete'
+   * @outputSpec boolean — true = allowed, false = denied
+   * @sideEffects none
+   * @calledBy canAccessRecord (surface='second'), validateConfigObjectPermissions
    */
   private canAccessConfigObject(ctx: RequestContext, action: 'create' | 'read' | 'update' | 'delete'): boolean {
     // System admin has full access
@@ -268,11 +383,22 @@ class _PermissionEngineInternal {
   }
 
   /**
-   * Sanitize config object data (second surface)
-   * 
+   * Strips fields from a second-surface config record based on the principal's access.
+   *
+   * system_admin and machine principals receive the full record. All others
+   * receive only `{ id, created_at, updated_at }`. This is intentionally strict
+   * — config objects contain sensitive pipeline logic, schema definitions, and
+   * integration credentials that must not leak to end users.
+   *
    * @param ctx - Request context
-   * @param record - The record to sanitize
-   * @returns Sanitized record
+   * @param record - The config record to sanitize
+   * @returns Sanitized record — full record or minimal stub
+   * @throws never
+   * @inputSpec ctx.principal: Principal — resolved principal
+   * @inputSpec record: object — must have id, created_at, updated_at at minimum
+   * @outputSpec object — full record for admin/machine, { id, created_at, updated_at } for others
+   * @sideEffects none
+   * @calledBy sanitizeRecordData (surface='second')
    */
   private sanitizeConfigObject(ctx: RequestContext, record: any): any {
     // System admin sees everything
@@ -294,11 +420,20 @@ class _PermissionEngineInternal {
   }
 
   /**
-   * Validate config object update permissions (second surface)
-   * 
+   * Validates whether the principal may perform `action` on a second-surface record.
+   * Thin wrapper around `canAccessConfigObject` that returns a typed result object
+   * suitable for returning directly from handler validation checks.
+   *
    * @param ctx - Request context
-   * @param action - Action being attempted
+   * @param action - CRUD action being validated
    * @returns { valid: boolean, error?: string }
+   * @throws never
+   * @inputSpec ctx.principal: Principal — resolved principal
+   * @inputSpec action: 'create' | 'read' | 'update' | 'delete'
+   * @outputSpec valid: boolean — true if action is permitted
+   * @outputSpec error: string | undefined — human-readable denial reason if !valid
+   * @sideEffects none
+   * @calledBy validateUpdatePermissions (surface='second')
    */
   private validateConfigObjectPermissions(ctx: RequestContext, action: 'create' | 'read' | 'update' | 'delete'): { valid: boolean; error?: string } {
     if (this.canAccessConfigObject(ctx, action)) {
@@ -308,18 +443,33 @@ class _PermissionEngineInternal {
     return { valid: false, error: 'Insufficient permissions for this operation' }
   }
 
-  /**
-   * Third surface permissions for system metadata
-   * Contextual access based on ownership and system context
-   */
+  // ─── THIRD SURFACE — SYSTEM METADATA ────────────────────────────────────────
 
   /**
-   * Check if user can access system metadata (third surface)
-   * 
+   * Checks whether the principal may access a third-surface system metadata record
+   * (logs, pipeline_executions, trigger_executions, link_types, links).
+   *
+   * Rules:
+   *   - system_admin: full access
+   *   - machine principal: full access
+   *   - human principal (read only):
+   *       - owns the record (created_by === principal.id), OR
+   *       - record is scoped to the principal's account (account_id === ctx.accountId), OR
+   *       - record references the principal directly (person_id === principal.id)
+   *   - human principal (create/update/delete): always denied
+   *
    * @param ctx - Request context
-   * @param record - The record to check access for
-   * @param action - Action being attempted
-   * @returns boolean - True if access is allowed
+   * @param record - The system metadata record being accessed
+   * @param action - CRUD action being attempted
+   * @returns boolean — true if access is allowed
+   * @throws never
+   * @inputSpec ctx.principal: Principal — resolved principal
+   * @inputSpec record: object — must have at least one of: created_by, account_id, person_id
+   * @inputSpec action: 'create' | 'read' | 'update' | 'delete'
+   * @outputSpec boolean
+   * @sideEffects none
+   * @calledBy canAccessRecord (surface='third'), sanitizeSystemMetadata,
+   *   validateSystemMetadataPermissions
    */
   private canAccessSystemMetadata(ctx: RequestContext, record: any, action: 'create' | 'read' | 'update' | 'delete'): boolean {
     // System admin has full access
@@ -355,11 +505,20 @@ class _PermissionEngineInternal {
   }
 
   /**
-   * Sanitize system metadata (third surface)
-   * 
+   * Strips fields from a third-surface system metadata record based on ownership.
+   *
+   * system_admin and machine principals receive the full record. Human principals
+   * who pass `canAccessSystemMetadata` receive the full record. All others
+   * receive only `{ id, created_at, updated_at }`.
+   *
    * @param ctx - Request context
-   * @param record - The record to sanitize
+   * @param record - The system metadata record to sanitize
    * @returns Sanitized record
+   * @throws never
+   * @inputSpec record: object — must have id, created_at, updated_at
+   * @outputSpec object — full record for system_admin/machine/owner, minimal stub for others
+   * @sideEffects none
+   * @calledBy sanitizeRecordData (surface='third')
    */
   private sanitizeSystemMetadata(ctx: RequestContext, record: any): any {
     // System admin and system role see everything
@@ -381,12 +540,19 @@ class _PermissionEngineInternal {
   }
 
   /**
-   * Validate system metadata permissions (third surface)
-   * 
+   * Validates whether the principal may perform `action` on a third-surface record.
+   * Delegates to `canAccessSystemMetadata` and wraps the result.
+   *
    * @param ctx - Request context
-   * @param record - The record to validate
-   * @param action - Action being attempted
+   * @param record - The system metadata record
+   * @param action - CRUD action being validated
    * @returns { valid: boolean, error?: string }
+   * @throws never
+   * @inputSpec record: object — the record being written/read
+   * @outputSpec valid: boolean — true if action is permitted
+   * @outputSpec error: string | undefined — denial reason if !valid
+   * @sideEffects none
+   * @calledBy validateUpdatePermissions (surface='third')
    */
   private validateSystemMetadataPermissions(ctx: RequestContext, record: any, action: 'create' | 'read' | 'update' | 'delete'): { valid: boolean; error?: string } {
     if (this.canAccessSystemMetadata(ctx, record, action)) {
@@ -396,24 +562,54 @@ class _PermissionEngineInternal {
     return { valid: false, error: 'Insufficient permissions for this operation' }
   }
 
+  // ─── SHARED HELPERS ──────────────────────────────────────────────────────────
+
   /**
-   * Check if user has system admin role
-   * 
-   * @param ctx - Request context
-   * @returns boolean - True if user is system admin
+   * Returns true if the principal in `ctx` holds the `system_admin` role.
+   *
+   * This is the canonical system_admin check used by all three surfaces and
+   * the unified principal methods. It is the ONLY mechanism for bypassing
+   * surface-level permission checks — there is no other bypass in the engine.
+   *
+   * @param ctx - Request context with resolved principal
+   * @returns boolean — true if principal.roles includes 'system_admin'
+   * @throws never
+   * @inputSpec ctx.principal: Principal — principal.roles: string[]
+   * @outputSpec boolean — false if principal is null, anonymous, or has no roles
+   * @sideEffects none
+   * @calledBy canAccessRecord, sanitizeRecordData, validateUpdatePermissions,
+   *   canAccessConfigObject, sanitizeConfigObject, sanitizeSystemMetadata,
+   *   canPrincipalAccessRecord
+   * @testUnit tests/unit/permissions.test.ts — 'isSystemAdmin' describe block
    */
   isSystemAdmin(ctx: RequestContext): boolean {
     return ctx.principal?.roles?.includes('system_admin') || false
   }
 
+  // ─── PUBLIC SURFACE ROUTER METHODS ──────────────────────────────────────────
+
   /**
-   * Evaluate if user can access a specific record
-   * Routes to appropriate surface based on table classification
-   * 
-   * @param ctx - Request context
-   * @param record - The record to check access for
-   * @param action - Action being attempted
-   * @returns boolean - True if access is allowed
+   * Checks whether the principal in `ctx` may perform `action` on `record`.
+   *
+   * Routes to the correct surface handler based on `record`'s table name:
+   *   - second surface tables → `canAccessConfigObject`
+   *   - third surface tables → `canAccessSystemMetadata`
+   *   - everything else (first surface) → `canAccessFirstSurfaceRecord`
+   *
+   * system_admin always returns true before surface routing.
+   *
+   * @param ctx - Request context with resolved principal
+   * @param record - The record being accessed (used for surface detection only)
+   * @param action - CRUD action being attempted
+   * @returns Promise<boolean> — true if access is allowed
+   * @throws never — all surface handlers catch errors and return false
+   * @inputSpec ctx.principal: Principal — must be resolved
+   * @inputSpec record: object — used for table_name/type/item_type extraction
+   * @inputSpec action: 'create' | 'read' | 'update' | 'delete'
+   * @outputSpec boolean — false for anonymous principals, missing records, unknown types
+   * @sideEffects DB read (first surface only): types and people tables
+   * @calledBy API handlers where explicit access gate is needed (rare — most use sanitize)
+   * @testUnit tests/unit/permissions.test.ts — 'canAccessRecord' describe block
    */
   async canAccessRecord(
     ctx: RequestContext,
@@ -444,12 +640,24 @@ class _PermissionEngineInternal {
   }
 
   /**
-   * First surface record access (original logic)
-   * 
+   * Access check for first-surface (runtime data) records.
+   *
+   * Delegates to `resolveFirstSurfacePermissions` to evaluate the design_schema
+   * permission model. For 'own' access level, additionally checks record ownership
+   * via `created_by === principal.id`.
+   *
+   * Returns false for anonymous principals and any principal without a valid accountId.
+   *
    * @param ctx - Request context
-   * @param record - The record to check access for
-   * @param action - Action being attempted
-   * @returns boolean - True if access is allowed
+   * @param record - The first-surface record being accessed
+   * @param action - CRUD action
+   * @returns Promise<boolean>
+   * @throws never
+   * @inputSpec ctx.principal: not anonymous, ctx.accountId: non-empty string
+   * @inputSpec record: must have account_id or item_type/type for schema resolution
+   * @outputSpec boolean — false for anonymous, missing schema, insufficient permissions
+   * @sideEffects DB read: types and people tables (via resolveFirstSurfacePermissions)
+   * @calledBy canAccessRecord (surface='first'), canPrincipalAccessRecord (human branch)
    */
   private async canAccessFirstSurfaceRecord(
     ctx: RequestContext,
@@ -504,13 +712,47 @@ class _PermissionEngineInternal {
   }
 
   /**
-   * Sanitize record data based on user's field permissions
-   * Routes to appropriate surface based on table classification
-   * 
-   * @param ctx - Request context
-   * @param record - The record to sanitize
-   * @param typeSlug - Type slug for schema lookup (optional for second/third surfaces)
-   * @returns Sanitized record with filtered fields
+   * Strips and formats a record's fields based on the principal's permissions.
+   *
+   * This is the primary output filter called by every API handler before returning
+   * data to the client. Routes to the correct surface handler, which applies
+   * field-level filtering from the record's stamped `design_schema`.
+   *
+   * system_admin receives the full record unchanged.
+   *
+   * For first-surface records with missing `design_schema` or no `record_permissions`,
+   * returns `{ id }` only — explicit deny, not a pass-through.
+   *
+   * @param ctx - Request context with resolved principal
+   * @param record - The record to sanitize (should be the raw DB row)
+   * @param typeSlug - Type slug used to classify the surface and look up schema
+   *   if not already stamped on the record. Optional for second/third surfaces.
+   * @returns Promise<object> — sanitized record safe to return to the client
+   * @throws never
+   * @inputSpec ctx.principal: Principal — resolved, may be anonymous
+   * @inputSpec record: object — raw DB row, must have id at minimum
+   * @inputSpec typeSlug: string | undefined — slug of the type (e.g. 'item', 'account')
+   * @outputSpec object — filtered record; field set depends on principal's role permissions
+   * @outputSpec system_admin: full record unchanged
+   * @outputSpec unauthenticated: { id, created_at, updated_at } only
+   * @outputSpec first surface, no schema: { id } only
+   * @sideEffects DB read (first surface): types and people tables via resolveFirstSurface
+   * @calledBy All 19 API handlers — this is the most-called method in the engine
+   * @calls sanitizeFirstSurfaceRecordData | sanitizeConfigObject | sanitizeSystemMetadata
+   * @testUnit tests/unit/permissions.test.ts — 'sanitizeRecordData' describe block
+   * @testIntegration tests/integration/admin-data-accounts.test.ts
+   *
+   * @example API handler usage
+   * ```ts
+   * const sanitized = await sanitizeRecordData(ctx, record, 'item')
+   * return { data: sanitized }
+   * ```
+   *
+   * @example Import usage (v2-custom/)
+   * ```ts
+   * import { sanitizeRecordData } from '../_shared/index'
+   * const safe = await sanitizeRecordData(ctx, rawRecord, 'ticket')
+   * ```
    */
   async sanitizeRecordData(
     ctx: RequestContext,
@@ -536,17 +778,33 @@ class _PermissionEngineInternal {
       
       case 'first':
       default:
-        return this.sanitizeFirstSurfaceRecordData(ctx, record, typeSlug)
+        return this.sanitizeFirstSurfaceRecordData(ctx, record, typeSlug || '')
     }
   }
 
   /**
-   * First surface record sanitization with data formatting
-   * 
+   * Field-level filter and formatter for first-surface (runtime data) records.
+   *
+   * Steps:
+   *   1. Return minimal stub for anonymous principals
+   *   2. Check `record.design_schema.record_permissions` — deny if missing
+   *   3. Resolve permissions via `resolveFirstSurfacePermissions`
+   *   4. Return minimal stub if `!perms.canRead`
+   *   5. For each field in `record.data`, include only if `fieldPerms.read === true`
+   *   6. Apply `formatFieldData` from schema-utils if validation_schema specifies a data_type
+   *   7. Strip `record.metadata` (legacy field, migrated to `data`)
+   *
    * @param ctx - Request context
-   * @param record - The record to sanitize
+   * @param record - First-surface DB row with design_schema and data fields
    * @param typeSlug - Type slug for schema lookup
-   * @returns Sanitized record with filtered and formatted fields
+   * @returns Promise<object> — filtered and formatted record
+   * @throws never
+   * @inputSpec record.design_schema: object with record_permissions — deny if missing
+   * @inputSpec record.data: object — JSONB data fields; only permitted fields returned
+   * @outputSpec object — sanitized record matching the principal's field permissions
+   * @sideEffects DB read: types and people via resolveFirstSurfacePermissions
+   * @calledBy sanitizeRecordData (surface='first')
+   * @calls resolveFirstSurfacePermissions, schema-utils.formatFieldData
    */
   private async sanitizeFirstSurfaceRecordData(
     ctx: RequestContext,
@@ -625,14 +883,43 @@ class _PermissionEngineInternal {
   }
 
   /**
-   * Validate update data against user's field permissions
-   * Routes to appropriate surface based on table classification
-   * 
-   * @param ctx - Request context
-   * @param updateData - Data being updated
-   * @param existingRecord - Existing record data
-   * @param typeSlug - Type slug for schema lookup (optional for second/third surfaces)
-   * @returns { valid: boolean, error?: string }
+   * Validates that the principal has write permission for every field in `updateData`,
+   * and sanitizes the data using the validation schema before returning it.
+   *
+   * Routes to the correct surface handler. system_admin bypasses all checks and
+   * receives `updateData` unchanged (with `sanitizedData` set to `updateData`).
+   *
+   * For first-surface records:
+   *   - Each field in `updateData.data` must have `fieldPerms.write === true`
+   *   - Fields are sanitized via `sanitizeFieldData` from schema-utils
+   *   - Returns `{ valid: false, error }` on the first denied or invalid field
+   *
+   * @param ctx - Request context with resolved principal
+   * @param updateData - The payload being written (may contain `data` and/or `metadata`)
+   * @param existingRecord - The current DB row (used for schema + account_id resolution)
+   * @param typeSlug - Type slug for surface classification and schema lookup
+   * @returns Promise<{ valid: boolean, error?: string, sanitizedData?: any }>
+   * @throws never
+   * @inputSpec ctx.principal: Principal — resolved, non-anonymous required for first surface
+   * @inputSpec updateData: object — payload with data: {} and/or metadata: {}
+   * @inputSpec existingRecord: object — must have design_schema, account_id
+   * @outputSpec valid: boolean — false on first permission or validation failure
+   * @outputSpec error: string | undefined — field name + reason when !valid
+   * @outputSpec sanitizedData: object | undefined — cleaned payload when valid
+   * @sideEffects DB read (first surface): types and people via resolveFirstSurfacePermissions
+   * @calledBy admin-data.ts (update handler), and any handler that accepts user writes
+   * @calls validateFirstSurfaceUpdatePermissions | validateConfigObjectPermissions |
+   *   validateSystemMetadataPermissions
+   * @testUnit tests/unit/permissions.test.ts — 'validateUpdatePermissions' describe block
+   *
+   * @example API handler usage
+   * ```ts
+   * const { valid, error, sanitizedData } = await validateUpdatePermissions(
+   *   ctx, body, existingRecord, 'item'
+   * )
+   * if (!valid) return { error }
+   * await ctx.db.from('items').update(sanitizedData).eq('id', id)
+   * ```
    */
   async validateUpdatePermissions(
     ctx: RequestContext,
@@ -642,7 +929,7 @@ class _PermissionEngineInternal {
   ): Promise<{ valid: boolean; error?: string }> {
     // System admin can update anything — pass data through unsanitized
     if (this.isSystemAdmin(ctx)) {
-      return { valid: true, sanitizedData: updateData }
+      return { valid: true, sanitizedData: updateData } as any
     }
 
     // Extract table name to determine surface
@@ -659,18 +946,30 @@ class _PermissionEngineInternal {
       
       case 'first':
       default:
-        return this.validateFirstSurfaceUpdatePermissions(ctx, updateData, existingRecord, typeSlug)
+        return this.validateFirstSurfaceUpdatePermissions(ctx, updateData, existingRecord, typeSlug || '')
     }
   }
 
   /**
-   * First surface update validation with data sanitization
-   * 
+   * Field-level write validation and sanitization for first-surface update payloads.
+   *
+   * Checks every field in `updateData.data` (and legacy `updateData.metadata`) against
+   * the principal's write permissions. Sanitizes each permitted field through
+   * `sanitizeFieldData` for type coercion and constraint validation. Returns on
+   * the first denied or invalid field — does not accumulate errors.
+   *
    * @param ctx - Request context
-   * @param updateData - Data being updated
-   * @param existingRecord - Existing record data
+   * @param updateData - Incoming update payload
+   * @param existingRecord - Existing DB row with design_schema stamped at creation
    * @param typeSlug - Type slug for schema lookup
-   * @returns { valid: boolean, error?: string, sanitizedData?: any }
+   * @returns Promise<{ valid: boolean, error?: string, sanitizedData?: any }>
+   * @throws never
+   * @inputSpec existingRecord.design_schema.record_permissions — deny if missing
+   * @inputSpec updateData.data: object — all fields must have fieldPerms.write=true
+   * @outputSpec sanitizedData: object — only present when valid=true
+   * @sideEffects DB read: types and people via resolveFirstSurfacePermissions
+   * @calledBy validateUpdatePermissions (surface='first')
+   * @calls resolveFirstSurfacePermissions, schema-utils.sanitizeFieldData
    */
   private async validateFirstSurfaceUpdatePermissions(
     ctx: RequestContext,
@@ -762,27 +1061,48 @@ class _PermissionEngineInternal {
     return { valid: true, sanitizedData }
   }
 
-  // ============================================
-  // UNIFIED PRINCIPAL METHODS (New Architecture)
-  // ============================================
-  
+  // ─── UNIFIED PRINCIPAL METHODS ───────────────────────────────────────────────
+
   /**
-   * Unified permission check - works for both humans and machines
-   * 
-   * This is the primary permission check for the Unified Principal Architecture.
-   * It handles all actor types: humans (JWT), machines (API keys), cron, triggers.
-   * 
-   * @param principal - The resolved principal (human or machine)
-   * @param record - The record being accessed (must include account_id and type)
-   * @param action - The CRUD action being attempted
-   * @returns boolean - True if access is allowed
-   * 
-   * @example
-   * const canRead = await PermissionEngine.canPrincipalAccessRecord(
-   *   ctx.principal,
-   *   { account_id: 'acc_123', type: 'ticket' },
-   *   'read'
+   * Unified permission check for all principal types (human, machine, cron, trigger).
+   *
+   * This is the preferred method when you have a `Principal` directly rather than
+   * a full `RequestContext`. Used by the Unified Principal Architecture to check
+   * access without constructing a fake context.
+   *
+   * Resolution:
+   *   1. system_admin (human with 'system_admin' role) → always true
+   *   2. machine principal → scope check via `checkMachineScope`
+   *   3. human principal with accountId → `canAccessFirstSurfaceRecord` (constructs minimal ctx)
+   *   4. all others → false
+   *
+   * @param principal - The fully resolved Principal from `resolvePrincipal()`
+   * @param record - The record being accessed; must include account_id and type for scope matching
+   * @param action - CRUD action being attempted
+   * @returns Promise<boolean> — true if the principal may perform the action
+   * @throws never
+   * @inputSpec principal: Principal — must be resolved (not ANONYMOUS_PRINCIPAL for useful results)
+   * @inputSpec record.account_id: string — required for human principals
+   * @inputSpec record.type: string | undefined — used for machine scope matching
+   * @outputSpec boolean
+   * @sideEffects DB read (human principal): types and people tables
+   * @calledBy Handlers that receive a Principal directly (e.g. CLI, import callers)
+   * @calls checkMachineScope, canAccessFirstSurfaceRecord
+   * @testUnit tests/unit/permissions.test.ts — 'canPrincipalAccessRecord' describe block
+   *
+   * @example Import usage (v2-custom/)
+   * ```ts
+   * import { PermissionEngine } from '../_shared/index'
+   * const allowed = await PermissionEngine.canPrincipalAccessRecord(
+   *   principal, { account_id: accountId, type: 'item' }, 'create'
    * )
+   * ```
+   *
+   * @example CLI usage
+   * ```bash
+   * # Access checks happen automatically when CLI constructs CoreContext
+   * spine items create --data '{"title":"Test"}'
+   * ```
    */
   async canPrincipalAccessRecord(
     principal: Principal,
@@ -808,11 +1128,8 @@ class _PermissionEngineInternal {
           db: null as any,
           accountId: principal.accountId,
           appId: null,
-          query: {},
-          personId: principal.id,
-          systemRole: principal.roles?.includes('system_admin') ? 'system_admin' : null,
-          roles: principal.roles || []
-        },
+          query: {}
+        } as any,
         record,
         action
       )
@@ -822,17 +1139,28 @@ class _PermissionEngineInternal {
   }
   
   /**
-   * Check if a machine principal has the required scope for an action
-   * 
-   * Supports wildcards:
-   * - "items:read" matches exactly
-   * - "items:*" matches any items action
-   * - "*:*" matches everything
-   * 
-   * @param principal - Machine principal with scopes
-   * @param record - The record being accessed
-   * @param action - The CRUD action
-   * @returns boolean - True if scope is granted
+   * Evaluates whether a machine principal's scopes permit the requested action.
+   *
+   * Scope matching supports three patterns (evaluated in order):
+   *   1. Exact match: `'items:read'` matches `'items:read'`
+   *   2. Wildcard action: `'items:*'` matches any action on `items`
+   *   3. Global wildcard: `'*:*'` matches any resource and any action
+   *
+   * The required scope is constructed as `<record.type>:<action>`. If `record.type`
+   * is absent, `'resource'` is used as the resource name.
+   *
+   * @param principal - Machine principal (principal.type must be 'machine')
+   * @param record - The record being accessed (record.type used as resource name)
+   * @param action - The CRUD action string
+   * @returns boolean — true if any scope in principal.scopes grants the action
+   * @throws never
+   * @inputSpec principal.type: 'machine' — returns false for non-machine principals
+   * @inputSpec principal.scopes: string[] — list of granted scope strings
+   * @inputSpec record.type: string | undefined — resource name portion of scope check
+   * @outputSpec boolean
+   * @sideEffects none
+   * @calledBy canPrincipalAccessRecord (machine branch)
+   * @testUnit tests/unit/permissions.test.ts — 'checkMachineScope' describe block
    */
   private checkMachineScope(
     principal: Principal,
@@ -858,10 +1186,29 @@ class _PermissionEngineInternal {
   }
   
   /**
-   * Get a summary of principal permissions for audit logging
-   * 
-   * @param principal - The principal to summarize
-   * @returns Object with permission summary
+   * Returns a structured summary of a principal's permission posture for use
+   * in audit log entries.
+   *
+   * Does not perform any access check — purely descriptive. The returned object
+   * is safe to serialize into the `metadata` column of the `logs` table.
+   *
+   * @param principal - The resolved principal to summarize
+   * @returns object — summary safe for audit log serialization
+   * @throws never
+   * @inputSpec principal: Principal — any resolved principal including ANONYMOUS
+   * @outputSpec { type, roles, is_system_admin } for human principals
+   * @outputSpec { type, machine_type, scopes, is_internal } for machine principals
+   * @outputSpec { type: 'unknown' } for all other types
+   * @sideEffects none
+   * @calledBy audit.ts (emitAudit), any handler that logs permission context
+   * @testUnit tests/unit/permissions.test.ts — 'getPrincipalPermissionSummary' describe block
+   *
+   * @example
+   * ```ts
+   * await emitAudit(ctx, 'record.read', record.id, {
+   *   permissions: PermissionEngine.getPrincipalPermissionSummary(ctx.principal)
+   * })
+   * ```
    */
   getPrincipalPermissionSummary(principal: Principal): object {
     if (principal.type === 'human') {
@@ -885,10 +1232,43 @@ class _PermissionEngineInternal {
   }
 }
 
-// EXPORT THE SINGLE INSTANCE - This is the only thing anyone should import
+// ─── SINGLETON EXPORT ────────────────────────────────────────────────────────
+
+/**
+ * The single shared PermissionEngine instance.
+ *
+ * This is the ONLY export that should be used for permission checks. Import this
+ * directly or use the named legacy aliases below. Do not instantiate
+ * `_PermissionEngineInternal` yourself.
+ *
+ * @stability stable
+ * @audience both
+ * @calledBy All 19 API handlers, tests, and custom code in v2-custom/
+ *
+ * @example API handler
+ * ```ts
+ * import { PermissionEngine } from './_shared/permissions'
+ * const sanitized = await PermissionEngine.sanitizeRecordData(ctx, record, 'item')
+ * ```
+ *
+ * @example Import usage (v2-custom/)
+ * ```ts
+ * import { PermissionEngine } from '../_shared/index'
+ * const allowed = await PermissionEngine.canPrincipalAccessRecord(principal, record, 'read')
+ * ```
+ */
 export const PermissionEngine: _PermissionEngineInternal = _PermissionEngineInternal.getInstance()
 
-// Legacy exports for backward compatibility - will be removed in future
+// ─── LEGACY EXPORTS ───────────────────────────────────────────────────────────
+
+/**
+ * Legacy named exports — bound methods on the singleton for backward compatibility.
+ * Prefer importing `PermissionEngine` and calling methods on it directly.
+ * These will be removed in a future version.
+ *
+ * @deprecated Use `PermissionEngine.<methodName>()` instead.
+ * @stability internal
+ */
 export const resolveFirstSurfacePermissions = PermissionEngine.resolveFirstSurfacePermissions.bind(PermissionEngine)
 export const isSystemAdmin = PermissionEngine.isSystemAdmin.bind(PermissionEngine)
 export const canAccessRecord = PermissionEngine.canAccessRecord.bind(PermissionEngine)

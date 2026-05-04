@@ -1,5 +1,30 @@
+/**
+ * @module src/hooks/useForm
+ * @audience installer
+ * @layer frontend-hook
+ * @stability stable
+ *
+ * Schema-aware form state hook. Manages field values, touched state,
+ * per-field validation (required, email, url, number range, text
+ * length/pattern), and form submission with async support.
+ *
+ * Designed to work directly with `FieldDefinition[]` arrays produced
+ * by `useSchemaRecord` or static field arrays in admin forms.
+ *
+ * **Validation order per field:**
+ * 1. Required check
+ * 2. Type-specific rule (email regex, URL parse, number range, text length/pattern)
+ * 3. Custom `validate` function (whole-form)
+ *
+ * @seeAlso src/types/types.ts (FieldDefinition — field schema shape)
+ * @seeAlso src/hooks/useSchemaRecord.ts (produces FieldDefinition[] for this hook)
+ * @seeAlso src/components/shared/SchemaFields.tsx (renders fields from FieldDefinition[])
+ */
+
 import { useState, useCallback, useEffect } from 'react'
 import { FieldDefinition, FormState, ValidationError } from '../types/types'
+
+// ─── TYPES ───────────────────────────────────────────────────────────────────
 
 interface UseFormOptions {
   initialValues: Record<string, any>
@@ -9,6 +34,23 @@ interface UseFormOptions {
   onChange?: (values: Record<string, any>) => void
 }
 
+/**
+ * Return value of `useForm`.
+ *
+ * @prop data - Current field values keyed by field name
+ * @prop errors - Per-field error messages (empty string = cleared, absent = untouched)
+ * @prop touched - Fields the user has interacted with
+ * @prop isSubmitting - True while `onSubmit` promise is pending
+ * @prop isValid - True when `errors` is empty
+ * @prop isDirty - True when any touched field differs from `initialValues`
+ * @prop handleChange - Update a field value (clears error, marks touched)
+ * @prop handleBlur - Mark a field touched and run field-level validation
+ * @prop handleSubmit - Validate all fields, then call `onSubmit` if valid
+ * @prop resetForm - Restore all state to `initialValues`
+ * @prop setFieldValue - Programmatic field update (same as handleChange)
+ * @prop setFieldError - Inject a server-side error for a field
+ * @prop clearErrors - Clear all errors (e.g. after navigation)
+ */
 interface UseFormReturn {
   data: Record<string, any>
   errors: Record<string, string>
@@ -25,6 +67,35 @@ interface UseFormReturn {
   clearErrors: () => void
 }
 
+// ─── HOOK ────────────────────────────────────────────────────────────────────
+
+/**
+ * Schema-driven form state and validation hook.
+ *
+ * @param options.initialValues - Seed values for all fields
+ * @param options.fields - `FieldDefinition[]` from schema or static config
+ * @param options.onSubmit - Async submit handler; called only if validation passes
+ * @param options.validate - Optional whole-form custom validator returning
+ *   `Record<fieldName, errorMessage>`
+ * @param options.onChange - Called on every field change with the full values map
+ *
+ * @returns `UseFormReturn` — see interface for full description
+ *
+ * @inputSpec fields[].data_type: 'email'|'url'|'number'|'text'|'textarea'
+ *   drives built-in validation rules
+ * @inputSpec fields[].validation.minLength/maxLength/pattern: text constraints
+ * @sideEffects React state mutations only
+ * @calledBy SchemaDetailForm.tsx, all admin detail pages
+ *
+ * @example
+ * ```tsx
+ * const form = useForm({
+ *   initialValues: { name: '', email: '' },
+ *   fields: [{ name: 'email', data_type: 'email', required: true, label: 'Email' }],
+ *   onSubmit: async (values) => await save(values)
+ * })
+ * ```
+ */
 export function useForm({
   initialValues,
   fields,

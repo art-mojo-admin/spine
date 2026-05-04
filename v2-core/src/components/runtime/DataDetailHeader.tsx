@@ -1,7 +1,35 @@
+/**
+ * @module src/components/runtime/DataDetailHeader
+ * @audience installer
+ * @layer frontend-component
+ * @stability stable
+ *
+ * Title bar for entity detail/create/edit pages. Shows the record title
+ * and a contextual action bar that switches between:
+ * - **Read mode:** Edit + Delete buttons
+ * - **Edit/Create mode:** Cancel + Save/Create buttons
+ *
+ * The icon name is resolved dynamically from `@heroicons/react`; falls
+ * back to `CubeIcon` if unrecognised.
+ *
+ * @seeAlso src/components/runtime/DataDetailPage.tsx (mounts this component)
+ */
+
 import React from 'react'
 import { Button } from '../ui/Button'
 import * as Icons from '@heroicons/react/24/outline'
 
+/**
+ * Props for `DataDetailHeader`.
+ *
+ * @prop entity - Entity name (shown below the title)
+ * @prop icon - Heroicon name string
+ * @prop title - Record display title
+ * @prop isEditing - True in edit mode (shows Save/Cancel)
+ * @prop isCreating - True in create mode (button label becomes "Create")
+ * @prop onEdit / onSave / onCancel / onDelete - Action callbacks
+ * @prop saving / deleting - Loading state for mutation buttons
+ */
 interface DataDetailHeaderProps {
   entity: string
   icon: string
@@ -16,6 +44,13 @@ interface DataDetailHeaderProps {
   deleting?: boolean
 }
 
+/**
+ * Detail page header with record title and contextual edit/save/delete actions.
+ *
+ * @param props - `DataDetailHeaderProps`
+ * @returns Header bar JSX
+ * @sideEffects none (delegates actions to callbacks)
+ */
 export function DataDetailHeader({
   entity,
   icon,

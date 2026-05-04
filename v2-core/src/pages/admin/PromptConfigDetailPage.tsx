@@ -1,3 +1,17 @@
+/**
+ * @module src/pages/admin/PromptConfigDetailPage
+ * @audience installer
+ * @layer frontend-page
+ * @stability stable
+ *
+ * Create / view / edit page for a single LLM prompt configuration.
+ * Route param: `id` (UUID). Exposes `system_prompt`, `model`,
+ * `temperature`, `max_tokens`, `prompt_type`, `category`, and
+ * `is_default` as editable fields.
+ *
+ * @seeAlso src/pages/admin/PromptConfigsPage.tsx
+ */
+
 import { useState, useEffect } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import { Button } from '../../components/ui/Button'
@@ -93,7 +107,7 @@ export function PromptConfigDetailPage() {
       })
       if (!response.ok) throw new Error('Failed to save')
       const result = await response.json()
-      if (isCreateMode) { navigate(`/admin/configs/prompts/${result.config_id || result.id}`) } else { navigate(-1) }
+      if (isCreateMode) { navigate(`/spine-framework/admin/configs/prompts/${result.config_id || result.id}`) } else { navigate(-1) }
     } catch (err: any) {
       alert(err.message)
     } finally {

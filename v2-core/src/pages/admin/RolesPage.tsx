@@ -1,3 +1,18 @@
+/**
+ * @module src/pages/admin/RolesPage
+ * @audience installer
+ * @layer frontend-page
+ * @stability stable
+ *
+ * Admin list page for roles. Fetches all roles via `/api/roles?action=list`,
+ * applies client-side search and sort, and renders inside `AdminListPage`
+ * with stat cards and a sortable table. Row clicks navigate to
+ * `/spine-framework/admin/configs/roles/:id`.
+ *
+ * @seeAlso src/components/admin/AdminListPage.tsx
+ * @seeAlso src/pages/admin/RoleDetailPage.tsx
+ */
+
 import React, { useState } from 'react'
 import { 
   PlusIcon,
@@ -81,7 +96,7 @@ export function RolesPage() {
   }
 
   const handleRowClick = (role: Role) => {
-    window.location.href = `/admin/configs/roles/${role.id}`
+    window.location.href = `/spine-framework/admin/configs/roles/${role.id}`
   }
 
   // Sort roles
@@ -161,7 +176,7 @@ export function RolesPage() {
       title="Roles"
       description="Manage system and custom roles"
       newButtonText="Add Role"
-      newButtonHref="/admin/configs/roles/new"
+      newButtonHref="/spine-framework/admin/configs/roles/new"
       statsCards={statsCards}
       searchPlaceholder="Search roles..."
       searchValue={searchTerm}

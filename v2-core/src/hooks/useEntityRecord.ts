@@ -1,12 +1,58 @@
+/**
+ * @module src/hooks/useEntityRecord
+ * @audience installer
+ * @layer frontend-hook
+ * @stability stable
+ *
+ * Schema-driven single-record hook. Fetches a record by ID, exposes its
+ * design schema, computes field-level read/write permissions for the
+ * current principal, and provides save and delete mutations.
+ *
+ * **Field permission model:**
+ * - `system_admin` role always gets `{ read: true, write: true }` on all fields
+ * - Other principals: permissions are read from `design_schema.fields[n].permissions`
+ *   as role arrays; defaults to `true` if absent
+ *
+ * **Save routing:**
+ * - Fields marked `fieldDef.system = true` go to top-level record columns
+ * - All other fields are nested under the `data` JSONB column
+ *
+ * **Delete:** sends a `DELETE` request with the configured `deleteAction`;
+ *   hard vs. soft delete is determined by the API handler (`config.softDelete`
+ *   signals intent to the handler).
+ *
+ * @seeAlso src/hooks/useApi.ts (useApi + useMutation primitives)
+ * @seeAlso src/hooks/useSchemaRecord.ts (companion for schema-driven form data)
+ * @seeAlso src/components/runtime/DataDetailPage.tsx (primary consumer)
+ * @seeAlso functions/admin-data.ts (API endpoint handling get/update/delete)
+ */
+
 import { useCallback } from 'react'
 import { useApi, useMutation } from './useApi'
 import { apiFetch } from '../lib/api'
 import { useAuth } from '../contexts/AuthContext'
 
+// ─── TYPES ───────────────────────────────────────────────────────────────────
+
+/**
+ * Per-field read/write permission map keyed by field name.
+ * Computed from `design_schema.fields[n].permissions` and the current user's roles.
+ */
 interface FieldPermissions {
   [key: string]: { read: boolean; write: boolean }
 }
 
+/**
+ * Minimal entity configuration consumed by `useEntityRecord`.
+ *
+ * @prop entity - Entity table name
+ * @prop typeSlug - Optional type slug for schema resolution
+ * @prop icon - Icon identifier (used by detail page header)
+ * @prop displayField - Field name used as the record title
+ * @prop api.endpoint - Netlify function base path
+ * @prop api.*Action - Action strings for get/create/update/delete
+ * @prop softDelete - Hint for the API handler (true = set is_active=false)
+ */
 interface MinimalEntityConfig {
   entity: string
   typeSlug?: string
@@ -22,6 +68,19 @@ interface MinimalEntityConfig {
   softDelete?: boolean
 }
 
+/**
+ * Return value of `useEntityRecord`.
+ *
+ * @prop record - Fetched record or null
+ * @prop schema - `design_schema` extracted from the record (or nested type)
+ * @prop fieldPermissions - Per-field `{ read, write }` map for the current user
+ * @prop loading - True while fetching
+ * @prop error - Error message or null
+ * @prop refetch - Re-fetch the record
+ * @prop save - Trigger the save mutation (create or update based on `id`)
+ * @prop delete - Trigger the delete mutation
+ * @prop saving / deleting - Mutation loading flags
+ */
 interface UseEntityRecordReturn {
   record: any
   schema: any
@@ -35,6 +94,29 @@ interface UseEntityRecordReturn {
   deleting: boolean
 }
 
+// ─── HOOK ────────────────────────────────────────────────────────────────────
+
+/**
+ * Fetches, saves, and deletes a single entity record with schema and
+ * field-permission awareness.
+ *
+ * @param entity - Entity table name (e.g. `'accounts'`)
+ * @param id - Record UUID; pass `undefined` to enter create mode
+ * @param config - Schema-derived config; pass `null` while loading
+ * @returns `UseEntityRecordReturn` — see type for full details
+ *
+ * @inputSpec id: string | undefined — undefined triggers create mode (no GET)
+ * @outputSpec schema: DesignSchema | {} — empty object if no design_schema found
+ * @outputSpec fieldPermissions: FieldPermissions — computed per-render
+ * @sideEffects Network requests via apiFetch; React state mutations
+ * @calledBy DataDetailPage.tsx
+ *
+ * @example
+ * ```tsx
+ * const { record, save, saving, fieldPermissions } =
+ *   useEntityRecord('accounts', id, config)
+ * ```
+ */
 export function useEntityRecord(
   entity: string,
   id: string | undefined,

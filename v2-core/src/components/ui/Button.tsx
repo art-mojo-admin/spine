@@ -1,6 +1,36 @@
+/**
+ * @module src/components/ui/Button
+ * @audience installer
+ * @layer frontend-component
+ * @stability stable
+ *
+ * Accessible button primitive that extends native `<button>` attributes.
+ *
+ * **Variants:** `primary` (navy fill), `secondary` (light fill),
+ * `outline` (border + white), `ghost` (text only), `destructive` /
+ * `danger` (red fill).
+ *
+ * **Loading state:** when `loading=true`, an animated spinner is
+ * prepended, `icon` is suppressed, and `disabled` is forced to prevent
+ * double-submission.
+ *
+ * **Icon slot:** pass a React node to `icon` for a leading icon (hidden
+ * while `loading`).
+ *
+ * @seeAlso src/lib/utils.ts (cn)
+ */
+
 import React from 'react'
 import { cn } from '../../lib/utils'
 
+/**
+ * Props for `Button`. Extends all native `<button>` HTML attributes.
+ *
+ * @prop variant - Visual style (default: `'primary'`)
+ * @prop size - Height / padding scale (default: `'md'`)
+ * @prop loading - Shows spinner and disables interaction
+ * @prop icon - Leading icon node (hidden when `loading`)
+ */
 interface ButtonProps extends React.ButtonHTMLAttributes<HTMLButtonElement> {
   variant?: 'primary' | 'secondary' | 'outline' | 'ghost' | 'destructive' | 'danger'
   size?: 'sm' | 'md' | 'lg'
@@ -9,6 +39,13 @@ interface ButtonProps extends React.ButtonHTMLAttributes<HTMLButtonElement> {
   children: React.ReactNode
 }
 
+/**
+ * Accessible button with variant, size, loading, and icon support.
+ *
+ * @param props - `ButtonProps`
+ * @returns `<button>` element
+ * @sideEffects none (delegates click to native button handler)
+ */
 export function Button({
   className,
   variant = 'primary',

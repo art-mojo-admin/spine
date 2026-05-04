@@ -1,6 +1,64 @@
+/**
+ * @module auth
+ * @audience core-contributor
+ * @layer api-handler
+ * @stability stable
+ *
+ * Authentication context endpoint. Returns the full user session context for
+ * the authenticated principal: person record, account, role, permissions, and
+ * accessible child accounts (via the `get_account_hierarchy` RPC).
+ *
+ * **Routed by:** `GET /.netlify/functions/auth`
+ *
+ * **Actions:**
+ * | method | handler  |
+ * |--------|----------|
+ * | GET    | context  |
+ * | HEALTH | health   |
+ *
+ * **Authorization:** `context` requires a non-anonymous authenticated
+ * principal. `health` is unauthenticated.
+ *
+ * **Returned session shape:**
+ * ```ts
+ * {
+ *   id: string             // person UUID
+ *   email: string
+ *   full_name: string
+ *   account_id: string
+ *   account: { id, slug, display_name, parent_id }
+ *   roles: string[]        // role slugs (e.g. ['system_admin'])
+ *   permissions: string[]  // derived from role.slug or role.permissions
+ *   accessible_accounts: AccountHierarchyRow[]
+ * }
+ * ```
+ *
+ * INVARIANT: `system_admin` role always receives the full permission set
+ *   ['read', 'write', 'admin', 'system'] regardless of `role.permissions`.
+ *
+ * @seeAlso middleware.ts (createHandler builds ctx.principal from JWT)
+ * @seeAlso _shared/db.ts (get_account_hierarchy RPC)
+ * @seeAlso roles.ts (role records referenced by FK)
+ */
+
 import { createHandler } from './_shared/middleware'
 
-// Get current user context (simplified auth model)
+// ─── HANDLERS ─────────────────────────────────────────────────────────────────
+
+/**
+ * Returns the full authenticated user context. Fetches person, account,
+ * and role in a single query, then calls `get_account_hierarchy` to
+ * resolve accessible child accounts.
+ *
+ * @returns Session object (see module-level shape doc)
+ * @throws Error('Authentication required') if principal is anonymous
+ * @throws Error('User not found: <id>') if person row is inactive or missing
+ * @sideEffects DB read: people table (with account + role joins)
+ * @sideEffects DB read: get_account_hierarchy RPC
+ * @calledBy handler (GET)
+ * @testUnit tests/unit/auth.test.ts — 'context'
+ * @testIntegration tests/integration/auth.test.ts — 'returns valid context'
+ */
 export const context = createHandler(async (ctx, _body) => {
   // Authentication is required
   if (!ctx.principal || ctx.principal.id === 'anonymous') {
@@ -95,11 +153,19 @@ export const context = createHandler(async (ctx, _body) => {
     account: account,
     roles: [roleSlug].filter(Boolean),
     permissions: effectivePermissions,
+    is_system_admin: roleSlug === 'system_admin',
     accessible_accounts: accessibleAccounts
   }
 })
 
-// Health check for auth service
+/**
+ * Lightweight health check for the auth function. Returns service name
+ * and current timestamp. No authentication required.
+ *
+ * @returns `{ status: 'healthy', timestamp: string, service: 'auth' }`
+ * @calledBy handler (HEALTH method)
+ * @calledBy load balancer health probes
+ */
 export const health = createHandler(async (ctx, _body) => {
   return {
     status: 'healthy',
@@ -108,13 +174,19 @@ export const health = createHandler(async (ctx, _body) => {
   }
 })
 
-// Main handler function for Netlify routing
+// ─── MAIN HANDLER ────────────────────────────────────────────────────────────
+
+/**
+ * Netlify function entry point. Routes by HTTP method:
+ * GET → context | HEALTH → health
+ * @throws Error('Unsupported method: <method>') on unmatched method
+ * @calledBy Netlify function routing
+ */
 export const handler = createHandler(async (ctx, _body) => {
   const method = ctx.query?.method || 'GET'
 
   switch (method) {
     case 'GET':
-      // Default to context endpoint for GET requests
       return await context(ctx, _body)
     case 'HEALTH':
       return await health(ctx, _body)

@@ -1,3 +1,20 @@
+/**
+ * @module src/pages/admin/AppsPage
+ * @audience installer
+ * @layer frontend-page
+ * @stability stable
+ *
+ * Admin list page for Spine apps. Fetches all apps via
+ * `/api/apps?action=list`, then applies client-side search, type filter
+ * (`all` | `core` | `custom` | `marketplace`), status filter
+ * (`all` | `active` | `inactive`), and sort. Renders inside
+ * `AdminListPage` with four stat cards and a sortable table.
+ * Row clicks navigate to `/spine-framework/admin/configs/apps/:id`.
+ *
+ * @seeAlso src/components/admin/AdminListPage.tsx
+ * @seeAlso src/pages/admin/AppDetailPage.tsx
+ */
+
 import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useApi } from '../../hooks/useApi'
@@ -144,7 +161,7 @@ export function AppsPage() {
   }
 
   const handleRowClick = (app: App) => {
-    navigate(`/admin/configs/apps/${app.id}`)
+    navigate(`/spine-framework/admin/configs/apps/${app.id}`)
   }
 
   if (loading) {
@@ -217,10 +234,7 @@ export function AppsPage() {
     }
   ]
 
-  const typeOptions = [
-    { value: 'all', label: 'All Types' },
-    ...appTypes.map(type => ({ value: type.value, label: type.label }))
-  ]
+  const typeOptions = appTypes
 
   const statusOptions = [
     { value: 'all', label: 'All Status' },
@@ -248,7 +262,7 @@ export function AppsPage() {
       title="Apps"
       description="Manage applications and their configurations"
       newButtonText="New App"
-      newButtonHref="/admin/configs/apps/new"
+      newButtonHref="/spine-framework/admin/configs/apps/new"
       statsCards={statsCards}
       searchPlaceholder="Search apps..."
       searchValue={searchTerm}

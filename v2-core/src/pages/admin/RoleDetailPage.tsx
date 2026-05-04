@@ -1,3 +1,17 @@
+/**
+ * @module src/pages/admin/RoleDetailPage
+ * @audience installer
+ * @layer frontend-page
+ * @stability stable
+ *
+ * Create / view / edit page for a single role. Route param: `id` (UUID).
+ * When `id === 'new'`, operates in create mode. Exposes the
+ * `permissions` object as a raw JSON textarea. System roles are
+ * read-only (edit button hidden).
+ *
+ * @seeAlso src/pages/admin/RolesPage.tsx
+ */
+
 import { useState, useEffect } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import { Button } from '../../components/ui/Button'
@@ -95,7 +109,7 @@ export function RoleDetailPage() {
       }
 
       const result = await response.json()
-      navigate(`/admin/configs/roles/${result.id || id}`)
+      navigate(`/spine-framework/admin/configs/roles/${result.id || id}`)
     } catch (err: any) {
       setError(err.message || 'Failed to save role')
     } finally {

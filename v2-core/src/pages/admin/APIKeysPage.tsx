@@ -1,3 +1,18 @@
+/**
+ * @module src/pages/admin/APIKeysPage
+ * @audience installer
+ * @layer frontend-page
+ * @stability stable
+ *
+ * Admin list page for API keys. Fetches all keys via
+ * `/api/api-keys?action=list`, applies client-side search, type filter
+ * (`public` | `private`), and sort. Key values are never shown in the
+ * list — only the prefix. Renders inside `AdminListPage`. Row clicks
+ * navigate to `/spine-framework/admin/configs/api-keys/:id`.
+ *
+ * @seeAlso src/pages/admin/APIKeyDetailPage.tsx
+ */
+
 import React, { useState } from 'react'
 import { 
   PlusIcon,
@@ -74,7 +89,7 @@ export function APIKeysPage() {
   }
 
   const handleRowClick = (key: APIKey) => {
-    window.location.href = `/admin/configs/api-keys/${key.id}`
+    window.location.href = `/spine-framework/admin/configs/api-keys/${key.id}`
   }
 
   const sortedKeys = [...(filteredKeys || [])].sort((a, b) => {
@@ -162,7 +177,7 @@ export function APIKeysPage() {
       title="API Keys"
       description="Manage API keys and access tokens"
       newButtonText="Generate API Key"
-      newButtonHref="/admin/configs/api-keys/new"
+      newButtonHref="/spine-framework/admin/configs/api-keys/new"
       statsCards={statsCards}
       searchPlaceholder="Search API keys..."
       searchValue={searchTerm}

@@ -1,3 +1,18 @@
+/**
+ * @module src/pages/admin/AIAgentDetailPage
+ * @audience installer
+ * @layer frontend-page
+ * @stability stable
+ *
+ * Create / view / edit page for a single AI agent. Route param: `id`
+ * (UUID). Exposes `model_config` (model, max_tokens, temperature),
+ * `system_prompt`, `tools` array, `capabilities`, and `constraints` as
+ * editable fields. Agent types: `chat` | `analysis` | `automation` |
+ * `custom`.
+ *
+ * @seeAlso src/pages/admin/AIAgentsPage.tsx
+ */
+
 import React, { useState, useEffect } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import { useApi } from '../../hooks/useApi'
@@ -117,7 +132,7 @@ export function AIAgentDetailPage() {
         // Navigate to the new agent
         const result = await response.json()
         const newId = result.data?.id || result.id
-        navigate(`/admin/configs/ai-agents/${newId}`)
+        navigate(`/spine-framework/admin/configs/ai-agents/${newId}`)
       } else {
         await refetch()
         setIsEditing(false)
@@ -130,7 +145,7 @@ export function AIAgentDetailPage() {
   // Handle cancel
   const handleCancel = () => {
     if (isCreateMode) {
-      navigate('/admin/configs/ai-agents')
+      navigate('/spine-framework/admin/configs/ai-agents')
       return
     }
     
@@ -183,7 +198,7 @@ export function AIAgentDetailPage() {
     <div className="p-6 max-w-4xl mx-auto">
       <div className="flex items-center justify-between mb-6">
         <div className="flex items-center gap-4">
-          <Button variant="ghost" onClick={() => isCreateMode ? navigate('/admin/configs/ai-agents') : navigate(-1)}>
+          <Button variant="ghost" onClick={() => isCreateMode ? navigate('/spine-framework/admin/configs/ai-agents') : navigate(-1)}>
             <ArrowLeftIcon className="w-5 h-5" />
           </Button>
           <div>

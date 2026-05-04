@@ -1,3 +1,28 @@
+/**
+ * @module src/components/runtime/DataListPage
+ * @audience installer
+ * @layer frontend-component
+ * @stability stable
+ *
+ * Schema-driven entity list page. Renders any entity list by reading the
+ * `entity` route param, resolving its `DesignSchema` via `useListSchema`,
+ * and wiring the result into `useEntityList`.
+ *
+ * **Route:** `/spine-framework/admin/runtime/:entity` (optional `:typeSlug` param for
+ * type-scoped lists)
+ *
+ * **Rendering pipeline:**
+ * 1. `useListSchema` resolves `schema` + `view` (may involve 1–2 API calls)
+ * 2. A minimal `config` object is constructed from `view` data
+ * 3. `useEntityList(entity, config)` fetches the paginated list
+ * 4. Sub-components (`DataHeader`, `DataStats`, `DataFilters`, `DataTable`)
+ *    render sections independently with their own loading/error states
+ *
+ * @seeAlso src/hooks/useListSchema.ts
+ * @seeAlso src/hooks/useEntityList.ts
+ * @seeAlso src/components/runtime/DataTable.tsx
+ */
+
 import { useParams } from 'react-router-dom'
 import { useListSchema } from '../../hooks/useListSchema'
 import { useEntityList } from '../../hooks/useEntityList'
@@ -6,6 +31,13 @@ import { DataStats } from './DataStats'
 import { DataFilters } from './DataFilters'
 import { DataTable } from './DataTable'
 
+/**
+ * Schema-driven list page. Reads `:entity` from the URL, resolves schema,
+ * and renders the full list UI.
+ *
+ * @returns Full list page or a loading/error fallback
+ * @sideEffects Network requests via useListSchema + useEntityList
+ */
 export function DataListPage() {
   const { entity, typeSlug } = useParams<{ entity: string; typeSlug?: string }>()
   
@@ -72,7 +104,7 @@ export function DataListPage() {
         title={config.entity}
         icon={config.icon}
         description={`Manage ${config.entity}`}
-        newButtonHref={`/admin/runtime/${entity}/new`}
+        newButtonHref={`/spine-framework/admin/runtime/${entity}/new`}
       />
       
       <DataStats 

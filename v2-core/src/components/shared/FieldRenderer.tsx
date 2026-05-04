@@ -1,6 +1,48 @@
+/**
+ * @module src/components/shared/FieldRenderer
+ * @audience installer
+ * @layer frontend-component
+ * @stability stable
+ *
+ * Low-level field rendering primitive. Given a `FieldDefinition` and a
+ * current value, renders the appropriate input widget (edit mode) or
+ * display element (read-only mode).
+ *
+ * **Render type resolution** (`resolveRenderType`):
+ * 1. If `displayType` is set (from the view config), it maps to a canonical
+ *    render type first — this lets a view override how a field looks without
+ *    changing the underlying `FieldDefinition`.
+ * 2. Falls back to `field.data_type`.
+ *
+ * **Supported render types:**
+ * `text`, `textarea`, `email`, `phone`, `url`, `number`, `date`,
+ * `datetime`, `select`, `multiselect`, `radio`, `checkbox`, `json`,
+ * `file`, `color`, `range`
+ *
+ * **Error display:** when `error` is set, a red helper text is shown below
+ * the field and `border-red-500` is applied where applicable.
+ *
+ * **Label + description:** rendered above / below the input respectively,
+ * with a red `*` suffix when `field.required` is true.
+ *
+ * @seeAlso src/components/shared/SchemaFields.tsx (mounts this component)
+ * @seeAlso src/types/types.ts (FieldDefinition)
+ */
+
 import React from 'react'
 import { FieldDefinition } from '../../types/types'
 
+/**
+ * Props for `FieldRenderer`.
+ *
+ * @prop field - Full field definition including data_type, options, validation
+ * @prop value - Current controlled value
+ * @prop onChange - Value change callback (omit or pass `undefined` for read-only)
+ * @prop onBlur - Optional blur callback for validation triggers
+ * @prop readonly - If true, renders a display element instead of an input
+ * @prop error - Validation error message to display below the field
+ * @prop displayType - View-config widget override (e.g. `'textarea'`, `'select'`)
+ */
 interface FieldRendererProps {
   field: FieldDefinition
   value: any
@@ -11,6 +53,17 @@ interface FieldRendererProps {
   displayType?: string // From view config — controls rendering without polluting field data contract
 }
 
+/**
+ * Resolves the canonical render type for a field.
+ *
+ * `displayType` (from view config) takes precedence over `field.data_type`
+ * so view authors can choose a different widget without changing the
+ * underlying schema.
+ *
+ * @param field - Field definition
+ * @param displayType - Optional view-config widget override
+ * @returns Canonical render type string (e.g. `'text'`, `'select'`, `'checkbox'`)
+ */
 function resolveRenderType(field: FieldDefinition, displayType?: string): string {
   // displayType from view config overrides data_type for rendering decisions
   if (displayType) {
@@ -80,6 +133,13 @@ function resolveRenderType(field: FieldDefinition, displayType?: string): string
   }
 }
 
+/**
+ * Renders a single schema field as an input widget or read-only display.
+ *
+ * @param props - `FieldRendererProps`
+ * @returns Label + field widget + description + error message
+ * @sideEffects none (delegates changes to `onChange`)
+ */
 export function FieldRenderer({ field, value, onChange, readonly = false, error, displayType }: FieldRendererProps) {
   const renderType = resolveRenderType(field, displayType)
 

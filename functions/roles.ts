@@ -1,14 +1,55 @@
+/**
+ * @module roles
+ * @audience core-contributor
+ * @layer api-handler
+ * @stability stable
+ *
+ * CRUD API for the `roles` table. Roles define permission sets (`permissions`
+ * JSONB) that are assigned to people within an account.
+ *
+ * **Routed by:** `GET/POST/PATCH/DELETE /.netlify/functions/roles`
+ *
+ * **Authorization model:**
+ * - All reads use `ctx.db` (RLS-scoped). System admins see raw records;
+ *   others get field-level sanitization via `sanitizeRecordData`.
+ * - `create`: requires system admin OR first-surface `canCreate` permission.
+ *   Creating a role with `slug === 'system_admin'` is system-admin-only.
+ * - `update` / `remove`: require authenticated principal. RLS controls row
+ *   access; field-level permissions validated via `validateUpdatePermissions`.
+ * - Slug uniqueness is enforced per-app: checked against `adminDb`.
+ *
+ * INVARIANT: `system_admin` role slug can only be created by system admins.
+ * INVARIANT: soft delete only — roles are set to `is_active = false`.
+ *
+ * @seeAlso middleware.ts (createHandler)
+ * @seeAlso permissions.ts (PermissionEngine, sanitizeRecordData)
+ * @seeAlso audit.ts (emitLog for role.created / role.updated / role.deleted)
+ */
+
 import { createHandler } from './_shared/middleware'
 import { adminDb } from './_shared/db'
 import { emitLog } from './_shared/audit'
 import { PermissionEngine, sanitizeRecordData } from './_shared/permissions'
 
-// Type assertion to ensure we're using the instance
 const permissions = PermissionEngine as any
 
-// List roles - RLS enforced via ctx.db
+// ─── HANDLERS ─────────────────────────────────────────────────────────────────
+
+/**
+ * Lists active roles with optional filtering by app_id and is_system.
+ * System admins receive raw records; others receive sanitized records.
+ *
+ * Query params: `app_id` ('null' for no-app roles), `is_system` ('true'/'false'),
+ * `limit` (default 50), `offset` (default 0)
+ *
+ * @returns Array of role records with app join
+ * @throws PostgREST error on RLS denial
+ * @sideEffects DB read: roles table (with app join)
+ * @calledBy handler (GET, no id)
+ * @testUnit tests/unit/roles.test.ts — 'list'
+ */
 export const list = createHandler(async (ctx, _body) => {
-  const { app_id, is_system, limit = 50, offset = 0 } = ctx.query || {}
+  const { app_id, is_system, limit = '50', offset = '0' } = ctx.query || {}
 
   // RLS automatically filters to accessible roles
   let query = ctx.db
@@ -52,7 +93,17 @@ export const list = createHandler(async (ctx, _body) => {
   return filteredData
 })
 
-// Get single role - RLS enforced via ctx.db
+/**
+ * Returns a single active role by UUID.
+ *
+ * Query params: `id` (required)
+ *
+ * @returns Sanitized role record with app join
+ * @throws Error('Role ID is required')
+ * @throws PostgREST error if not found or RLS denied
+ * @sideEffects DB read: roles table
+ * @calledBy handler (GET ?id)
+ */
 export const get = createHandler(async (ctx, _body) => {
   const { id } = ctx.query || {}
   
@@ -78,7 +129,27 @@ export const get = createHandler(async (ctx, _body) => {
   return await sanitizeRecordData(ctx, roleWithType, 'role')
 })
 
-// Create role - RLS enforced via ctx.db
+/**
+ * Creates a new role. Requires system admin or first-surface `canCreate` permission.
+ * `system_admin` slug is system-admin-only. Slug uniqueness verified against adminDb.
+ * Audit log emitted on success.
+ *
+ * Body: `slug`, `name` (required), plus optional `app_id`, `description`,
+ * `permissions` (JSONB), `is_system`
+ *
+ * @returns Inserted role record
+ * @throws Error('slug and name are required')
+ * @throws Error('system_admin role can only be created by system administrators')
+ * @throws Error('Insufficient permissions to create roles')
+ * @throws Error('Role slug already exists for this app')
+ * @inputSpec slug: string — unique per app_id
+ * @inputSpec permissions: Record<string, any> — JSONB permission config
+ * @sideEffects DB write: roles table (INSERT)
+ * @sideEffects audit: emitLog('role.created')
+ * @calledBy handler (POST)
+ * @calls emitLog
+ * @testUnit tests/unit/roles.test.ts — 'create'
+ */
 export const create = createHandler(async (ctx, body) => {
   const { app_id, slug, name, description, permissions: rolePermissions, is_system } = body
 
@@ -149,7 +220,21 @@ export const create = createHandler(async (ctx, body) => {
   return data
 })
 
-// Update role - RLS enforced via ctx.db
+/**
+ * Updates a role. Authenticated principal required. Field-level permissions
+ * validated. Audit log emitted on success.
+ *
+ * Body: `id` (required), plus any updatable fields
+ *
+ * @returns Updated role record
+ * @throws Error('Role ID is required')
+ * @throws Error('Role not found or access denied')
+ * @throws Error from validateUpdatePermissions
+ * @sideEffects DB write: roles table (UPDATE)
+ * @sideEffects audit: emitLog('role.updated', { before, after })
+ * @calledBy handler (PATCH)
+ * @calls emitLog, validateUpdatePermissions
+ */
 export const update = createHandler(async (ctx, body) => {
   const { id, ...updates } = body
 
@@ -202,7 +287,18 @@ export const update = createHandler(async (ctx, body) => {
   return data
 })
 
-// Soft delete role - RLS enforced via ctx.db
+/**
+ * Soft-deletes a role (sets `is_active = false`). Audit log emitted on success.
+ *
+ * Body: `id` (required)
+ *
+ * @returns Updated role record (with is_active: false)
+ * @throws Error('Role ID is required')
+ * @throws Error('Role not found or access denied')
+ * @sideEffects DB write: roles table (UPDATE is_active=false)
+ * @sideEffects audit: emitLog('role.deleted', { before })
+ * @calledBy handler (DELETE)
+ */
 export const remove = createHandler(async (ctx, body) => {
   const { id } = body
 
@@ -243,7 +339,21 @@ export const remove = createHandler(async (ctx, body) => {
   return data
 })
 
-// Main handler function
+// ─── MAIN HANDLER ────────────────────────────────────────────────────────────
+
+/**
+ * Netlify function entry point. Routes by HTTP method:
+ * | method | condition | handler |
+ * |--------|-----------|---------|
+ * | GET    | ?id       | get     |
+ * | GET    | (default) | list    |
+ * | POST   | —         | create  |
+ * | PATCH  | —         | update  |
+ * | DELETE | —         | remove  |
+ *
+ * @throws Error('Unsupported method')
+ * @calledBy Netlify function routing
+ */
 export const handler = createHandler(async (ctx, body) => {
   const method = ctx.query?.method || 'GET'
 

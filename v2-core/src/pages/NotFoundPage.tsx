@@ -1,3 +1,13 @@
+/**
+ * @module src/pages/NotFoundPage
+ * @audience installer
+ * @layer frontend-page
+ * @stability stable
+ *
+ * Generic 404 page rendered by the catch-all route. Displays a large
+ * "404" heading and a "Go back home" link to `/dashboard`.
+ */
+
 import React from 'react'
 import { Link } from 'react-router-dom'
 import { HomeIcon } from '@heroicons/react/24/outline'

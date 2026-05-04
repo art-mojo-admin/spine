@@ -1,9 +1,44 @@
+/**
+ * @module src/components/runtime/DataTable
+ * @audience installer
+ * @layer frontend-component
+ * @stability stable
+ *
+ * Schema-driven sortable data table for entity list pages. Renders an
+ * HTML table from a `columns` + `data` pair with:
+ * - **Sortable headers** — clicking a sortable column toggles `asc`/`desc`;
+ *   active direction indicated by Heroicon chevron
+ * - **Cell rendering** — supports `timestamp` (via `formatDateTime`),
+ *   `badge` (colour map), `maxLength` truncation, and plain string fallback
+ * - **Row navigation** — clicking any row navigates to
+ *   `/spine-framework/admin/runtime/:entity/:id`
+ * - **State overlays** — loading spinner, error+retry, and empty state
+ *
+ * @seeAlso src/types/types.ts (EntityColumn)
+ * @seeAlso src/lib/utils.ts (formatDateTime)
+ * @seeAlso src/components/runtime/DataListPage.tsx (mounts this component)
+ */
+
 import React from 'react'
 import { useNavigate } from 'react-router-dom'
 import { EntityColumn } from '../../types/types'
 import { formatDateTime } from '../../lib/utils'
 import * as Icons from '@heroicons/react/24/outline'
 
+/**
+ * Props for `DataTable`.
+ *
+ * @prop columns - Column definitions (key, label, sortable, type, badgeColors, maxLength)
+ * @prop data - Row data array
+ * @prop loading - Shows spinner when true
+ * @prop error - Shows error message when set
+ * @prop onRetry - Callback for the "Retry" link shown on error
+ * @prop sort - Current sort state (field + direction)
+ * @prop onSort - Callback to update sort state
+ * @prop entity - Entity name for row navigation URL
+ * @prop emptyMessage - Text shown when `data` is empty
+ * @prop emptyIcon - Heroicon name for the empty state illustration
+ */
 interface DataTableProps {
   columns: EntityColumn[]
   data: any[]
@@ -17,6 +52,13 @@ interface DataTableProps {
   emptyIcon: string
 }
 
+/**
+ * Sortable data table with loading, error, and empty states.
+ *
+ * @param props - `DataTableProps`
+ * @returns Table JSX or state overlay
+ * @sideEffects Navigates to detail page on row click
+ */
 export function DataTable({ 
   columns, 
   data, 
@@ -78,7 +120,7 @@ export function DataTable({
   }
   
   const handleRowClick = (row: any) => {
-    navigate(`/admin/runtime/${entity}/${row.id}`)
+    navigate(`/spine-framework/admin/runtime/${entity}/${row.id}`)
   }
   
   if (loading) {
